@@ -68,13 +68,17 @@ export default function Dashboard() {
   });
 
   const stats = useMemo(() => {
-    const totalStockValueCost = stockEntries.reduce((sum, entry) => 
-      sum + (entry.quantity_available * entry.unit_cost || 0), 0
-    );
+    const totalStockValueCost = stockEntries.reduce((sum, entry) => {
+      const product = products.find(p => p.id === entry.product_id);
+      const cost = entry.unit_cost > 0 ? entry.unit_cost : (product?.cost_price || 0);
+      return sum + (entry.quantity_available * cost);
+    }, 0);
 
-    const totalPotentialSalesValue = products.reduce((sum, product) => 
-      sum + (product.current_stock * product.sale_price || 0), 0
-    );
+    const totalPotentialSalesValue = stockEntries.reduce((sum, entry) => {
+      const product = products.find(p => p.id === entry.product_id);
+      const price = product?.sale_price || 0;
+      return sum + (entry.quantity_available * price);
+    }, 0);
 
     const lowStockProducts = products.filter(p => 
       p.current_stock <= p.min_stock && p.min_stock > 0
