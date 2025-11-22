@@ -87,7 +87,19 @@ export default function WarehousePage() {
     createMutation.mutate(formData);
   };
 
-  const totalValue = stockEntries.reduce((sum, e) => sum + (e.quantity_available * e.unit_cost || 0), 0);
+  const totalValueCost = stockEntries.reduce((sum, e) => {
+    // Tenta usar o custo da entrada, se for 0 tenta pegar do produto (fallback)
+    const product = products.find(p => p.id === e.product_id);
+    const cost = e.unit_cost > 0 ? e.unit_cost : (product?.cost_price || 0);
+    return sum + (e.quantity_available * cost);
+  }, 0);
+
+  const totalValueSales = stockEntries.reduce((sum, e) => {
+    const product = products.find(p => p.id === e.product_id);
+    const price = product?.sale_price || 0;
+    return sum + (e.quantity_available * price);
+  }, 0);
+
   const totalItems = stockEntries.reduce((sum, e) => sum + e.quantity_available, 0);
 
   return (
@@ -230,7 +242,7 @@ export default function WarehousePage() {
         </Dialog>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
+      <div className="grid md:grid-cols-4 gap-6 mb-8">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-blue-100">Total de Entradas</CardTitle>
@@ -251,15 +263,29 @@ export default function WarehousePage() {
           </CardContent>
         </Card>
 
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-100">Valor em Estoque (Custo)</CardTitle>
+            <Warehouse className="h-5 w-5 text-emerald-200" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              R$ {totalValueCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-xs text-emerald-200 mt-1">Baseado no custo de aquisição</p>
+          </CardContent>
+        </Card>
+
         <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-purple-100">Valor Total</CardTitle>
+            <CardTitle className="text-sm font-medium text-purple-100">Potencial de Venda</CardTitle>
             <AlertCircle className="h-5 w-5 text-purple-200" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {totalValueSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
+            <p className="text-xs text-purple-200 mt-1">Valor estimado de venda</p>
           </CardContent>
         </Card>
       </div>
@@ -289,9 +315,14 @@ export default function WarehousePage() {
                   <p className="text-lg font-bold text-slate-900">
                     {entry.quantity_available} un
                   </p>
-                  <p className="text-sm text-slate-500">
-                    R$ {(entry.quantity_available * entry.unit_cost).toFixed(2)}
-                  </p>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-emerald-600">
+                      Custo: R$ {(entry.quantity_available * (entry.unit_cost || products.find(p => p.id === entry.product_id)?.cost_price || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-purple-600">
+                      Venda: R$ {(entry.quantity_available * (products.find(p => p.id === entry.product_id)?.sale_price || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                   {entry.location && (
                     <p className="text-xs text-slate-400 mt-1">{entry.location}</p>
                   )}
