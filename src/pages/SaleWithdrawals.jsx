@@ -35,10 +35,12 @@ export default function SaleWithdrawals() {
   // Buscar vendas para calcular totais e pendências
   const { data: sales = [] } = useQuery({
     queryKey: ['sales', selectedCompanyId],
-    queryFn: () => base44.entities.Sale.filter({
-      company_id: selectedCompanyId,
-      status: { $in: ['faturada', 'concluida'] } // Apenas vendas efetivadas
-    }, '-sale_date'),
+    queryFn: async () => {
+      const sales = await base44.entities.Sale.filter({
+        company_id: selectedCompanyId
+      }, '-sale_date');
+      return sales.filter(s => ['faturada', 'concluida'].includes(s.status));
+    },
     initialData: []
   });
 
