@@ -26,6 +26,7 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState('all');
   const [searchTerm, setSearchTerm] = useState(''); // NOVO: campo de pesquisa
   const [openCombobox, setOpenCombobox] = useState(false);
+  const [openCategoryCombobox, setOpenCategoryCombobox] = useState(false);
 
   const [viewingPayments, setViewingPayments] = useState(null);
   const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
@@ -39,6 +40,27 @@ export default function Transactions() {
     payment_method: "dinheiro",
     notes: ""
   });
+
+  const defaultCategories = [
+    "Combustível",
+    "Manutenção Veículos",
+    "Peças",
+    "Salários",
+    "Alimentação",
+    "Serviços Terceiros",
+    "Impostos",
+    "Aluguel",
+    "Energia Elétrica",
+    "Água/Esgoto",
+    "Internet/Telefone",
+    "Material de Escritório",
+    "Material de Construção",
+    "EPIs",
+    "Marketing",
+    "Vendas",
+    "Pró-labore",
+    "Outros"
+  ];
 
   const [formData, setFormData] = useState({
     description: "",
@@ -417,12 +439,57 @@ export default function Transactions() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex flex-col">
                       <Label>Categoria</Label>
-                      <Input
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      />
+                      <Popover open={openCategoryCombobox} onOpenChange={setOpenCategoryCombobox}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openCategoryCombobox}
+                            className="justify-between w-full font-normal"
+                          >
+                            {formData.category || "Selecione ou digite..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0" align="start">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Buscar categoria..." 
+                              onValueChange={(search) => {
+                                if (search && !defaultCategories.includes(search)) {
+                                  // Permite digitar nova categoria
+                                  setFormData(prev => ({ ...prev, category: search }));
+                                }
+                              }}
+                            />
+                            <CommandList>
+                              <CommandEmpty>Digite para criar nova categoria.</CommandEmpty>
+                              <CommandGroup heading="Sugestões">
+                                {defaultCategories.map((category) => (
+                                  <CommandItem
+                                    key={category}
+                                    value={category}
+                                    onSelect={(currentValue) => {
+                                      setFormData({ ...formData, category: currentValue });
+                                      setOpenCategoryCombobox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.category === category ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {category}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="space-y-2 flex flex-col">
                       <Label>Contato</Label>
