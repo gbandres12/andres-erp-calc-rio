@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +25,7 @@ export default function Sales() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [activeTab, setActiveTab] = useState("dados");
+  const [openClientCombobox, setOpenClientCombobox] = useState(false);
   
   const [receiptSale, setReceiptSale] = useState(null); 
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false); 
@@ -472,31 +476,55 @@ export default function Sales() {
 
                 <TabsContent value="dados" className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex flex-col">
                       <Label>Cliente *</Label>
-                      <Select
-                        required
-                        value={formData.client_id}
-                        onValueChange={(value) => {
-                          const client = contacts.find(c => c.id === value);
-                          setFormData({ 
-                            ...formData, 
-                            client_id: value,
-                            client_name: client?.name || ""
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o cliente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contacts.map((contact) => (
-                            <SelectItem key={contact.id} value={contact.id}>
-                              {contact.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={openClientCombobox} onOpenChange={setOpenClientCombobox}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openClientCombobox}
+                            className="justify-between w-full font-normal"
+                          >
+                            {formData.client_id
+                              ? contacts.find((contact) => contact.id === formData.client_id)?.name
+                              : "Selecione o cliente..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Pesquisar cliente..." />
+                            <CommandList>
+                              <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                {contacts.map((contact) => (
+                                  <CommandItem
+                                    key={contact.id}
+                                    value={contact.name}
+                                    onSelect={() => {
+                                      setFormData({ 
+                                        ...formData, 
+                                        client_id: contact.id,
+                                        client_name: contact.name 
+                                      });
+                                      setOpenClientCombobox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.client_id === contact.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {contact.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="space-y-2">
                       <Label>Vendedor</Label>

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2 } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +25,7 @@ export default function Transactions() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [searchTerm, setSearchTerm] = useState(''); // NOVO: campo de pesquisa
+  const [openCombobox, setOpenCombobox] = useState(false);
 
   const [viewingPayments, setViewingPayments] = useState(null);
   const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
@@ -421,23 +424,51 @@ export default function Transactions() {
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex flex-col">
                       <Label>Contato</Label>
-                      <Select
-                        value={formData.contact_id}
-                        onValueChange={(value) => setFormData({ ...formData, contact_id: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contacts.map((contact) => (
-                            <SelectItem key={contact.id} value={contact.id}>
-                              {contact.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openCombobox}
+                            className="justify-between w-full font-normal"
+                          >
+                            {formData.contact_id
+                              ? contacts.find((contact) => contact.id === formData.contact_id)?.name
+                              : "Selecione o contato..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Pesquisar contato..." />
+                            <CommandList>
+                              <CommandEmpty>Nenhum contato encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                {contacts.map((contact) => (
+                                  <CommandItem
+                                    key={contact.id}
+                                    value={contact.name}
+                                    onSelect={() => {
+                                      setFormData({ ...formData, contact_id: contact.id });
+                                      setOpenCombobox(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.contact_id === contact.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {contact.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
