@@ -68,8 +68,12 @@ export default function Dashboard() {
   });
 
   const stats = useMemo(() => {
-    const totalStockValue = stockEntries.reduce((sum, entry) => 
+    const totalStockValueCost = stockEntries.reduce((sum, entry) => 
       sum + (entry.quantity_available * entry.unit_cost || 0), 0
+    );
+
+    const totalPotentialSalesValue = products.reduce((sum, product) => 
+      sum + (product.current_stock * product.sale_price || 0), 0
     );
 
     const lowStockProducts = products.filter(p => 
@@ -99,7 +103,8 @@ export default function Dashboard() {
     const suppliersCount = contacts.filter(c => c.type === 'fornecedor' || c.type === 'ambos').length;
 
     return {
-      totalStockValue,
+      totalStockValueCost,
+      totalPotentialSalesValue,
       lowStockProducts,
       thisMonthRevenue,
       thisMonthExpenses,
@@ -195,11 +200,11 @@ export default function Dashboard() {
         </div>
 
         {/* Cards Principais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-violet-500 to-violet-700 text-white border-none hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-violet-100">
-                Produtos Cadastrados
+                Produtos
               </CardTitle>
               <Package className="h-5 w-5 text-violet-200" />
             </CardHeader>
@@ -212,16 +217,33 @@ export default function Dashboard() {
           <Card className="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white border-none hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-emerald-100">
-                Valor em Estoque
+                Custo do Estoque
               </CardTitle>
               <Warehouse className="h-5 w-5 text-emerald-200" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                R$ {(stats.totalStockValue / 1000).toFixed(1)}k
+                R$ {(stats.totalStockValueCost / 1000).toFixed(1)}k
               </div>
               <p className="text-xs text-emerald-200 mt-2">
-                {stockEntries.length} entradas registradas
+                Baseado no custo de compra
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-700 text-white border-none hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-purple-100">
+                Potencial de Venda
+              </CardTitle>
+              <DollarSign className="h-5 w-5 text-purple-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                R$ {(stats.totalPotentialSalesValue / 1000).toFixed(1)}k
+              </div>
+              <p className="text-xs text-purple-200 mt-2">
+                Baseado no preço de venda
               </p>
             </CardContent>
           </Card>
