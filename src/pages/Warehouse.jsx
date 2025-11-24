@@ -55,7 +55,7 @@ export default function WarehousePage() {
       
       const product = products.find(p => p.id === data.product_id);
       
-      return base44.entities.StockEntry.create({
+      const entry = await base44.entities.StockEntry.create({
         ...data,
         reference: newRef,
         company_id: selectedCompanyId,
@@ -63,11 +63,8 @@ export default function WarehousePage() {
         quantity_available: data.quantity_received,
         total_cost: data.quantity_received * data.unit_cost
       });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['stockEntries']);
-      setIsDialogOpen(false);
-        if (data.generate_payable && data.origin === 'compra') {
+
+      if (data.generate_payable && data.origin === 'compra') {
         await base44.entities.Transaction.create({
           description: `Compra Estoque - ${product?.name} - ${data.supplier || 'Fornecedor'}`,
           amount: data.quantity_received * data.unit_cost,
@@ -80,10 +77,12 @@ export default function WarehousePage() {
           paid_amount: 0
         });
       }
+
+      return entry;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['stockEntries']);
-      queryClient.invalidateQueries(['transactions']); // Update transactions list
+      queryClient.invalidateQueries(['transactions']);
       setIsDialogOpen(false);
       resetForm();
       toast.success("Entrada registrada com sucesso!");
