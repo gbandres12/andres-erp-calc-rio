@@ -113,27 +113,20 @@ export default function Reports() {
             summary
         });
 
-        // The SDK returns the raw response object for function calls if it's not JSON?
-        // Actually base44.functions.invoke usually returns { data, status } where data is the body.
-        // But if the response is binary/blob, we might need to handle it differently or the SDK handles it.
-        // Let's assume standard fetch behavior for blob response in the instruction example.
-        // "return Response(pdfBytes...)" -> SDK might return the ArrayBuffer or Blob if configured?
-        // The instructions example 2: "const { data } = await base44.functions.invoke('exportTasks'); const blob = new Blob([data]..."
-        // So 'data' is the arraybuffer/blob content.
-
-        const blob = new Blob([response.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${title.replace(/\s+/g, '_')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
-        toast.success("Relatório gerado com sucesso!");
+        if (response.data && response.data.file_data) {
+            const link = document.createElement('a');
+            link.href = response.data.file_data;
+            link.download = `${title.replace(/\s+/g, '_')}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Relatório gerado com sucesso!");
+        } else {
+            throw new Error("Dados inválidos recebidos do servidor");
+        }
     } catch (error) {
         console.error(error);
-        toast.error("Erro ao gerar PDF");
+        toast.error("Erro ao gerar PDF: " + error.message);
     } finally {
         setGeneratingPDF(false);
     }
