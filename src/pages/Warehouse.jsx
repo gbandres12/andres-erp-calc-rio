@@ -293,11 +293,26 @@ export default function WarehousePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Entradas de Estoque</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Entradas de Estoque</CardTitle>
+            <div className="relative w-72">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder="Buscar produto, ref ou fornecedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stockEntries.map((entry) => (
+            {stockEntries.filter(entry => 
+              entry.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              entry.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              entry.supplier?.toLowerCase().includes(searchTerm.toLowerCase())
+            ).map((entry) => (
               <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
