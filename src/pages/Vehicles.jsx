@@ -222,8 +222,24 @@ export default function Vehicles() {
         </Dialog>
       </div>
 
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Input
+            placeholder="Buscar placa, modelo ou motorista..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {vehicles.map((vehicle) => (
+        {vehicles.filter(v => 
+          v.plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          v.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          v.driver_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        ).map((vehicle) => (
           <Card key={vehicle.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
