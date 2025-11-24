@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Warehouse, Plus, Package, TrendingUp, AlertCircle, Search } from "lucide-react";
+import { Warehouse, Plus, Package, TrendingUp, AlertCircle, Search, DollarSign } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
