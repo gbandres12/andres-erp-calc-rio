@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import ThermalReceipt from "../components/receipts/ThermalReceipt";
 import A4Receipt from "../components/receipts/A4Receipt";
 import { formatBRL } from "@/components/utils/formatters";
+import { ProductSelector } from "@/components/sales/ProductSelector";
 
 export default function Sales() {
   const queryClient = useQueryClient();
@@ -561,22 +562,11 @@ export default function Sales() {
                         <div className="grid grid-cols-6 gap-4">
                           <div className="col-span-2 space-y-2">
                             <Label>Produto *</Label>
-                            <Select
-                              required
+                            <ProductSelector
+                              products={products}
                               value={item.product_id}
-                              onValueChange={(value) => updateItem(index, 'product_id', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onChange={(value) => updateItem(index, 'product_id', value)}
+                            />
                           </div>
                           <div className="space-y-2">
                             <Label>Qtd *</Label>
