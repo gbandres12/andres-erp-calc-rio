@@ -62,9 +62,8 @@ Deno.serve(async (req) => {
         alternateRowStyles: { fillColor: [245, 245, 245] },
         margin: { top: 45 },
         didDrawPage: function (data) {
-            // Header on new pages
             if (data.pageNumber > 1) {
-                 // Optional: Add simplified header
+                 // Header on new pages
             }
         }
       });
@@ -81,15 +80,10 @@ Deno.serve(async (req) => {
         doc.text('Página ' + i + ' de ' + pageCount, 196, 285, { align: 'right' });
     }
 
-    const pdfBytes = doc.output('arraybuffer');
+    // Return Data URI string directly
+    const dataUri = doc.output('datauristring');
 
-    return new Response(pdfBytes, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${reportType}_${Date.now()}.pdf"`
-      }
-    });
+    return Response.json({ file_data: dataUri });
 
   } catch (error) {
     console.error("PDF Generation Error:", error);
