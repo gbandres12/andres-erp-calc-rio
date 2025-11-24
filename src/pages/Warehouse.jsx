@@ -100,7 +100,9 @@ export default function WarehousePage() {
       quantity_received: 0,
       supplier: "",
       invoice_number: "",
-      unit_cost: 0
+      unit_cost: 0,
+      generate_payable: false,
+      payable_due_date: new Date().toISOString().split('T')[0]
     });
   };
 
