@@ -26,6 +26,7 @@ export default function Sales() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [activeTab, setActiveTab] = useState("dados");
   const [openClientCombobox, setOpenClientCombobox] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   
   const [receiptSale, setReceiptSale] = useState(null); 
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false); 
