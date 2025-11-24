@@ -2,16 +2,28 @@ import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Package, TruckIcon, DollarSign, ShoppingCart, Fuel, Scale, Users, AlertTriangle, FileText, Download } from "lucide-react";
+import { BarChart3, TrendingUp, Package, TruckIcon, DollarSign, ShoppingCart, Fuel, Scale, Users, AlertTriangle, FileText, Download, Calendar as CalendarIcon, Printer, ArrowUpCircle, ArrowDownCircle, Building2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { formatBRL, formatDate } from "@/components/utils/formatters";
+import { toast } from "sonner";
 
 export default function Reports() {
   const [selectedCompanyId] = React.useState(localStorage.getItem('selectedCompanyId'));
   const [period, setPeriod] = useState("30");
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAccount, setSelectedAccount] = useState("all");
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
@@ -67,6 +79,80 @@ export default function Reports() {
     initialData: []
   });
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts', selectedCompanyId],
+    queryFn: () => base44.entities.FinancialAccount.filter({ company_id: selectedCompanyId }),
+    initialData: []
+  });
+
+  // Funções de Exportação
+  const handleExportCSV = (data, filename, columns) => {
+    const csvContent = [
+        columns.map(c => c.header).join(','),
+        ...data.map(row => columns.map(c => `"${String(row[c.dataKey] || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = async (reportType, title, data, columns, summary) => {
+    try {
+        setGeneratingPDF(true);
+        const response = await base44.functions.invoke('exportReportPdf', {
+            reportType,
+            title,
+            subtitle: `Período: ${formatDate(startDate)} a ${formatDate(endDate)}`,
+            data,
+            columns,
+            summary
+        });
+
+        // The SDK returns the raw response object for function calls if it's not JSON?
+        // Actually base44.functions.invoke usually returns { data, status } where data is the body.
+        // But if the response is binary/blob, we might need to handle it differently or the SDK handles it.
+        // Let's assume standard fetch behavior for blob response in the instruction example.
+        // "return Response(pdfBytes...)" -> SDK might return the ArrayBuffer or Blob if configured?
+        // The instructions example 2: "const { data } = await base44.functions.invoke('exportTasks'); const blob = new Blob([data]..."
+        // So 'data' is the arraybuffer/blob content.
+
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        toast.success("Relatório gerado com sucesso!");
+    } catch (error) {
+        console.error(error);
+        toast.error("Erro ao gerar PDF");
+    } finally {
+        setGeneratingPDF(false);
+    }
+  };
+
+  // Filtros de Data
+  const filterByDate = (items, dateField) => {
+    const start = new Date(startDate);
+    start.setHours(0,0,0,0);
+    const end = new Date(endDate);
+    end.setHours(23,59,59,999);
+    
+    return items.filter(item => {
+        if (!item[dateField]) return false;
+        const d = new Date(item[dateField]);
+        return d >= start && d <= end;
+    });
+  };
+
   // Cálculos Gerais
   const totalStockValue = stockEntries.reduce((sum, e) => sum + (e.quantity_available * e.unit_cost || 0), 0);
   const totalSales = sales.reduce((sum, s) => sum + (s.total || 0), 0);
@@ -111,11 +197,10 @@ export default function Reports() {
     const incomeByCategory = {};
     const expenseByCategory = {};
     
-    // Filtrar transações do período (simplificado para tudo o que está pago por enquanto, ou poderia filtrar por data)
-    // Vamos usar todas as pagas para um "DRE Acumulado"
-    const paidTransactions = transactions.filter(t => t.status === 'pago');
+    // Filtrar transações PAGAS no período selecionado
+    const filteredTransactions = filterByDate(transactions, 'payment_date').filter(t => t.status === 'pago');
 
-    paidTransactions.forEach(t => {
+    filteredTransactions.forEach(t => {
       const cat = t.category || 'Sem Categoria';
       if (t.type === 'receita') {
         incomeByCategory[cat] = (incomeByCategory[cat] || 0) + t.paid_amount;
@@ -134,7 +219,41 @@ export default function Reports() {
       totalDespesa: totalDespesas,
       resultado: totalReceitaOperacional - totalDespesas
     };
-  }, [transactions]);
+  }, [transactions, startDate, endDate]);
+
+  // Dados para Extrato Bancário
+  const statementData = useMemo(() => {
+    let filtered = filterByDate(transactions, 'payment_date').filter(t => t.status === 'pago');
+    
+    if (selectedAccount !== 'all') {
+        filtered = filtered.filter(t => t.account_id === selectedAccount);
+    }
+
+    return filtered.sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date)).map(t => ({
+        date: t.payment_date,
+        description: t.description,
+        category: t.category,
+        type: t.type,
+        value: t.type === 'receita' ? t.paid_amount : -t.paid_amount,
+        account_name: accounts.find(a => a.id === t.account_id)?.name || 'N/A'
+    }));
+  }, [transactions, startDate, endDate, selectedAccount, accounts]);
+
+  // Dados para Contas a Pagar/Receber
+  const pendingData = useMemo(() => {
+    // Filtra por data de VENCIMENTO
+    const filtered = filterByDate(transactions, 'due_date').filter(t => t.status !== 'pago');
+    
+    const receivables = filtered.filter(t => t.type === 'receita');
+    const payables = filtered.filter(t => t.type === 'despesa');
+
+    return {
+        receivables: receivables.sort((a, b) => new Date(a.due_date) - new Date(b.due_date)),
+        payables: payables.sort((a, b) => new Date(a.due_date) - new Date(b.due_date)),
+        totalReceivables: receivables.reduce((sum, t) => sum + (t.amount - (t.paid_amount||0)), 0),
+        totalPayables: payables.reduce((sum, t) => sum + (t.amount - (t.paid_amount||0)), 0)
+    };
+  }, [transactions, startDate, endDate]);
 
   // Vendas por mês (últimos 6 meses)
   const last6Months = Array.from({ length: 6 }, (_, i) => {
@@ -170,20 +289,55 @@ export default function Reports() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Relatórios Gerenciais</h1>
-          <p className="text-slate-500 mt-1">Análises e dashboards completos</p>
+      <div className="mb-8 space-y-4">
+        <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Relatórios Gerenciais</h1>
+              <p className="text-slate-500 mt-1">Análises e dashboards completos</p>
+            </div>
         </div>
-        <div className="flex gap-2">
-          {/* Future: Export Buttons */}
-        </div>
+        
+        {/* Global Date Filter */}
+        <Card className="bg-slate-50 border-slate-200">
+            <CardContent className="p-4 flex items-end gap-4 flex-wrap">
+                <div className="space-y-1">
+                    <Label>Data Inicial</Label>
+                    <Input 
+                        type="date" 
+                        value={startDate} 
+                        onChange={(e) => setStartDate(e.target.value)} 
+                        className="bg-white w-[160px]"
+                    />
+                </div>
+                <div className="space-y-1">
+                    <Label>Data Final</Label>
+                    <Input 
+                        type="date" 
+                        value={endDate} 
+                        onChange={(e) => setEndDate(e.target.value)} 
+                        className="bg-white w-[160px]"
+                    />
+                </div>
+                <div className="pb-1">
+                    <Button variant="outline" onClick={() => {
+                        const today = new Date();
+                        setEndDate(today.toISOString().split('T')[0]);
+                        today.setDate(today.getDate() - 30);
+                        setStartDate(today.toISOString().split('T')[0]);
+                    }}>
+                        Últimos 30 dias
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="financial">Financeiro & DRE</TabsTrigger>
+          <TabsTrigger value="financial">DRE & Fluxo</TabsTrigger>
+          <TabsTrigger value="statement">Extrato Bancário</TabsTrigger>
+          <TabsTrigger value="payables">A Pagar/Receber</TabsTrigger>
           <TabsTrigger value="operational">Operacional</TabsTrigger>
         </TabsList>
 
@@ -286,21 +440,102 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Análise Financeira</h2>
-            <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="15">Últimos 15 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="60">Últimos 60 dias</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* DRE Improved */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>DRE - Demonstração do Resultado</CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Período: {formatDate(startDate)} a {formatDate(endDate)}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleExportCSV(
+                        [...dreData.incomes.map(i => ({...i, type: 'Receita'})), ...dreData.expenses.map(i => ({...i, type: 'Despesa'}))], 
+                        'dre_dados', 
+                        [{header: 'Tipo', dataKey: 'type'}, {header: 'Categoria', dataKey: 'name'}, {header: 'Valor', dataKey: 'value'}]
+                    )}>
+                        <FileText className="w-4 h-4 mr-2" /> CSV
+                    </Button>
+                    <Button size="sm" onClick={() => handleExportPDF(
+                        'DRE', 
+                        'Demonstração do Resultado do Exercício',
+                        [
+                            ...dreData.incomes.map(i => ({ categoria: i.name, valor: formatBRL(i.value), tipo: 'Receita' })),
+                            ...dreData.expenses.map(i => ({ categoria: i.name, valor: formatBRL(i.value), tipo: 'Despesa' }))
+                        ],
+                        [
+                            { header: 'Tipo', dataKey: 'tipo' },
+                            { header: 'Categoria', dataKey: 'categoria' },
+                            { header: 'Valor', dataKey: 'valor' }
+                        ],
+                        [
+                            { label: 'Total Receitas', value: formatBRL(dreData.totalReceita) },
+                            { label: 'Total Despesas', value: formatBRL(dreData.totalDespesa) },
+                            { label: 'Resultado', value: formatBRL(dreData.resultado) }
+                        ]
+                    )} disabled={generatingPDF}>
+                        <Printer className="w-4 h-4 mr-2" /> PDF
+                    </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+                <div className="grid md:grid-cols-2 gap-6">
+                    {/* ... existing DRE content logic adapted ... */}
+                    <div className="space-y-4">
+                        <h3 className="font-semibold text-green-700 flex items-center gap-2">
+                            <ArrowUpCircle className="w-4 h-4" /> Receitas Operacionais
+                        </h3>
+                        <Table>
+                            <TableBody>
+                                {dreData.incomes.map((item, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{item.name}</TableCell>
+                                        <TableCell className="text-right">{formatBRL(item.value)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                <TableRow className="font-bold bg-green-50">
+                                    <TableCell>Total Receitas</TableCell>
+                                    <TableCell className="text-right">{formatBRL(dreData.totalReceita)}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
 
+                    <div className="space-y-4">
+                        <h3 className="font-semibold text-red-700 flex items-center gap-2">
+                            <ArrowDownCircle className="w-4 h-4" /> Despesas Operacionais
+                        </h3>
+                        <Table>
+                            <TableBody>
+                                {dreData.expenses.map((item, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{item.name}</TableCell>
+                                        <TableCell className="text-right">{formatBRL(item.value)}</TableCell>
+                                    </TableRow>
+                                ))}
+                                <TableRow className="font-bold bg-red-50">
+                                    <TableCell>Total Despesas</TableCell>
+                                    <TableCell className="text-right">{formatBRL(dreData.totalDespesa)}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+
+                <div className={`mt-6 p-4 rounded-lg border ${dreData.resultado >= 0 ? 'bg-green-100 border-green-200' : 'bg-red-100 border-red-200'}`}>
+                    <div className="flex justify-between items-center">
+                        <span className="text-lg font-bold">RESULTADO LÍQUIDO</span>
+                        <span className={`text-2xl font-bold ${dreData.resultado >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                            {formatBRL(dreData.resultado)}
+                        </span>
+                    </div>
+                </div>
+            </CardContent>
+          </Card>
+          
           {/* Fluxo de Caixa */}
           <Card>
             <CardHeader>
@@ -324,83 +559,202 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          {/* DRE Simplificado */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>DRE - Receitas por Categoria</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dreData.incomes.map((item, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{item.name}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">
-                          {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-bold bg-slate-50">
-                      <TableCell>TOTAL RECEITAS</TableCell>
-                      <TableCell className="text-right text-green-700">
-                        {dreData.totalReceita.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+          {/* Removed old DRE sections as they are now unified above */}
+        </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>DRE - Despesas por Categoria</CardTitle>
-              </CardHeader>
-              <CardContent>
+        <TabsContent value="statement" className="space-y-6">
+          <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <CardTitle>Extrato Bancário</CardTitle>
+                        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                            <SelectTrigger className="w-[250px]">
+                                <SelectValue placeholder="Selecione a Conta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas as Contas</SelectItem>
+                                {accounts.map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleExportCSV(
+                            statementData, 'extrato_bancario', 
+                            [
+                                {header: 'Data', dataKey: 'date'}, 
+                                {header: 'Descrição', dataKey: 'description'}, 
+                                {header: 'Valor', dataKey: 'value'},
+                                {header: 'Conta', dataKey: 'account_name'}
+                            ]
+                        )}>
+                            <FileText className="w-4 h-4 mr-2" /> CSV
+                        </Button>
+                        <Button size="sm" onClick={() => handleExportPDF(
+                            'Extrato',
+                            `Extrato Bancário - ${selectedAccount === 'all' ? 'Consolidado' : accounts.find(a=>a.id===selectedAccount)?.name}`,
+                            statementData.map(i => ({
+                                date: formatDate(i.date),
+                                description: i.description,
+                                category: i.category,
+                                value: formatBRL(i.value),
+                                account: i.account_name
+                            })),
+                            [
+                                {header: 'Data', dataKey: 'date'},
+                                {header: 'Descrição', dataKey: 'description'},
+                                {header: 'Categoria', dataKey: 'category'},
+                                {header: 'Conta', dataKey: 'account'},
+                                {header: 'Valor', dataKey: 'value'}
+                            ],
+                            [
+                                { label: 'Saldo do Período', value: formatBRL(statementData.reduce((sum, i) => sum + i.value, 0)) }
+                            ]
+                        )} disabled={generatingPDF}>
+                            <Printer className="w-4 h-4 mr-2" /> PDF
+                        </Button>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dreData.expenses.map((item, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{item.name}</TableCell>
-                        <TableCell className="text-right text-red-600 font-medium">
-                          {item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-bold bg-slate-50">
-                      <TableCell>TOTAL DESPESAS</TableCell>
-                      <TableCell className="text-right text-red-700">
-                        {dreData.totalDespesa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Conta</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {statementData.length > 0 ? statementData.map((item, i) => (
+                            <TableRow key={i}>
+                                <TableCell>{formatDate(item.date)}</TableCell>
+                                <TableCell>{item.description}</TableCell>
+                                <TableCell>{item.category}</TableCell>
+                                <TableCell>{item.account_name}</TableCell>
+                                <TableCell className={`text-right font-medium ${item.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatBRL(item.value)}
+                                </TableCell>
+                            </TableRow>
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                                    Nenhuma movimentação encontrada no período.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className={`${dreData.resultado >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold text-slate-700">Resultado do Exercício (Lucro/Prejuízo)</span>
-                <span className={`text-3xl font-bold ${dreData.resultado >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  {dreData.resultado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-              </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="payables" className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+                <Card className="bg-red-50 border-red-100">
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-red-800">Contas a Pagar</CardTitle>
+                            <Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-100" onClick={() => handleExportPDF(
+                                'A_Pagar', 'Relatório de Contas a Pagar (Aberto)',
+                                pendingData.payables.map(p => ({
+                                    vencimento: formatDate(p.due_date),
+                                    descricao: p.description,
+                                    valor: formatBRL(p.amount - (p.paid_amount||0))
+                                })),
+                                [
+                                    {header: 'Vencimento', dataKey: 'vencimento'},
+                                    {header: 'Descrição', dataKey: 'descricao'},
+                                    {header: 'Valor Pendente', dataKey: 'valor'}
+                                ],
+                                [{label: 'Total a Pagar', value: formatBRL(pendingData.totalPayables)}]
+                            )}>
+                                <Printer className="w-4 h-4 mr-2" /> PDF
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-red-700 mb-4">{formatBRL(pendingData.totalPayables)}</div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Vencimento</TableHead>
+                                    <TableHead>Descrição</TableHead>
+                                    <TableHead className="text-right">Valor</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {pendingData.payables.slice(0, 10).map((item, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{formatDate(item.due_date)}</TableCell>
+                                        <TableCell className="max-w-[200px] truncate" title={item.description}>{item.description}</TableCell>
+                                        <TableCell className="text-right font-medium text-red-600">
+                                            {formatBRL(item.amount - (item.paid_amount||0))}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                        {pendingData.payables.length > 10 && (
+                            <p className="text-xs text-center mt-2 text-slate-500">Exibindo 10 de {pendingData.payables.length} itens</p>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-blue-50 border-blue-100">
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-blue-800">Contas a Receber</CardTitle>
+                             <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-100" onClick={() => handleExportPDF(
+                                'A_Receber', 'Relatório de Contas a Receber (Aberto)',
+                                pendingData.receivables.map(p => ({
+                                    vencimento: formatDate(p.due_date),
+                                    descricao: p.description,
+                                    valor: formatBRL(p.amount - (p.paid_amount||0))
+                                })),
+                                [
+                                    {header: 'Vencimento', dataKey: 'vencimento'},
+                                    {header: 'Descrição', dataKey: 'descricao'},
+                                    {header: 'Valor Pendente', dataKey: 'valor'}
+                                ],
+                                [{label: 'Total a Receber', value: formatBRL(pendingData.totalReceivables)}]
+                            )}>
+                                <Printer className="w-4 h-4 mr-2" /> PDF
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-blue-700 mb-4">{formatBRL(pendingData.totalReceivables)}</div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Vencimento</TableHead>
+                                    <TableHead>Descrição</TableHead>
+                                    <TableHead className="text-right">Valor</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {pendingData.receivables.slice(0, 10).map((item, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{formatDate(item.due_date)}</TableCell>
+                                        <TableCell className="max-w-[200px] truncate" title={item.description}>{item.description}</TableCell>
+                                        <TableCell className="text-right font-medium text-blue-600">
+                                            {formatBRL(item.amount - (item.paid_amount||0))}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                        {pendingData.receivables.length > 10 && (
+                            <p className="text-xs text-center mt-2 text-slate-500">Exibindo 10 de {pendingData.receivables.length} itens</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
         </TabsContent>
 
         <TabsContent value="operational" className="space-y-6">
