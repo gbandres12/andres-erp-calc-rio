@@ -906,7 +906,11 @@ export default function Sales() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {sales.map((sale) => {
+            {sales.filter(sale => 
+              sale.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              sale.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              sale.status?.toLowerCase().includes(searchTerm.toLowerCase())
+            ).map((sale) => {
               return (
                 <div key={sale.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50">
                   <div className="flex items-start gap-4">
