@@ -154,17 +154,18 @@ export default function Reports() {
   const totalFuelCost = refuelings.reduce((sum, r) => sum + (r.total_cost || 0), 0);
   const lowStockProducts = products.filter(p => p.current_stock <= p.min_stock && p.min_stock > 0);
 
-  // Dados para Fluxo de Caixa (Realizado - Baseado em data de pagamento)
+  // Dados para Fluxo de Caixa (Realizado)
   const cashFlowData = useMemo(() => {
-    const days = parseInt(period);
     const data = [];
-    const today = new Date();
+    if (!startDate || !endDate) return [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(today.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      const dateLabel = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    if (start > end) return [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const dateLabel = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       
       const dayTransactions = transactions.filter(t => 
         t.status === 'pago' && 
@@ -183,7 +184,7 @@ export default function Reports() {
       });
     }
     return data;
-  }, [transactions, period]);
+  }, [transactions, startDate, endDate]);
 
   // Dados para DRE (Demonstração do Resultado do Exercício)
   const dreData = useMemo(() => {
