@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 export default function Vehicles() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [formData, setFormData] = useState({
