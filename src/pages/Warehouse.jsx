@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 export default function WarehousePage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [formData, setFormData] = useState({
     product_id: "",
