@@ -67,6 +67,24 @@ export default function WarehousePage() {
     onSuccess: () => {
       queryClient.invalidateQueries(['stockEntries']);
       setIsDialogOpen(false);
+        if (data.generate_payable && data.origin === 'compra') {
+        await base44.entities.Transaction.create({
+          description: `Compra Estoque - ${product?.name} - ${data.supplier || 'Fornecedor'}`,
+          amount: data.quantity_received * data.unit_cost,
+          type: 'despesa',
+          category: 'Estoque',
+          status: 'pendente',
+          due_date: data.payable_due_date,
+          company_id: selectedCompanyId,
+          notes: `Gerado via Entrada de Estoque Ref: ${newRef}`,
+          paid_amount: 0
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['stockEntries']);
+      queryClient.invalidateQueries(['transactions']); // Update transactions list
+      setIsDialogOpen(false);
       resetForm();
       toast.success("Entrada registrada com sucesso!");
     }
