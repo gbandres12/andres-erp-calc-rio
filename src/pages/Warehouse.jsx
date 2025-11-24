@@ -255,6 +255,39 @@ export default function WarehousePage() {
                   />
                 </div>
               </div>
+
+              {formData.origin === 'compra' && (
+                <div className="bg-slate-50 p-4 rounded-lg border space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Gerar Conta a Pagar</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Cria automaticamente um lançamento de despesa pendente
+                      </p>
+                    </div>
+                    <Switch
+                      checked={formData.generate_payable}
+                      onCheckedChange={(checked) => setFormData({ ...formData, generate_payable: checked })}
+                    />
+                  </div>
+
+                  {formData.generate_payable && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                      <Label>Data de Vencimento</Label>
+                      <Input
+                        type="date"
+                        required
+                        value={formData.payable_due_date}
+                        onChange={(e) => setFormData({ ...formData, payable_due_date: e.target.value })}
+                      />
+                      <div className="flex items-center gap-2 text-sm text-slate-600 mt-2">
+                        <DollarSign className="w-4 h-4" />
+                        Valor a Pagar: <strong>R$ {(formData.quantity_received * formData.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
