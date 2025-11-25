@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,13 +43,17 @@ export default function Contacts() {
   const { data: contacts = [], isLoading, isFetching, error } = useQuery({
     queryKey: ['contacts', selectedCompanyId],
     queryFn: async () => {
-      console.log('🔄 Buscando contatos para empresa:', selectedCompanyId);
+      // Busca todos os contatos ativos para garantir que contatos antigos (sem filial) também apareçam
+      console.log('🔄 Buscando contatos...');
       const result = await base44.entities.Contact.filter({ 
         is_active: true,
-        company_id: selectedCompanyId 
       }, '-created_date');
-      console.log('✅ Contatos encontrados:', result.length);
-      return result;
+      
+      // Filtra para mostrar contatos desta filial OU contatos sem filial definida (legado/global)
+      const filtered = result.filter(c => !c.company_id || c.company_id === selectedCompanyId);
+      
+      console.log(`✅ Total: ${result.length}, Filtrados para esta filial: ${filtered.length}`);
+      return filtered;
     },
     enabled: !!selectedCompanyId,
     staleTime: 2 * 60 * 1000, // 2 minutos - reduzido
