@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { formatDate } from "@/components/utils/formatters";
 
 export default function Dashboard() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
@@ -47,6 +48,56 @@ export default function Dashboard() {
     initialData: [],
     staleTime: 2 * 60 * 1000,
   });
+
+  // NOVO: Buscar transações pagas dos últimos 30 dias para o gráfico de fluxo de caixa
+  const { data: allPaidTransactions = [] } = useQuery({
+    queryKey: ['allPaidTransactions', selectedCompanyId],
+    queryFn: () => base44.entities.Transaction.filter({ 
+      company_id: selectedCompanyId,
+      status: 'pago'
+    }),
+    initialData: [],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // NOVO: Processar dados para o gráfico de fluxo de caixa diário
+  const dailyCashFlowData = useMemo(() => {
+    const grouped = {};
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - 30);
+    limitDate.setHours(0, 0, 0, 0);
+    
+    // Inicializa os últimos 30 dias com zero
+    for (let i = 0; i <= 30; i++) {
+      const d = new Date(limitDate);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      grouped[dateStr] = { date: dateStr, receita: 0, despesa: 0 };
+    }
+
+    allPaidTransactions.forEach(t => {
+      if (t.payment_date) {
+        const tDate = new Date(t.payment_date);
+        // Corrige fuso horário simplificado (pega só a parte da data YYYY-MM-DD)
+        const dateStr = t.payment_date.split('T')[0]; 
+        
+        if (tDate >= limitDate && grouped[dateStr]) {
+          if (t.type === 'receita') {
+            grouped[dateStr].receita += (t.paid_amount || t.amount);
+          } else {
+            grouped[dateStr].despesa += (t.paid_amount || t.amount);
+          }
+        }
+      }
+    });
+
+    return Object.values(grouped)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(item => ({
+         ...item,
+         formattedDate: formatDate(item.date).slice(0, 5) // DD/MM
+      }));
+  }, [allPaidTransactions]);
 
   const { data: transfers = [], isLoading: loadingTransfers } = useQuery({
     queryKey: ['transfers'],
@@ -402,37 +453,33 @@ export default function Dashboard() {
 
         {/* Listas */}
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Produtos com Estoque Baixo */}
+          {/* Movimentação de Caixa Diária */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Produtos com Estoque Baixo</CardTitle>
-              <Link to={createPageUrl('Products')}>
+              <CardTitle className="text-lg">Movimentação de Caixa (30 dias)</CardTitle>
+              <Link to={createPageUrl('FinancialAccounts')}>
                 <Button variant="ghost" size="sm">
-                  Ver todos <ArrowRight className="w-4 h-4 ml-1" />
+                  Ver detalhes <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
             </CardHeader>
             <CardContent>
-              {stats.lowStockProducts.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.lowStockProducts.slice(0, 5).map((product) => (
-                    <div key={product.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                      <div>
-                        <p className="font-medium text-slate-900">{product.name}</p>
-                        <p className="text-sm text-slate-500">{product.code}</p>
-                      </div>
-                      <Badge variant="destructive">
-                        {product.current_stock} / {product.min_stock}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500">
-                  <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>Todos os produtos estão com estoque adequado</p>
-                </div>
-              )}
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyCashFlowData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="formattedDate" tick={{fontSize: 12}} />
+                    <YAxis tick={{fontSize: 12}} />
+                    <Tooltip 
+                      formatter={(value) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                    />
+                    <Legend wrapperStyle={{fontSize: '12px'}} />
+                    <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
