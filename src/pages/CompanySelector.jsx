@@ -43,9 +43,16 @@ export default function CompanySelector() {
   };
 
   const { data: allCompanies = [] } = useQuery({
-    queryKey: ['companies'],
-    queryFn: () => base44.entities.Company.filter({ is_active: true }, '-created_date'),
-    initialData: []
+    queryKey: ['companies', user?.id],
+    queryFn: async () => {
+      const companies = await base44.entities.Company.filter({ is_active: true }, '-created_date');
+      if (user?.custom_role === 'operator' && user?.allowed_companies?.length > 0) {
+        return companies.filter(c => user.allowed_companies.includes(c.id));
+      }
+      return companies;
+    },
+    initialData: [],
+    enabled: !!user
   });
 
   const companies = React.useMemo(() => {
