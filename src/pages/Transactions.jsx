@@ -214,7 +214,7 @@ export default function Transactions() {
       setSelectedTransaction(null);
       setPaymentFormData({
         amount: 0,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: getTodayDate(),
         account_id: "",
         payment_method: "dinheiro",
         notes: ""
@@ -238,7 +238,7 @@ export default function Transactions() {
       type: "receita",
       category: "",
       status: "pendente",
-      due_date: new Date().toISOString().split('T')[0],
+      due_date: getTodayDate(),
       payment_date: "",
       account_id: "",
       contact_id: "",

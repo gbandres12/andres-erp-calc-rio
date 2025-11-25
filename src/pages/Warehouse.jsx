@@ -11,6 +11,7 @@ import { Warehouse, Plus, Package, TrendingUp, AlertCircle, Search, DollarSign }
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { getTodayDate } from "@/components/utils/formatters";
 
 export default function WarehousePage() {
   const queryClient = useQueryClient();
@@ -28,7 +29,7 @@ export default function WarehousePage() {
     invoice_number: "",
     unit_cost: 0,
     generate_payable: false,
-    payable_due_date: new Date().toLocaleDateString('pt-BR').split('/').reverse().join('-') // Fallback if getTodayDate not imported yet, but better to import it.
+    payable_due_date: getTodayDate()
   });
 
   const { data: products = [] } = useQuery({
@@ -101,7 +102,7 @@ export default function WarehousePage() {
       invoice_number: "",
       unit_cost: 0,
       generate_payable: false,
-      payable_due_date: new Date().toISOString().split('T')[0]
+      payable_due_date: getTodayDate()
     });
   };
 
