@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatBRL, getTodayDate } from "@/components/utils/formatters";
+import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 
 export default function Transactions() {
   const queryClient = useQueryClient();
@@ -812,7 +812,7 @@ export default function Transactions() {
                                   #{paymentHistory.length - idx}
                                 </Badge>
                                 <span className="text-sm font-medium">
-                                  {new Date(payment.payment_date).toLocaleDateString('pt-BR')}
+                                  {formatDate(payment.payment_date)}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-600">
@@ -974,7 +974,7 @@ export default function Transactions() {
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <p className="text-xs text-slate-400 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          Venc: {new Date(transaction.due_date).toLocaleDateString('pt-BR')}
+                          Venc: {formatDate(transaction.due_date)}
                         </p>
                         {dateStatus && (
                           <Badge variant="outline" className={`text-xs ${dateStatus.color} border-current`}>
@@ -983,7 +983,7 @@ export default function Transactions() {
                         )}
                         {transaction.payment_date && transaction.status === 'pago' && (
                           <Badge variant="outline" className="text-xs text-green-600 bg-green-50 border-green-200">
-                            Pago em: {new Date(transaction.payment_date).toLocaleDateString('pt-BR')}
+                            Pago em: {formatDate(transaction.payment_date)}
                           </Badge>
                         )}
                       </div>

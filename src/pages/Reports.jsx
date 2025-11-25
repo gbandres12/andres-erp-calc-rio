@@ -632,7 +632,7 @@ export default function Reports() {
                     <TableBody>
                         {statementData.length > 0 ? statementData.map((item, i) => (
                             <TableRow key={i}>
-                                <TableCell>{formatDate(item.date)}</TableCell>
+                                <TableCell>{item.date ? formatDate(item.date) : 'N/A'}</TableCell>
                                 <TableCell>{item.description}</TableCell>
                                 <TableCell>{item.category}</TableCell>
                                 <TableCell>{item.account_name}</TableCell>

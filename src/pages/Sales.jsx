@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ThermalReceipt from "../components/receipts/ThermalReceipt";
 import A4Receipt from "../components/receipts/A4Receipt";
-import { formatBRL, getTodayDate } from "@/components/utils/formatters";
+import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 
 export default function Sales() {
@@ -919,7 +919,7 @@ export default function Sales() {
                         </Badge>
                       </div>
                       <p className="text-xs text-slate-500 mt-1">
-                        {new Date(sale.sale_date).toLocaleDateString('pt-BR')} • {sale.items?.length || 0} itens
+                        {formatDate(sale.sale_date)} • {sale.items?.length || 0} itens
                       </p>
                     </div>
                   </div>
