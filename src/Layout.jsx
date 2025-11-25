@@ -56,7 +56,7 @@ const navigationGroups = [
   {
     title: "Comercial",
     items: [
-      { title: "Orçamentos", url: "Quotes", icon: FileText },
+      { title: "Orçamentos", url: "Quotes", icon: FileText }, // Added new item
       { title: "Vendas", url: "Sales", icon: ShoppingCart },
       { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck }
     ]
@@ -77,19 +77,12 @@ const navigationGroups = [
       { title: "Configurações", url: "Settings", icon: Settings }
     ]
   }
-];
+  ];
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const navigate = useNavigate();
-
-  // Fetch user first to know permissions
-  useEffect(() => {
-    base44.auth.me().then(setUser).catch(console.error);
-  }, []);
 
   const filteredNavigation = React.useMemo(() => {
     if (!user) return navigationGroups;
@@ -113,6 +106,13 @@ export default function Layout({ children, currentPageName }) {
     }
     return navigationGroups;
   }, [user]);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
+
+  // Fetch user first to know permissions
+  useEffect(() => {
+    base44.auth.me().then(setUser).catch(console.error);
+  }, []);
 
   const { data: companies = [] } = useQuery({
     queryKey: ['companies', user?.id],
@@ -137,6 +137,7 @@ export default function Layout({ children, currentPageName }) {
       
       // Se não tiver filial selecionada E não estiver na página de seleção, redirecionar
       if (!savedCompanyId && currentPageName !== 'CompanySelector') {
+        // Use navigate instead of window.location to avoid refresh loops if configured correctly
         navigate(createPageUrl('CompanySelector'));
         return;
       }
