@@ -137,15 +137,9 @@ export default function Reports() {
 
   // Filtros de Data
   const filterByDate = (items, dateField) => {
-    const start = new Date(startDate);
-    start.setHours(0,0,0,0);
-    const end = new Date(endDate);
-    end.setHours(23,59,59,999);
-    
     return items.filter(item => {
         if (!item[dateField]) return false;
-        const d = new Date(item[dateField]);
-        return d >= start && d <= end;
+        return item[dateField] >= startDate && item[dateField] <= endDate;
     });
   };
 
@@ -168,7 +162,8 @@ export default function Reports() {
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
-      const dateLabel = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const [y, m, day] = dateStr.split('-');
+      const dateLabel = `${day}/${m}`;
       
       const dayTransactions = transactions.filter(t => 
         t.status === 'pago' && 
