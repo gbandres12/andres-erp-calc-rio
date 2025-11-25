@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +22,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatBRL } from "@/components/utils/formatters";
+import { formatBRL, formatDate } from "@/components/utils/formatters";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function FinancialAccounts() {
   const queryClient = useQueryClient();
@@ -52,6 +52,62 @@ export default function FinancialAccounts() {
     }),
     initialData: []
   });
+
+  // NOVO: Buscar TODAS as transações pagas para cálculo real do saldo e gráfico
+  const { data: allTransactions = [] } = useQuery({
+    queryKey: ['all-transactions', selectedCompanyId],
+    queryFn: () => base44.entities.Transaction.filter({ 
+      company_id: selectedCompanyId,
+      status: 'pago'
+    }),
+    initialData: []
+  });
+
+  // NOVO: Calcular saldos reais dinamicamente
+  const accountBalances = useMemo(() => {
+    const balances = {};
+    // Inicializa com saldos iniciais
+    accounts.forEach(acc => {
+      balances[acc.id] = acc.initial_balance || 0;
+    });
+
+    // Processa todas as transações
+    allTransactions.forEach(t => {
+      if (balances[t.account_id] !== undefined) {
+        if (t.type === 'receita') {
+          balances[t.account_id] += (t.paid_amount || 0);
+        } else {
+          balances[t.account_id] -= (t.paid_amount || 0);
+        }
+      }
+    });
+    return balances;
+  }, [accounts, allTransactions]);
+
+  // NOVO: Dados para o gráfico de movimentação diária
+  const dailyChartData = useMemo(() => {
+    const grouped = {};
+    // Últimos 30 dias
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - 30);
+    const limitStr = limitDate.toISOString().split('T')[0];
+
+    allTransactions.forEach(t => {
+      if (t.payment_date && t.payment_date >= limitStr) {
+        const date = t.payment_date;
+        if (!grouped[date]) grouped[date] = { date, receita: 0, despesa: 0 };
+        if (t.type === 'receita') grouped[date].receita += (t.paid_amount || 0);
+        else grouped[date].despesa += (t.paid_amount || 0);
+      }
+    });
+
+    return Object.values(grouped)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(item => ({
+         ...item,
+         formattedDate: formatDate(item.date).slice(0, 5) // DD/MM
+      }));
+  }, [allTransactions]);
 
   // ATUALIZAR: Buscar transações da conta selecionada com filtro de data
   const { data: accountTransactions = [] } = useQuery({
@@ -246,7 +302,8 @@ export default function FinancialAccounts() {
     setEndDate(newEndDate);
   };
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
+  // Usa o saldo calculado dinamicamente em vez do armazenado
+  const totalBalance = Object.values(accountBalances).reduce((sum, val) => sum + val, 0);
 
   const typeIcons = {
     banco: Building,
@@ -369,17 +426,43 @@ export default function FinancialAccounts() {
       </div>
 
       {/* KPI - Saldo Total */}
-      <Card className="mb-8 bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-        <CardHeader>
-          <CardTitle className="text-blue-100">Saldo Total</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-5xl font-bold mb-2">
-            {formatBRL(totalBalance)}
-          </div>
-          <p className="text-blue-200">em {accounts.length} conta(s)</p>
-        </CardContent>
-      </Card>
+      <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white md:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-blue-100">Saldo Total</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold mb-2">
+              {formatBRL(totalBalance)}
+            </div>
+            <p className="text-blue-200">em {accounts.length} conta(s)</p>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Movimentação de Caixa (Últimos 30 dias)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[150px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailyChartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="formattedDate" tick={{fontSize: 12}} />
+                  <YAxis tick={{fontSize: 12}} />
+                  <Tooltip 
+                    formatter={(value) => formatBRL(value)}
+                    contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                  />
+                  <Legend wrapperStyle={{fontSize: '12px'}} />
+                  <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Lista de Contas */}
       {accounts.length === 0 ? (
@@ -437,18 +520,18 @@ export default function FinancialAccounts() {
                   </div>
                   
                   <div className="pt-3 border-t">
-                    <p className="text-sm text-slate-600 mb-1">Saldo Atual:</p>
+                    <p className="text-sm text-slate-600 mb-1">Saldo Atual (Real):</p>
                     <p className={`text-2xl font-bold ${
-                      account.current_balance >= 0 ? 'text-green-600' : 'text-red-600'
+                      (accountBalances[account.id] || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatBRL(account.current_balance)}
+                      {formatBRL(accountBalances[account.id] || 0)}
                     </p>
-                    {account.current_balance !== account.initial_balance && (
+                    {(accountBalances[account.id] || 0) !== account.initial_balance && (
                       <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
                         <TrendingUp className="w-3 h-3" />
                         <span>
-                          {account.current_balance > account.initial_balance ? '+' : ''}
-                          {formatBRL(account.current_balance - account.initial_balance)}
+                          {(accountBalances[account.id] || 0) > account.initial_balance ? '+' : ''}
+                          {formatBRL((accountBalances[account.id] || 0) - account.initial_balance)}
                         </span>
                       </div>
                     )}
