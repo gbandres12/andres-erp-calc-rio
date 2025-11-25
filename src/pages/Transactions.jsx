@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Transactions() {
   const queryClient = useQueryClient();
@@ -111,13 +112,42 @@ export default function Transactions() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Transaction.create({
-      ...data,
-      company_id: selectedCompanyId,
-      paid_amount: data.status === 'pago' ? data.amount : 0
-    }),
+    mutationFn: async (data) => {
+      const transaction = await base44.entities.Transaction.create({
+        ...data,
+        company_id: selectedCompanyId,
+        paid_amount: data.status === 'pago' ? data.amount : 0
+      });
+
+      if (data.status === 'pago' && data.account_id) {
+        const account = accounts.find(a => a.id === data.account_id);
+        if (account) {
+          const adjustment = data.type === 'receita' ? data.amount : -data.amount;
+          await base44.entities.FinancialAccount.update(data.account_id, {
+            current_balance: account.current_balance + adjustment
+          });
+
+          // Registrar histórico de pagamento inicial
+          const user = await base44.auth.me();
+          await base44.entities.TransactionPayment.create({
+            transaction_id: transaction.id,
+            transaction_reference: transaction.description,
+            amount: data.amount,
+            payment_date: data.payment_date || getTodayDate(),
+            account_id: data.account_id,
+            account_name: account.name,
+            payment_method: 'dinheiro', // Default
+            responsible: user?.full_name || user?.email || '',
+            notes: 'Pagamento registrado na criação',
+            company_id: selectedCompanyId
+          });
+        }
+      }
+      return transaction;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions']);
+      queryClient.invalidateQueries(['accounts']);
       setIsDialogOpen(false);
       resetForm();
       toast.success("Lançamento criado com sucesso!");
@@ -373,6 +403,31 @@ export default function Transactions() {
     atrasado: "bg-red-100 text-red-800",
     parcial: "bg-orange-100 text-orange-800"
   };
+
+  // Dados do gráfico de fluxo de caixa diário
+  const dailyCashFlow = React.useMemo(() => {
+    const grouped = {};
+    // Pega últimos 30 dias para o gráfico não ficar gigante
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - 30);
+    const limitStr = limitDate.toISOString().split('T')[0];
+
+    transactions.forEach(t => {
+      if (t.status === 'pago' && t.payment_date && t.payment_date >= limitStr) {
+        const date = t.payment_date;
+        if (!grouped[date]) grouped[date] = { date, receita: 0, despesa: 0 };
+        if (t.type === 'receita') grouped[date].receita += (t.paid_amount || 0);
+        else grouped[date].despesa += (t.paid_amount || 0);
+      }
+    });
+
+    return Object.values(grouped)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(item => ({
+         ...item,
+         formattedDate: formatDate(item.date).slice(0, 5) // DD/MM
+      }));
+  }, [transactions]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -893,6 +948,31 @@ export default function Transactions() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráfico de Movimentação Diária */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Movimentação de Caixa Diária (Últimos 30 dias)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyCashFlow}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="formattedDate" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => formatBRL(value)}
+                  contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                />
+                <Legend />
+                <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filtros */}
       <Card className="mb-6">
