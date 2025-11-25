@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Warehouse, TruckIcon, DollarSign, AlertTriangle, TrendingUp, TrendingDown, ArrowRight, Calendar } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -12,6 +13,16 @@ import { formatDate } from "@/components/utils/formatters";
 
 export default function Dashboard() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
+  const navigate = useNavigate();
+
+  // Redirecionar operador para Pesagem
+  useEffect(() => {
+    base44.auth.me().then(user => {
+      if (user.custom_role === 'operator') {
+        navigate(createPageUrl('Weighing'));
+      }
+    });
+  }, [navigate]);
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],

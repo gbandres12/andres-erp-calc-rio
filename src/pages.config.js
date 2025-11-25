@@ -19,6 +19,7 @@ import ITAssets from './pages/ITAssets';
 import Reports from './pages/Reports';
 import SaleWithdrawals from './pages/SaleWithdrawals';
 import Quotes from './pages/Quotes';
+import Users from './pages/Users';
 import __Layout from './Layout.jsx';
 
 
@@ -44,6 +45,7 @@ export const PAGES = {
     "Reports": Reports,
     "SaleWithdrawals": SaleWithdrawals,
     "Quotes": Quotes,
+    "Users": Users,
 }
 
 export const pagesConfig = {

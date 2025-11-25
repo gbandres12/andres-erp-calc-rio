@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { createPageUrl } from "@/utils";
 import {
@@ -74,56 +73,102 @@ const navigationGroups = [
     items: [
       { title: "Relatórios", url: "Reports", icon: BarChart3 },
       { title: "Auditoria", url: "ActivityLogs", icon: History },
+      { title: "Usuários", url: "Users", icon: Users },
       { title: "Configurações", url: "Settings", icon: Settings }
     ]
   }
-];
+  ];
+
+  // Filtrar menu baseado no papel do usuário
+  const filteredNavigation = useMemo(() => {
+  if (!user) return [];
+
+  if (user.custom_role === 'operator') {
+    return navigationGroups.map(group => {
+      // Remover grupos proibidos
+      if (group.title === "Financeiro" || group.title === "Comercial" || group.title === "Principal") {
+         if (group.title === "Principal") {
+            // Manter apenas "Trocar Filial" no principal, remover Dashboard
+            return {
+              ...group,
+              items: group.items.filter(item => item.url === 'CompanySelector')
+            };
+         }
+         return null; 
+      }
+
+      // Filtrar itens específicos em outros grupos
+      const filteredItems = group.items.filter(item => {
+        const forbidden = ['Reports', 'ActivityLogs', 'Settings', 'Users', 'Dashboard'];
+        return !forbidden.includes(item.url);
+      });
+
+      if (filteredItems.length === 0) return null;
+
+      return { ...group, items: filteredItems };
+    }).filter(Boolean);
+  }
+
+  return navigationGroups;
+  }, [user]);
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
+  const navigate = useNavigate();
+
+  // Fetch user first to know permissions
+  useEffect(() => {
+    base44.auth.me().then(setUser).catch(console.error);
+  }, []);
 
   const { data: companies = [] } = useQuery({
-    queryKey: ['companies'],
-    queryFn: () => base44.entities.Company.filter({ is_active: true }),
+    queryKey: ['companies', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const all = await base44.entities.Company.filter({ is_active: true });
+      // Filtrar empresas permitidas para operador
+      if (user.custom_role === 'operator' && user.allowed_companies?.length > 0) {
+        return all.filter(c => user.allowed_companies.includes(c.id));
+      }
+      return all;
+    },
+    enabled: !!user,
     initialData: []
   });
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await base44.auth.me();
-        setUser(userData);
-        
-        // Verificar se precisa selecionar filial
-        const savedCompanyId = localStorage.getItem('selectedCompanyId');
-        
-        // Se não tiver filial selecionada E não estiver na página de seleção, redirecionar
-        if (!savedCompanyId && currentPageName !== 'CompanySelector') {
-          window.location.href = createPageUrl('CompanySelector');
-          return;
-        }
-        
-        // Carregar filial selecionada
-        if (savedCompanyId && companies.length > 0) {
-          const company = companies.find(c => c.id === savedCompanyId);
-          if (company) {
-            setSelectedCompany(company);
-          } else if (companies.length > 0) {
-            // Se a filial salva não existe mais, selecionar a primeira
-            setSelectedCompany(companies[0]);
-            localStorage.setItem('selectedCompanyId', companies[0].id);
-            setSelectedCompanyId(companies[0].id);
+    const checkCompany = async () => {
+      if (!user || companies.length === 0) return;
+
+      const savedCompanyId = localStorage.getItem('selectedCompanyId');
+      
+      // Se não tiver filial selecionada E não estiver na página de seleção, redirecionar
+      if (!savedCompanyId && currentPageName !== 'CompanySelector') {
+        // Use navigate instead of window.location to avoid refresh loops if configured correctly
+        navigate(createPageUrl('CompanySelector'));
+        return;
+      }
+      
+      // Carregar filial selecionada
+      if (savedCompanyId) {
+        const company = companies.find(c => c.id === savedCompanyId);
+        if (company) {
+          setSelectedCompany(company);
+        } else {
+          // Se a filial salva não é permitida ou não existe, limpar e redirecionar
+          localStorage.removeItem('selectedCompanyId');
+          localStorage.removeItem('selectedCompanyName');
+          if (currentPageName !== 'CompanySelector') {
+             navigate(createPageUrl('CompanySelector'));
           }
         }
-      } catch (error) {
-        console.error("Error loading user:", error);
       }
     };
-    loadUser();
-  }, [companies, currentPageName]);
+    checkCompany();
+  }, [companies, currentPageName, user, navigate]);
 
   const handleCompanyChange = (company) => {
     setSelectedCompany(company);
@@ -196,7 +241,7 @@ export default function Layout({ children, currentPageName }) {
           </SidebarHeader>
 
           <SidebarContent className="p-2">
-            {navigationGroups.map((group) => (
+            {filteredNavigation.map((group) => (
               <SidebarGroup key={group.title}>
                 <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
                   {group.title}
