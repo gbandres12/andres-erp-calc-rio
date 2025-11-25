@@ -79,42 +79,33 @@ const navigationGroups = [
   }
   ];
 
-  // Filtrar menu baseado no papel do usuário
-  const filteredNavigation = useMemo(() => {
-  if (!user) return [];
-
-  if (user.custom_role === 'operator') {
-    return navigationGroups.map(group => {
-      // Remover grupos proibidos
-      if (group.title === "Financeiro" || group.title === "Comercial" || group.title === "Principal") {
-         if (group.title === "Principal") {
-            // Manter apenas "Trocar Filial" no principal, remover Dashboard
-            return {
-              ...group,
-              items: group.items.filter(item => item.url === 'CompanySelector')
-            };
-         }
-         return null; 
-      }
-
-      // Filtrar itens específicos em outros grupos
-      const filteredItems = group.items.filter(item => {
-        const forbidden = ['Reports', 'ActivityLogs', 'Settings', 'Users', 'Dashboard'];
-        return !forbidden.includes(item.url);
-      });
-
-      if (filteredItems.length === 0) return null;
-
-      return { ...group, items: filteredItems };
-    }).filter(Boolean);
-  }
-
-  return navigationGroups;
-  }, [user]);
-
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
+  const filteredNavigation = React.useMemo(() => {
+    if (!user) return navigationGroups;
+    
+    if (user.custom_role === 'operator') {
+      return navigationGroups.map(group => {
+        if (group.title === "Financeiro" || group.title === "Comercial") return null;
+        
+        if (group.title === "Principal") {
+           return { ...group, items: group.items.filter(item => item.url === 'CompanySelector') };
+        }
+        
+        const filteredItems = group.items.filter(item => {
+          const forbidden = ['Reports', 'ActivityLogs', 'Settings', 'Users', 'Dashboard'];
+          return !forbidden.includes(item.url);
+        });
+
+        if (filteredItems.length === 0) return null;
+        return { ...group, items: filteredItems };
+      }).filter(Boolean);
+    }
+    return navigationGroups;
+  }, [user]);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const navigate = useNavigate();
