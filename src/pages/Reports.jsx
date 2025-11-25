@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatBRL, formatDate } from "@/components/utils/formatters";
+import { formatBRL, formatDate, getTodayDate } from "@/components/utils/formatters";
 import { toast } from "sonner";
 
 export default function Reports() {
@@ -19,9 +19,12 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(getTodayDate());
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
@@ -314,10 +317,13 @@ export default function Reports() {
                 </div>
                 <div className="pb-1">
                     <Button variant="outline" onClick={() => {
-                        const today = new Date();
-                        setEndDate(today.toISOString().split('T')[0]);
-                        today.setDate(today.getDate() - 30);
-                        setStartDate(today.toISOString().split('T')[0]);
+                        setEndDate(getTodayDate());
+                        const d = new Date();
+                        d.setDate(d.getDate() - 30);
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        setStartDate(`${year}-${month}-${day}`);
                     }}>
                         Últimos 30 dias
                     </Button>

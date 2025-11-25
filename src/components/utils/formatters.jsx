@@ -54,11 +54,33 @@ export function formatBRL(input) {
  */
 export function formatDate(date) {
   if (!date) return 'N/A';
+  
+  // Se for string YYYY-MM-DD, formata direto para evitar problemas de fuso horário
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
   const d = new Date(date);
+  // Adiciona o offset do fuso horário para garantir a data correta se for objeto Date puro
+  // Mas geralmente objetos Date já estão no fuso local do navegador.
+  // O problema maior é string YYYY-MM-DD que vira UTC meia-noite.
+  
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
   return `${day}/${month}/${year}`;
+}
+
+/**
+ * Retorna a data atual no formato YYYY-MM-DD considerando o fuso local
+ */
+export function getTodayDate() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**

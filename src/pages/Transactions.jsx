@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatBRL } from "@/components/utils/formatters";
+import { formatBRL, getTodayDate } from "@/components/utils/formatters";
 
 export default function Transactions() {
   const queryClient = useQueryClient();
@@ -35,7 +35,7 @@ export default function Transactions() {
 
   const [paymentFormData, setPaymentFormData] = useState({
     amount: 0,
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: getTodayDate(),
     account_id: "",
     payment_method: "dinheiro",
     notes: ""
@@ -68,7 +68,7 @@ export default function Transactions() {
     type: "receita",
     category: "",
     status: "pendente",
-    due_date: new Date().toISOString().split('T')[0],
+    due_date: getTodayDate(),
     payment_date: "",
     account_id: "",
     contact_id: "",

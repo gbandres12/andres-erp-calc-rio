@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ThermalReceipt from "../components/receipts/ThermalReceipt";
 import A4Receipt from "../components/receipts/A4Receipt";
-import { formatBRL } from "@/components/utils/formatters";
+import { formatBRL, getTodayDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 
 export default function Sales() {
@@ -37,7 +37,7 @@ export default function Sales() {
     client_id: "",
     client_name: "",
     seller_name: "",
-    sale_date: new Date().toISOString().split('T')[0],
+    sale_date: getTodayDate(),
     items: [{ product_id: "", product_name: "", quantity: 0, unit: "UN", unit_price: 0, discount: 0, total: 0 }],
     subtotal: 0,
     discount: 0,
@@ -51,7 +51,7 @@ export default function Sales() {
     payment_method: "dinheiro",
     account_id: "",
     installments: 1,
-    first_due_date: new Date().toISOString().split('T')[0]
+    first_due_date: getTodayDate()
   });
 
   const { data: products = [] } = useQuery({

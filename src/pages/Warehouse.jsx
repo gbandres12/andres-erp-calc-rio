@@ -28,7 +28,7 @@ export default function WarehousePage() {
     invoice_number: "",
     unit_cost: 0,
     generate_payable: false,
-    payable_due_date: new Date().toISOString().split('T')[0]
+    payable_due_date: new Date().toLocaleDateString('pt-BR').split('/').reverse().join('-') // Fallback if getTodayDate not imported yet, but better to import it.
   });
 
   const { data: products = [] } = useQuery({
