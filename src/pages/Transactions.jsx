@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
+import { isSameDay, isSameWeek, isSameMonth, parseISO } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Transactions() {
@@ -25,6 +26,7 @@ export default function Transactions() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState(''); // NOVO: campo de pesquisa
   const [openCombobox, setOpenCombobox] = useState(false);
   const [openCategoryCombobox, setOpenCategoryCombobox] = useState(false);
@@ -345,6 +347,19 @@ export default function Transactions() {
   const filteredTransactions = transactions.filter(t => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
     if (filterType !== 'all' && t.type !== filterType) return false;
+
+    // Date Filter
+    if (dateFilter !== 'all') {
+        const today = new Date();
+        // Se pago, usa data pagamento, senão data vencimento
+        const dateToCheck = t.status === 'pago' && t.payment_date 
+            ? parseISO(t.payment_date) 
+            : parseISO(t.due_date);
+            
+        if (dateFilter === 'today' && !isSameDay(dateToCheck, today)) return false;
+        if (dateFilter === 'week' && !isSameWeek(dateToCheck, today)) return false;
+        if (dateFilter === 'month' && !isSameMonth(dateToCheck, today)) return false;
+    }
     
     // Pesquisa por descrição ou contato
     if (searchTerm) {
@@ -1008,6 +1023,18 @@ export default function Transactions() {
                 <SelectItem value="parcial">Parcial</SelectItem>
                 <SelectItem value="pago">Pago</SelectItem>
                 <SelectItem value="atrasado">Atrasado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo Período</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="week">Esta Semana</SelectItem>
+                <SelectItem value="month">Este Mês</SelectItem>
               </SelectContent>
             </Select>
           </div>
