@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
-import { isSameDay, isSameWeek, isSameMonth, parseISO } from 'date-fns';
+import { isSameDay, isSameWeek, isSameMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Transactions() {
@@ -27,6 +27,7 @@ export default function Transactions() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [customDates, setCustomDates] = useState({ start: '', end: '' });
   const [searchTerm, setSearchTerm] = useState(''); // NOVO: campo de pesquisa
   const [openCombobox, setOpenCombobox] = useState(false);
   const [openCategoryCombobox, setOpenCategoryCombobox] = useState(false);
@@ -359,6 +360,11 @@ export default function Transactions() {
         if (dateFilter === 'today' && !isSameDay(dateToCheck, today)) return false;
         if (dateFilter === 'week' && !isSameWeek(dateToCheck, today)) return false;
         if (dateFilter === 'month' && !isSameMonth(dateToCheck, today)) return false;
+        if (dateFilter === 'custom' && customDates.start && customDates.end) {
+            const start = startOfDay(parseISO(customDates.start));
+            const end = endOfDay(parseISO(customDates.end));
+            if (!isWithinInterval(dateToCheck, { start, end })) return false;
+        }
     }
     
     // Pesquisa por descrição ou contato
@@ -1035,8 +1041,27 @@ export default function Transactions() {
                 <SelectItem value="today">Hoje</SelectItem>
                 <SelectItem value="week">Esta Semana</SelectItem>
                 <SelectItem value="month">Este Mês</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
+
+            {dateFilter === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Input 
+                  type="date" 
+                  value={customDates.start}
+                  onChange={(e) => setCustomDates(prev => ({ ...prev, start: e.target.value }))}
+                  className="w-auto"
+                />
+                <span className="text-slate-400">até</span>
+                <Input 
+                  type="date" 
+                  value={customDates.end}
+                  onChange={(e) => setCustomDates(prev => ({ ...prev, end: e.target.value }))}
+                  className="w-auto"
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
