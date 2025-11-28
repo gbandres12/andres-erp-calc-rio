@@ -141,7 +141,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* ENDEREÇOS */}
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: '8px' }}>
           <h3 style={{
             fontSize: '11pt',
             fontWeight: 'bold',
@@ -257,7 +257,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* FORMA / CONDIÇÕES DE PAGAMENTO */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '8px' }}>
           <h3 style={{
             fontSize: '11pt',
             fontWeight: 'bold',
@@ -296,7 +296,7 @@ export default function A4Receipt({ type, data, onPrint }) {
 
         {/* OBSERVAÇÕES */}
         {data.notes && (
-          <div style={{ marginBottom: '20px', background: '#FFFBEB', padding: '12px', borderRadius: '6px', border: '1px solid #FDE047' }}>
+          <div style={{ marginBottom: '8px', background: '#FFFBEB', padding: '8px', borderRadius: '6px', border: '1px solid #FDE047' }}>
             <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '6px', color: '#854D0E' }}>
               Observações:
             </div>
@@ -455,11 +455,11 @@ export default function A4Receipt({ type, data, onPrint }) {
         width: '210mm',
         minHeight: '297mm',
         background: 'white',
-        padding: '15mm',
+        padding: '10mm',
         fontFamily: 'Arial, sans-serif',
-        fontSize: '10pt',
+        fontSize: '9pt',
         color: '#000',
-        lineHeight: '1.4'
+        lineHeight: '1.2'
       }}>
         {/* CABEÇALHO */}
         <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '3px solid #1B3C73', paddingBottom: '15px' }}>
@@ -481,9 +481,9 @@ export default function A4Receipt({ type, data, onPrint }) {
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
           <h2 style={{
-            fontSize: '18pt',
+            fontSize: '14pt',
             fontWeight: 'bold',
             color: '#0B1E3C',
             margin: '0'
@@ -493,7 +493,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* DADOS DO ORÇAMENTO */}
-        <div style={{ marginBottom: '16px', background: '#F9FAFB', padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+        <div style={{ marginBottom: '8px', background: '#F9FAFB', padding: '8px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
           <h3 style={{
             fontSize: '11pt',
             fontWeight: 'bold',
@@ -539,7 +539,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* ENDEREÇOS */}
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: '8px' }}>
           <h3 style={{
             fontSize: '11pt',
             fontWeight: 'bold',
@@ -581,7 +581,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* ITENS DO ORÇAMENTO */}
-        <div style={{ marginBottom: '15px' }}>
+        <div style={{ marginBottom: '8px' }}>
           <h3 style={{
             fontSize: '11pt',
             fontWeight: 'bold',
@@ -621,7 +621,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* TOTAIS DO ORÇAMENTO */}
-        <div style={{ marginBottom: '15px', background: '#F0F4F8', padding: '12px', borderRadius: '6px', border: '2px solid #1B3C73' }}>
+        <div style={{ marginBottom: '8px', background: '#F0F4F8', padding: '8px', borderRadius: '6px', border: '2px solid #1B3C73' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <table style={{ width: '50%', fontSize: '9pt' }}>
               <tbody>
@@ -655,7 +655,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* FORMA / CONDIÇÕES DE PAGAMENTO */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '8px' }}>
           <h3 style={{
             fontSize: '11pt',
             fontWeight: 'bold',
@@ -694,7 +694,7 @@ export default function A4Receipt({ type, data, onPrint }) {
 
         {/* OBSERVAÇÕES */}
         {data.notes && (
-          <div style={{ marginBottom: '20px', background: '#FFFBEB', padding: '12px', borderRadius: '6px', border: '1px solid #FDE047' }}>
+          <div style={{ marginBottom: '8px', background: '#FFFBEB', padding: '8px', borderRadius: '6px', border: '1px solid #FDE047' }}>
             <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '6px', color: '#854D0E' }}>
               Observações:
             </div>
@@ -705,15 +705,15 @@ export default function A4Receipt({ type, data, onPrint }) {
         )}
 
         {/* LINHAS DE ASSINATURA */}
-        <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid #E2E8F0' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+        <div style={{ marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #E2E8F0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '8px', marginTop: '50px', fontSize: '9pt', color: '#333' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', marginTop: '30px', fontSize: '8pt', color: '#333' }}>
                 <strong>Assinatura do Cliente</strong>
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '8px', marginTop: '50px', fontSize: '9pt', color: '#333' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', marginTop: '30px', fontSize: '8pt', color: '#333' }}>
                 <strong>Assinatura do Vendedor</strong>
               </div>
             </div>
