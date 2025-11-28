@@ -64,12 +64,13 @@ export default function A4Receipt({ type, data, onPrint }) {
         lineHeight: '1.2'
       }}>
         {/* CABEÇALHO */}
-        <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '3px solid #1B3C73', paddingBottom: '15px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '2px solid #1B3C73', paddingBottom: '5px' }}>
+          <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68ea91a66a9614db4a82043d/0e678bbed_CALCARIOAMAZONIALOGO.png" alt="Logo" style={{ maxHeight: '50px', margin: '0 auto 5px auto', display: 'block' }} />
           <h1 style={{
-            fontSize: '20pt',
+            fontSize: '14pt',
             fontWeight: 'bold',
             color: '#1B3C73',
-            margin: '0 0 8px 0'
+            margin: '0 0 4px 0'
           }}>
             {data.company_name || 'EMPRESA'}
           </h1>
@@ -462,12 +463,13 @@ export default function A4Receipt({ type, data, onPrint }) {
         lineHeight: '1.2'
       }}>
         {/* CABEÇALHO */}
-        <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '3px solid #1B3C73', paddingBottom: '15px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '2px solid #1B3C73', paddingBottom: '5px' }}>
+          <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68ea91a66a9614db4a82043d/0e678bbed_CALCARIOAMAZONIALOGO.png" alt="Logo" style={{ maxHeight: '50px', margin: '0 auto 5px auto', display: 'block' }} />
           <h1 style={{
-            fontSize: '20pt',
+            fontSize: '14pt',
             fontWeight: 'bold',
             color: '#1B3C73',
-            margin: '0 0 8px 0'
+            margin: '0 0 4px 0'
           }}>
             {data.company_name || 'EMPRESA'}
           </h1>
