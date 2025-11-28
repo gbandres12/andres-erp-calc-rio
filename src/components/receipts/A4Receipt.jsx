@@ -141,47 +141,7 @@ export default function A4Receipt({ type, data, onPrint }) {
           </table>
         </div>
 
-        {/* ENDEREÇOS */}
-        <div style={{ marginBottom: '8px' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 10px 0',
-            color: '#1B3C73',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '6px'
-          }}>
-            Endereços
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#0B1E3C' }}>
-                Endereço de Cobrança
-              </div>
-              <div style={{ fontSize: '9pt', lineHeight: '1.6' }}>
-                <div><strong>Endereço:</strong> {data.client_address || 'N/A'}</div>
-                {data.client_number && <div><strong>Número:</strong> {data.client_number}</div>}
-                {data.client_neighborhood && <div><strong>Bairro:</strong> {data.client_neighborhood}</div>}
-                <div><strong>Cidade:</strong> {data.client_city || 'N/A'}</div>
-                <div><strong>Estado:</strong> {data.client_state || 'N/A'}</div>
-                <div><strong>CEP:</strong> {data.client_zip_code || 'N/A'}</div>
-              </div>
-            </div>
-            <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#0B1E3C' }}>
-                Endereço de Entrega
-              </div>
-              <div style={{ fontSize: '9pt', lineHeight: '1.6' }}>
-                <div><strong>Endereço:</strong> {data.client_address || 'N/A'}</div>
-                {data.client_number && <div><strong>Número:</strong> {data.client_number}</div>}
-                {data.client_neighborhood && <div><strong>Bairro:</strong> {data.client_neighborhood}</div>}
-                <div><strong>Cidade:</strong> {data.client_city || 'N/A'}</div>
-                <div><strong>Estado:</strong> {data.client_state || 'N/A'}</div>
-                <div><strong>CEP:</strong> {data.client_zip_code || 'N/A'}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* ITENS DO PEDIDO */}
         <div style={{ marginBottom: '8px' }}>
@@ -540,47 +500,7 @@ export default function A4Receipt({ type, data, onPrint }) {
           </table>
         </div>
 
-        {/* ENDEREÇOS */}
-        <div style={{ marginBottom: '8px' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 10px 0',
-            color: '#1B3C73',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '6px'
-          }}>
-            Endereços
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#0B1E3C' }}>
-                Endereço do Cliente
-              </div>
-              <div style={{ fontSize: '9pt', lineHeight: '1.6' }}>
-                <div><strong>Endereço:</strong> {data.client_address || 'N/A'}</div>
-                {data.client_number && <div><strong>Número:</strong> {data.client_number}</div>}
-                {data.client_neighborhood && <div><strong>Bairro:</strong> {data.client_neighborhood}</div>}
-                <div><strong>Cidade:</strong> {data.client_city || 'N/A'}</div>
-                <div><strong>Estado:</strong> {data.client_state || 'N/A'}</div>
-                <div><strong>CEP:</strong> {data.client_zip_code || 'N/A'}</div>
-              </div>
-            </div>
-            <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '6px', border: '1px solid #E0E0E0' }}>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#0B1E3C' }}>
-                Endereço de Entrega
-              </div>
-              <div style={{ fontSize: '9pt', lineHeight: '1.6' }}>
-                <div><strong>Endereço:</strong> {data.delivery_address || data.client_address || 'N/A'}</div>
-                {data.delivery_number && <div><strong>Número:</strong> {data.delivery_number}</div>}
-                {data.delivery_neighborhood && <div><strong>Bairro:</strong> {data.delivery_neighborhood}</div>}
-                <div><strong>Cidade:</strong> {data.delivery_city || data.client_city || 'N/A'}</div>
-                <div><strong>Estado:</strong> {data.delivery_state || data.client_state || 'N/A'}</div>
-                <div><strong>CEP:</strong> {data.delivery_zip_code || data.client_zip_code || 'N/A'}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* ITENS DO ORÇAMENTO */}
         <div style={{ marginBottom: '8px' }}>
