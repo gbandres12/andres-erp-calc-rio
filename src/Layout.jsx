@@ -13,12 +13,14 @@ import {
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarHeader, SidebarFooter, SidebarProvider, SidebarTrigger
 } from "@/components/ui/sidebar";
+import { toast } from "sonner";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 
 const navigationGroups = [
   {
@@ -56,7 +58,7 @@ const navigationGroups = [
   {
     title: "Comercial",
     items: [
-      { title: "Orçamentos", url: "Quotes", icon: FileText }, // Added new item
+      { title: "Orçamentos", url: "Quotes", icon: FileText },
       { title: "Vendas", url: "Sales", icon: ShoppingCart },
       { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck }
     ]
@@ -77,12 +79,38 @@ const navigationGroups = [
       { title: "Configurações", url: "Settings", icon: Settings }
     ]
   }
-  ];
+];
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Fetch user first to know permissions
+  useEffect(() => {
+    base44.auth.me().then(setUser).catch(console.error);
+  }, []);
+
+  // Auto-refresh logic
+  useEffect(() => {
+    const intervalTime = parseInt(localStorage.getItem('refresh_interval') || '0');
+    if (intervalTime > 0) {
+      const interval = setInterval(() => {
+        handleRefreshData();
+      }, intervalTime);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries();
+    setTimeout(() => setIsRefreshing(false), 1000); // Visual feedback
+  };
 
   const filteredNavigation = React.useMemo(() => {
     if (!user) return navigationGroups;
@@ -106,13 +134,6 @@ export default function Layout({ children, currentPageName }) {
     }
     return navigationGroups;
   }, [user]);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
-
-  // Fetch user first to know permissions
-  useEffect(() => {
-    base44.auth.me().then(setUser).catch(console.error);
-  }, []);
 
   const { data: companies = [] } = useQuery({
     queryKey: ['companies', user?.id],
@@ -137,7 +158,6 @@ export default function Layout({ children, currentPageName }) {
       
       // Se não tiver filial selecionada E não estiver na página de seleção, redirecionar
       if (!savedCompanyId && currentPageName !== 'CompanySelector') {
-        // Use navigate instead of window.location to avoid refresh loops if configured correctly
         navigate(createPageUrl('CompanySelector'));
         return;
       }
@@ -160,12 +180,16 @@ export default function Layout({ children, currentPageName }) {
     checkCompany();
   }, [companies, currentPageName, user, navigate]);
 
-  const handleCompanyChange = (company) => {
+  const handleCompanyChange = async (company) => {
     setSelectedCompany(company);
     setSelectedCompanyId(company.id);
     localStorage.setItem('selectedCompanyId', company.id);
     localStorage.setItem('selectedCompanyName', company.name);
-    window.location.reload();
+    
+    // Otimização: Em vez de reload, invalidar queries e navegar
+    await queryClient.invalidateQueries();
+    navigate(createPageUrl('Dashboard'));
+    toast.success(`Filial alterada para ${company.name}`);
   };
 
   const handleLogout = () => {
@@ -197,6 +221,19 @@ export default function Layout({ children, currentPageName }) {
                 <h2 className="font-bold text-slate-900 text-lg">Andres Tech</h2>
                 <p className="text-xs text-slate-500 truncate">Sistema de Gestão</p>
               </div>
+            </div>
+
+            <div className="mt-4 mb-2 px-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full gap-2 bg-purple-50 border-purple-200 hover:bg-purple-100 text-purple-700"
+                onClick={handleRefreshData}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Atualizando...' : 'Atualizar Dados'}
+              </Button>
             </div>
 
             {selectedCompany && (

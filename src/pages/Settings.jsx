@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette } from "lucide-react";
+import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -17,6 +17,7 @@ export default function Settings() {
     email_notifications: true,
     low_stock_alerts: true,
     transfer_alerts: true,
+    refresh_interval: "0",
     theme: "light"
   });
 
@@ -82,6 +83,30 @@ export default function Settings() {
                 <Label>Fuso Horário</Label>
                 <Input value="America/Sao_Paulo" disabled className="bg-slate-100" />
               </div>
+
+              <div className="space-y-2">
+                <Label>Intervalo de Atualização Automática (Dados)</Label>
+                <div className="flex items-center gap-2 p-3 border rounded-lg bg-slate-50">
+                  <RefreshCw className="w-5 h-5 text-blue-600" />
+                  <select 
+                    className="flex-1 bg-transparent border-none text-sm focus:ring-0"
+                    value={settings.refresh_interval}
+                    onChange={(e) => {
+                      setSettings({...settings, refresh_interval: e.target.value});
+                      // Save to local storage for immediate effect in Layout without fetch
+                      localStorage.setItem('refresh_interval', e.target.value);
+                    }}
+                  >
+                    <option value="0">Manual (Sem atualização automática)</option>
+                    <option value="60000">1 Minuto</option>
+                    <option value="300000">5 Minutos</option>
+                    <option value="600000">10 Minutos</option>
+                    <option value="1800000">30 Minutos</option>
+                  </select>
+                </div>
+                <p className="text-xs text-slate-500">Define com que frequência os dados da tela são recarregados automaticamente.</p>
+              </div>
+
               <Button onClick={handleSaveSettings}>
                 <Save className="w-4 h-4 mr-2" />
                 Salvar Alterações
