@@ -838,6 +838,7 @@ export default function Transactions() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Dialog Receber/Pagar (Abatimento) */}
