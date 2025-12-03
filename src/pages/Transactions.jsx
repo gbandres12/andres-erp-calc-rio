@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -36,6 +36,16 @@ export default function Transactions() {
   const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
   const [isReceivePayOpen, setIsReceivePayOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  
+  // Password Edit States
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [pendingEditTransaction, setPendingEditTransaction] = useState(null);
+
+  // Import States
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [paymentFormData, setPaymentFormData] = useState({
     amount: 0,
@@ -289,21 +299,111 @@ export default function Transactions() {
     }
   };
 
-  const handleEdit = (transaction) => {
-    setEditingTransaction(transaction);
-    setFormData({
-      description: transaction.description || "",
-      amount: transaction.amount || 0,
-      type: transaction.type || "receita",
-      category: transaction.category || "",
-      status: transaction.status || "pendente",
-      due_date: transaction.due_date || new Date().toISOString().split('T')[0],
-      payment_date: transaction.payment_date || "",
-      account_id: transaction.account_id || "",
-      contact_id: transaction.contact_id || "",
-      notes: transaction.notes || ""
-    });
-    setIsDialogOpen(true);
+  const initiateEdit = (transaction) => {
+    setPendingEditTransaction(transaction);
+    setPasswordInput("");
+    setIsPasswordDialogOpen(true);
+  };
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    if (passwordInput === "1234") {
+      setIsPasswordDialogOpen(false);
+      const transaction = pendingEditTransaction;
+      
+      setEditingTransaction(transaction);
+      setFormData({
+        description: transaction.description || "",
+        amount: transaction.amount || 0,
+        type: transaction.type || "receita",
+        category: transaction.category || "",
+        status: transaction.status || "pendente",
+        due_date: transaction.due_date || new Date().toISOString().split('T')[0],
+        payment_date: transaction.payment_date || "",
+        account_id: transaction.account_id || "",
+        contact_id: transaction.contact_id || "",
+        notes: transaction.notes || ""
+      });
+      setIsDialogOpen(true);
+      setPendingEditTransaction(null);
+      toast.success("Acesso autorizado!");
+    } else {
+      toast.error("Senha incorreta!");
+    }
+  };
+
+  const handleImportFile = async (e) => {
+    e.preventDefault();
+    if (!importFile) {
+      toast.error("Selecione um arquivo CSV");
+      return;
+    }
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      try {
+        const csv = event.target.result;
+        const lines = csv.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+        
+        // Map CSV headers to internal keys
+        // Expected format: descricao, valor, tipo, categoria, vencimento, status
+        
+        let successCount = 0;
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          // Simple split handling commas inside quotes would be better, but keeping simple for now
+          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+          
+          if (values.length < 2) continue;
+
+          const row = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index];
+          });
+
+          // Construct transaction object
+          const description = row['descricao'] || row['descrição'] || 'Importado via CSV';
+          const amount = parseFloat((row['valor'] || '0').replace('R$', '').replace('.', '').replace(',', '.'));
+          let type = (row['tipo'] || 'receita').toLowerCase();
+          if (!['receita', 'despesa'].includes(type)) type = 'receita'; // default
+          
+          const category = row['categoria'] || 'Geral';
+          const dueDate = row['vencimento'] || row['data'] || getTodayDate();
+          
+          // Create Transaction
+          await base44.entities.Transaction.create({
+            description,
+            amount: isNaN(amount) ? 0 : amount,
+            type,
+            category,
+            status: 'pendente', // Default to pending for safety on import
+            due_date: dueDate,
+            company_id: selectedCompanyId,
+            notes: `Importado em ${formatDate(getTodayDate())}`
+          });
+          
+          successCount++;
+        }
+
+        queryClient.invalidateQueries(['transactions']);
+        setIsImportDialogOpen(false);
+        setImportFile(null);
+        toast.success(`${successCount} lançamentos importados com sucesso!`);
+      } catch (error) {
+        console.error(error);
+        toast.error("Erro ao processar arquivo: " + error.message);
+      } finally {
+        setIsImporting(false);
+      }
+    };
+
+    reader.readAsText(importFile);
   };
 
   const handleReceivePay = (transaction) => {
@@ -457,13 +557,49 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold text-slate-900">Lançamentos Financeiros</h1>
           <p className="text-slate-500 mt-1">Receitas e despesas</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Lançamento
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Upload className="w-4 h-4" />
+                Importar
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Importar Lançamentos (CSV)</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="p-4 bg-slate-50 rounded-lg text-sm text-slate-600 space-y-2">
+                  <p className="font-semibold">Formato esperado do CSV:</p>
+                  <p>descricao, valor, tipo, categoria, vencimento</p>
+                  <p className="text-xs text-slate-400">Ex: Pagamento Luz, 150.00, despesa, Energia, 2023-12-01</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Arquivo CSV</Label>
+                  <Input 
+                    type="file" 
+                    accept=".csv"
+                    onChange={(e) => setImportFile(e.target.files[0])}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleImportFile} disabled={isImporting || !importFile}>
+                    {isImporting ? 'Importando...' : 'Processar Importação'}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Lançamento
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingTransaction ? "Editar" : "Novo"} Lançamento</DialogTitle>
@@ -831,6 +967,34 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Senha para Edição */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              Autorização Necessária
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Senha de Administrador</Label>
+              <Input 
+                type="password" 
+                placeholder="Digite a senha..."
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setIsPasswordDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit">Confirmar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog Histórico de Pagamentos */}
       <Dialog open={isPaymentHistoryOpen} onOpenChange={setIsPaymentHistoryOpen}>
         <DialogContent className="max-w-3xl">
@@ -1138,6 +1302,14 @@ export default function Transactions() {
                       </>
                     )}
                     <div className="flex gap-2 mt-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => initiateEdit(transaction)}
+                        className="text-slate-500 hover:text-blue-600"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
                       {transaction.status !== 'pago' && (
                         <Button
                           size="sm"
