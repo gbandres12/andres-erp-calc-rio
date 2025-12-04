@@ -46,6 +46,8 @@ export default function Transactions() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importType, setImportType] = useState('receita');
+  const [importAccountId, setImportAccountId] = useState("");
 
   const [paymentFormData, setPaymentFormData] = useState({
     amount: 0,
@@ -338,6 +340,10 @@ export default function Transactions() {
       toast.error("Selecione um arquivo CSV");
       return;
     }
+    if (!importAccountId) {
+      toast.error("Selecione uma conta para os lançamentos pagos");
+      return;
+    }
 
     setIsImporting(true);
     const reader = new FileReader();
@@ -348,16 +354,13 @@ export default function Transactions() {
         const lines = csv.split('\n');
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
         
-        // Map CSV headers to internal keys
-        // Expected format: descricao, valor, tipo, categoria, vencimento, status
-        
         let successCount = 0;
+        let totalAdjustment = 0;
         
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           
-          // Simple split handling commas inside quotes would be better, but keeping simple for now
           const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
           
           if (values.length < 2) continue;
@@ -370,31 +373,54 @@ export default function Transactions() {
           // Construct transaction object
           const description = row['descricao'] || row['descrição'] || 'Importado via CSV';
           const amount = parseFloat((row['valor'] || '0').replace('R$', '').replace('.', '').replace(',', '.'));
-          let type = (row['tipo'] || 'receita').toLowerCase();
-          if (!['receita', 'despesa'].includes(type)) type = 'receita'; // default
+          const validAmount = isNaN(amount) ? 0 : amount;
+          
+          // Use selected type for all imported items
+          const type = importType;
           
           const category = row['categoria'] || 'Geral';
           const dueDate = row['vencimento'] || row['data'] || getTodayDate();
           
-          // Create Transaction
+          // Create Transaction with status 'pago'
           await base44.entities.Transaction.create({
             description,
-            amount: isNaN(amount) ? 0 : amount,
+            amount: validAmount,
             type,
             category,
-            status: 'pendente', // Default to pending for safety on import
+            status: 'pago', 
+            paid_amount: validAmount,
             due_date: dueDate,
+            payment_date: dueDate, // Assume paid on due date/import date
+            account_id: importAccountId,
             company_id: selectedCompanyId,
-            notes: `Importado em ${formatDate(getTodayDate())}`
+            notes: `Importado em ${formatDate(getTodayDate())} (Pago)`
           });
+
+          // Calculate adjustment
+          if (type === 'receita') {
+            totalAdjustment += validAmount;
+          } else {
+            totalAdjustment -= validAmount;
+          }
           
           successCount++;
         }
 
+        // Update Financial Account Balance
+        if (successCount > 0 && importAccountId) {
+            const account = accounts.find(a => a.id === importAccountId);
+            if (account) {
+                await base44.entities.FinancialAccount.update(importAccountId, {
+                    current_balance: account.current_balance + totalAdjustment
+                });
+            }
+        }
+
         queryClient.invalidateQueries(['transactions']);
+        queryClient.invalidateQueries(['accounts']);
         setIsImportDialogOpen(false);
         setImportFile(null);
-        toast.success(`${successCount} lançamentos importados com sucesso!`);
+        toast.success(`${successCount} lançamentos importados e marcados como pagos!`);
       } catch (error) {
         console.error(error);
         toast.error("Erro ao processar arquivo: " + error.message);
@@ -574,6 +600,35 @@ export default function Transactions() {
                   <p className="font-semibold">Formato esperado do CSV:</p>
                   <p>descricao, valor, tipo, categoria, vencimento</p>
                   <p className="text-xs text-slate-400">Ex: Pagamento Luz, 150.00, despesa, Energia, 2023-12-01</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Tipo de Lançamento</Label>
+                    <Select value={importType} onValueChange={setImportType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="receita">Receita</SelectItem>
+                        <SelectItem value="despesa">Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Conta (Pago)</Label>
+                    <Select value={importAccountId} onValueChange={setImportAccountId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a conta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name} ({formatBRL(account.current_balance)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Arquivo CSV</Label>
