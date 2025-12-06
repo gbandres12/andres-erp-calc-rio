@@ -20,6 +20,7 @@ import Reports from './pages/Reports';
 import SaleWithdrawals from './pages/SaleWithdrawals';
 import Quotes from './pages/Quotes';
 import Users from './pages/Users';
+import Receivables from './pages/Receivables';
 import __Layout from './Layout.jsx';
 
 
@@ -46,6 +47,7 @@ export const PAGES = {
     "SaleWithdrawals": SaleWithdrawals,
     "Quotes": Quotes,
     "Users": Users,
+    "Receivables": Receivables,
 }
 
 export const pagesConfig = {
