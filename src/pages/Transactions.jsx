@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -48,6 +48,16 @@ export default function Transactions() {
   const [isImporting, setIsImporting] = useState(false);
   const [importType, setImportType] = useState('receita');
   const [importAccountId, setImportAccountId] = useState("");
+
+  // Quick Entry States
+  const [isQuickEntryOpen, setIsQuickEntryOpen] = useState(false);
+  const [quickFormData, setQuickFormData] = useState({
+    description: "",
+    amount: 0,
+    type: "despesa",
+    category: "",
+    account_id: ""
+  });
 
   const [paymentFormData, setPaymentFormData] = useState({
     amount: 0,
@@ -472,6 +482,69 @@ export default function Transactions() {
     });
   };
 
+  const quickEntryMutation = useMutation({
+    mutationFn: async (data) => {
+      const transaction = await base44.entities.Transaction.create({
+        description: data.description,
+        amount: data.amount,
+        type: data.type,
+        category: data.category,
+        status: 'pago',
+        due_date: getTodayDate(),
+        payment_date: getTodayDate(),
+        account_id: data.account_id,
+        company_id: selectedCompanyId,
+        paid_amount: data.amount,
+        notes: 'Lançamento rápido'
+      });
+
+      const account = accounts.find(a => a.id === data.account_id);
+      if (account) {
+        const adjustment = data.type === 'receita' ? data.amount : -data.amount;
+        await base44.entities.FinancialAccount.update(data.account_id, {
+          current_balance: account.current_balance + adjustment
+        });
+
+        const user = await base44.auth.me();
+        await base44.entities.TransactionPayment.create({
+          transaction_id: transaction.id,
+          transaction_reference: transaction.description,
+          amount: data.amount,
+          payment_date: getTodayDate(),
+          account_id: data.account_id,
+          account_name: account.name,
+          payment_method: 'dinheiro',
+          responsible: user?.full_name || user?.email || '',
+          notes: 'Lançamento rápido',
+          company_id: selectedCompanyId
+        });
+      }
+      return transaction;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['transactions']);
+      queryClient.invalidateQueries(['accounts']);
+      setIsQuickEntryOpen(false);
+      setQuickFormData({
+        description: "",
+        amount: 0,
+        type: "despesa",
+        category: "",
+        account_id: ""
+      });
+      toast.success("✅ Lançamento rápido criado!");
+    }
+  });
+
+  const handleQuickEntry = (e) => {
+    e.preventDefault();
+    if (!quickFormData.description || !quickFormData.account_id || quickFormData.amount <= 0) {
+      toast.error("Preencha todos os campos obrigatórios!");
+      return;
+    }
+    quickEntryMutation.mutate(quickFormData);
+  };
+
   // ATUALIZAR: Adicionar pesquisa ao filtro
   const filteredTransactions = transactions.filter(t => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
@@ -586,6 +659,112 @@ export default function Transactions() {
           <p className="text-slate-500 mt-1">Receitas e despesas</p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={isQuickEntryOpen} onOpenChange={setIsQuickEntryOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200">
+                <Zap className="w-4 h-4" />
+                Lançamento Rápido
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-purple-600" />
+                  Lançamento Rápido
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleQuickEntry} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Tipo *</Label>
+                    <Select
+                      required
+                      value={quickFormData.type}
+                      onValueChange={(value) => setQuickFormData({ ...quickFormData, type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="receita">💰 Receita</SelectItem>
+                        <SelectItem value="despesa">💸 Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valor (R$) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={quickFormData.amount}
+                      onChange={(e) => setQuickFormData({ ...quickFormData, amount: parseFloat(e.target.value) || 0 })}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Descrição *</Label>
+                  <Input
+                    required
+                    value={quickFormData.description}
+                    onChange={(e) => setQuickFormData({ ...quickFormData, description: e.target.value })}
+                    placeholder="Ex: Almoço, Combustível..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Categoria *</Label>
+                  <Select
+                    required
+                    value={quickFormData.category}
+                    onValueChange={(value) => setQuickFormData({ ...quickFormData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {defaultCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Conta *</Label>
+                  <Select
+                    required
+                    value={quickFormData.account_id}
+                    onValueChange={(value) => setQuickFormData({ ...quickFormData, account_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name} ({formatBRL(account.current_balance)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="ghost" onClick={() => setIsQuickEntryOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={quickEntryMutation.isPending} className="bg-purple-600 hover:bg-purple-700">
+                    <Zap className="w-4 h-4 mr-2" />
+                    {quickEntryMutation.isPending ? "Criando..." : "Registrar Agora"}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">

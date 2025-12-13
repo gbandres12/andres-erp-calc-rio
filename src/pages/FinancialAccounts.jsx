@@ -157,15 +157,15 @@ export default function FinancialAccounts() {
     });
   }, [accountTransactions, startDate, endDate]);
 
-  // NOVO: Calcular totais do período filtrado
+  // NOVO: Calcular totais do período filtrado usando paid_amount
   const periodStats = useMemo(() => {
     const entradas = filteredTransactions
       .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
+      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
     
     const saidas = filteredTransactions
       .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
+      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
 
     return {
       entradas,
@@ -577,23 +577,23 @@ export default function FinancialAccounts() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Saldo Inicial</p>
                     <p className="text-xl font-bold text-slate-900">
-                      {formatBRL(viewingAccount?.initial_balance)}
+                      {formatBRL(viewingAccount?.initial_balance || 0)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600 mb-1">Saldo Atual</p>
+                    <p className="text-sm text-slate-600 mb-1">Saldo Real (Calculado)</p>
                     <p className={`text-xl font-bold ${
-                      viewingAccount?.current_balance >= 0 ? 'text-green-600' : 'text-red-600'
+                      (accountBalances[viewingAccount?.id] || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatBRL(viewingAccount?.current_balance)}
+                      {formatBRL(accountBalances[viewingAccount?.id] || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Movimentação Total</p>
                     <p className={`text-xl font-bold ${
-                      (viewingAccount?.current_balance - viewingAccount?.initial_balance) >= 0 ? 'text-green-600' : 'text-red-600'
+                      ((accountBalances[viewingAccount?.id] || 0) - (viewingAccount?.initial_balance || 0)) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatBRL(viewingAccount?.current_balance - viewingAccount?.initial_balance)}
+                      {formatBRL((accountBalances[viewingAccount?.id] || 0) - (viewingAccount?.initial_balance || 0))}
                     </p>
                   </div>
                 </div>
@@ -798,7 +798,7 @@ export default function FinancialAccounts() {
                             <p className={`text-xl font-bold ${
                               transaction.type === 'receita' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {transaction.type === 'receita' ? '+' : '-'} {formatBRL(transaction.amount)}
+                              {transaction.type === 'receita' ? '+' : '-'} {formatBRL(transaction.paid_amount || transaction.amount)}
                             </p>
                             {transaction.contact_name && (
                               <p className="text-xs text-slate-500 mt-1">{transaction.contact_name}</p>
