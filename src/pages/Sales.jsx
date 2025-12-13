@@ -1028,6 +1028,22 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Recibo de Pagamento Individual */}
+      <Dialog open={isPaymentReceiptOpen} onOpenChange={setIsPaymentReceiptOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recibo de Pagamento</DialogTitle>
+          </DialogHeader>
+          {paymentReceiptData && (
+            <PaymentReceipt 
+              payment={paymentReceiptData.payment}
+              sale={paymentReceiptData.sale}
+              previousPayments={paymentReceiptData.previousPayments}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Filtros */}
       <Card className="mb-6">
         <CardContent className="pt-6">
