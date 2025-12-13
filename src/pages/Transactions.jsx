@@ -74,6 +74,8 @@ export default function Transactions() {
     "EPIs",
     "Marketing",
     "Vendas",
+    "Distribuição entre Filiais",
+    "Empréstimo entre Filiais",
     "Pró-labore",
     "Outros"
   ];

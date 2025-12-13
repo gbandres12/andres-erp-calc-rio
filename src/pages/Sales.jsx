@@ -177,86 +177,90 @@ export default function Sales() {
     }
   });
 
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [saleToInvoice, setSaleToInvoice] = useState(null);
+  const [invoicePayments, setInvoicePayments] = useState([]);
+
   const invoiceSaleMutation = useMutation({
-    mutationFn: async (sale) => {
+    mutationFn: async ({ sale, payments }) => {
       console.log("💰 Faturando venda:", sale.reference);
 
       await base44.entities.Sale.update(sale.id, {
         status: 'faturada'
       });
 
-      if (sale.paid_amount > 0) {
-        await base44.entities.Transaction.create({
-          description: `Entrada - ${sale.reference} - ${sale.client_name}`,
-          amount: sale.paid_amount,
-          type: 'receita',
-          category: 'Vendas',
-          status: 'pago',
-          due_date: sale.sale_date,
-          payment_date: sale.sale_date,
-          account_id: sale.payment_account_id || '',
-          contact_id: sale.client_id,
-          contact_name: sale.client_name,
-          company_id: selectedCompanyId,
-          paid_amount: sale.paid_amount,
-          notes: `Venda: ${sale.reference}`
-        });
-
-        if (sale.payment_account_id) {
-          const account = accounts.find(a => a.id === sale.payment_account_id);
-          if (account) {
-            await base44.entities.FinancialAccount.update(sale.payment_account_id, {
-              current_balance: account.current_balance + sale.paid_amount
-            });
-          }
-        }
-        
-        console.log("✅ Lançamento de entrada criado:", sale.paid_amount);
-      }
-
-      if (sale.installments && sale.installments.length > 0) {
-        for (const installment of sale.installments) {
-          const transaction = await base44.entities.Transaction.create({
-            description: `${sale.reference} - Parcela ${installment.installment_number}/${sale.installments.length} - ${sale.client_name}`,
-            amount: installment.amount,
+      // Processar pagamentos fracionados
+      let totalPaidNow = 0;
+      for (const payment of payments) {
+        if (payment.amount > 0) {
+          await base44.entities.Transaction.create({
+            description: `${sale.reference} - ${payment.description || 'Pagamento'} - ${sale.client_name}`,
+            amount: payment.amount,
             type: 'receita',
             category: 'Vendas',
-            status: installment.status === 'pago' ? 'pago' : 'pendente',
-            due_date: installment.due_date,
-            payment_date: installment.payment_date || '',
-            account_id: installment.account_id || '',
+            status: 'pago',
+            due_date: payment.date,
+            payment_date: payment.date,
+            account_id: payment.account_id,
             contact_id: sale.client_id,
             contact_name: sale.client_name,
             company_id: selectedCompanyId,
-            paid_amount: installment.paid_amount || 0,
-            notes: `Venda: ${sale.reference}`
+            paid_amount: payment.amount,
+            notes: `Venda: ${sale.reference} - ${payment.payment_method}`
           });
 
-          await base44.entities.SaleInstallment.update(installment.id, {
-            transaction_id: transaction.id
+          const account = accounts.find(a => a.id === payment.account_id);
+          if (account) {
+            await base44.entities.FinancialAccount.update(payment.account_id, {
+              current_balance: account.current_balance + payment.amount
+            });
+          }
+
+          await base44.entities.SalePayment.create({
+            sale_id: sale.id,
+            sale_reference: sale.reference,
+            payment_method: payment.payment_method,
+            amount: payment.amount,
+            payment_date: payment.date,
+            account_id: payment.account_id,
+            company_id: selectedCompanyId,
+            notes: payment.description || ''
           });
 
-          console.log(`✅ Lançamento de parcela ${installment.installment_number} criado`);
+          totalPaidNow += payment.amount;
         }
-      } else if (sale.paid_amount === 0 && sale.total > 0) {
+      }
+
+      // Criar conta a receber para o saldo restante
+      const remainingAmount = sale.total - totalPaidNow;
+      if (remainingAmount > 0.01) {
         await base44.entities.Transaction.create({
-          description: `${sale.reference} - ${sale.client_name}`,
-          amount: sale.total,
+          description: `${sale.reference} - Saldo a Receber - ${sale.client_name}`,
+          amount: remainingAmount,
           type: 'receita',
           category: 'Vendas',
           status: 'pendente',
           due_date: sale.sale_date,
-          payment_date: '',
-          account_id: '',
           contact_id: sale.client_id,
           contact_name: sale.client_name,
           company_id: selectedCompanyId,
           paid_amount: 0,
           notes: `Venda: ${sale.reference}`
         });
-        
-        console.log("✅ Lançamento único criado (sem entrada e sem parcelas)");
       }
+
+      // Atualizar venda
+      const newPaidAmount = (sale.paid_amount || 0) + totalPaidNow;
+      const newRemainingAmount = sale.total - newPaidAmount;
+      let paymentStatus = 'pendente';
+      if (newRemainingAmount <= 0.01) paymentStatus = 'pago';
+      else if (newPaidAmount > 0) paymentStatus = 'parcial';
+
+      await base44.entities.Sale.update(sale.id, {
+        paid_amount: newPaidAmount,
+        remaining_amount: newRemainingAmount,
+        payment_status: paymentStatus
+      });
 
       return sale;
     },
@@ -264,6 +268,9 @@ export default function Sales() {
       queryClient.invalidateQueries(['sales']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['transactions']);
+      setIsInvoiceDialogOpen(false);
+      setSaleToInvoice(null);
+      setInvoicePayments([]);
       toast.success("✅ Venda faturada e lançamentos criados no financeiro!");
     },
     onError: (error) => {
@@ -361,16 +368,39 @@ export default function Sales() {
       return;
     }
 
-    if (confirm(`Faturar a venda ${sale.reference}?\n\nIsso criará os lançamentos financeiros automaticamente.`)) {
-      const installments = await base44.entities.SaleInstallment.filter({
-        sale_id: sale.id
-      }, 'installment_number');
+    setSaleToInvoice(sale);
+    setInvoicePayments([{
+      description: "Pagamento 1",
+      amount: 0,
+      date: getTodayDate(),
+      account_id: "",
+      payment_method: "dinheiro"
+    }]);
+    setIsInvoiceDialogOpen(true);
+  };
 
-      invoiceSaleMutation.mutate({
-        ...sale,
-        installments
-      });
-    }
+  const addInvoicePayment = () => {
+    setInvoicePayments([...invoicePayments, {
+      description: `Pagamento ${invoicePayments.length + 1}`,
+      amount: 0,
+      date: getTodayDate(),
+      account_id: "",
+      payment_method: "dinheiro"
+    }]);
+  };
+
+  const removeInvoicePayment = (idx) => {
+    setInvoicePayments(invoicePayments.filter((_, i) => i !== idx));
+  };
+
+  const updateInvoicePayment = (idx, field, value) => {
+    const updated = [...invoicePayments];
+    updated[idx][field] = value;
+    setInvoicePayments(updated);
+  };
+
+  const confirmInvoice = () => {
+    invoiceSaleMutation.mutate({ sale: saleToInvoice, payments: invoicePayments });
   };
 
   const handlePrintReceipt = async (sale, type = 'thermal') => {
@@ -792,6 +822,141 @@ export default function Sales() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Dialog Faturamento com Pagamentos Fracionados */}
+      <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Faturar Venda - Pagamentos Recebidos</DialogTitle>
+          </DialogHeader>
+          {saleToInvoice && (
+            <div className="space-y-4">
+              <Card className="bg-blue-50">
+                <CardContent className="pt-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold">{saleToInvoice.reference}</p>
+                      <p className="text-sm text-slate-600">{saleToInvoice.client_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-slate-600">Valor Total</p>
+                      <p className="text-2xl font-bold text-blue-600">{formatBRL(saleToInvoice.total)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label className="text-base font-semibold">Pagamentos Recebidos</Label>
+                  <Button type="button" size="sm" variant="outline" onClick={addInvoicePayment}>
+                    <Plus className="w-4 h-4 mr-1" /> Adicionar
+                  </Button>
+                </div>
+
+                {invoicePayments.map((payment, idx) => (
+                  <Card key={idx}>
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Descrição</Label>
+                          <Input 
+                            placeholder="Ex: Entrada, PIX, etc"
+                            value={payment.description}
+                            onChange={e => updateInvoicePayment(idx, 'description', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Valor (R$)</Label>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            value={payment.amount}
+                            onChange={e => updateInvoicePayment(idx, 'amount', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Data</Label>
+                          <Input 
+                            type="date"
+                            value={payment.date}
+                            onChange={e => updateInvoicePayment(idx, 'date', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Forma</Label>
+                          <Select value={payment.payment_method} onValueChange={v => updateInvoicePayment(idx, 'payment_method', v)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                              <SelectItem value="pix">PIX</SelectItem>
+                              <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                              <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                              <SelectItem value="transferencia">Transferência</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs">Conta</Label>
+                          <div className="flex gap-2">
+                            <Select value={payment.account_id} onValueChange={v => updateInvoicePayment(idx, 'account_id', v)} className="flex-1">
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a conta" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {accounts.map(a => (
+                                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {invoicePayments.length > 1 && (
+                              <Button type="button" size="icon" variant="ghost" onClick={() => removeInvoicePayment(idx)}>
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <Card className="bg-slate-50">
+                <CardContent className="pt-4">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Total da Venda:</span>
+                      <span className="font-bold">{formatBRL(saleToInvoice.total)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Pagamentos Registrados:</span>
+                      <span className="font-bold text-green-600">
+                        {formatBRL(invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="font-semibold">Saldo a Receber:</span>
+                      <span className="font-bold text-orange-600">
+                        {formatBRL(saleToInvoice.total - invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0))}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsInvoiceDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={confirmInvoice} disabled={invoiceSaleMutation.isPending} className="bg-green-600 hover:bg-green-700">
+                  {invoiceSaleMutation.isPending ? 'Faturando...' : 'Confirmar Faturamento'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
