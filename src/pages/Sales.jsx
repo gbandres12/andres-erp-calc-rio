@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ThermalReceipt from "../components/receipts/ThermalReceipt";
 import A4Receipt from "../components/receipts/A4Receipt";
+import PaymentReceipt from "../components/receipts/PaymentReceipt";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 
@@ -32,6 +33,9 @@ export default function Sales() {
   const [receiptSale, setReceiptSale] = useState(null); 
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false); 
   const [receiptType, setReceiptType] = useState('thermal');
+  
+  const [paymentReceiptData, setPaymentReceiptData] = useState(null);
+  const [isPaymentReceiptOpen, setIsPaymentReceiptOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     client_id: "",
@@ -401,6 +405,30 @@ export default function Sales() {
 
   const confirmInvoice = () => {
     invoiceSaleMutation.mutate({ sale: saleToInvoice, payments: invoicePayments });
+  };
+
+  const handlePrintPaymentReceipt = async (sale, paymentId) => {
+    try {
+      const allPayments = await base44.entities.SalePayment.filter({ sale_id: sale.id }, 'payment_date');
+      const paymentIndex = allPayments.findIndex(p => p.id === paymentId);
+      const currentPayment = allPayments[paymentIndex];
+      const previousPayments = allPayments.slice(0, paymentIndex);
+      
+      const company = companies.find(c => c.id === selectedCompanyId);
+      
+      setPaymentReceiptData({
+        payment: currentPayment,
+        sale: {
+          ...sale,
+          company_name: company?.name || '',
+          company_cnpj: company?.cnpj || ''
+        },
+        previousPayments
+      });
+      setIsPaymentReceiptOpen(true);
+    } catch (error) {
+      toast.error("Erro ao carregar dados do recibo");
+    }
   };
 
   const handlePrintReceipt = async (sale, type = 'thermal') => {
@@ -1121,8 +1149,41 @@ export default function Sales() {
                         onClick={() => handlePrintReceipt(sale, 'thermal')}
                       >
                         <Printer className="w-4 h-4 mr-1" />
-                        Recibo
+                        Pedido
                       </Button>
+
+                      {sale.status === 'faturada' && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Receipt className="w-4 h-4 mr-1" />
+                              Recibos
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80">
+                            <div className="space-y-2">
+                              <p className="font-semibold text-sm mb-3">Recibos de Pagamento</p>
+                              {sale.paid_amount > 0 ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start"
+                                  onClick={async () => {
+                                    const payments = await base44.entities.SalePayment.filter({ sale_id: sale.id }, 'payment_date');
+                                    if (payments.length > 0) {
+                                      payments.forEach(p => handlePrintPaymentReceipt(sale, p.id));
+                                    }
+                                  }}
+                                >
+                                  Ver Todos os Recibos
+                                </Button>
+                              ) : (
+                                <p className="text-xs text-slate-500">Nenhum pagamento registrado</p>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                   </div>
                 </div>
