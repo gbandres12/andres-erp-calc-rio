@@ -444,6 +444,7 @@ export default function FinancialAccounts() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* KPI - Saldo Total */}
