@@ -1,53 +1,55 @@
-import CompanySelector from './pages/CompanySelector';
-import Dashboard from './pages/Dashboard';
-import Products from './pages/Products';
-import Warehouse from './pages/Warehouse';
-import Transfers from './pages/Transfers';
-import Vehicles from './pages/Vehicles';
-import Contacts from './pages/Contacts';
-import Profile from './pages/Profile';
 import ActivityLogs from './pages/ActivityLogs';
-import Settings from './pages/Settings';
-import Requisitions from './pages/Requisitions';
-import Weighing from './pages/Weighing';
-import Fuel from './pages/Fuel';
-import FinancialAccounts from './pages/FinancialAccounts';
-import Transactions from './pages/Transactions';
-import Sales from './pages/Sales';
+import CompanySelector from './pages/CompanySelector';
+import Contacts from './pages/Contacts';
+import Dashboard from './pages/Dashboard';
 import EPIs from './pages/EPIs';
+import FinancialAccounts from './pages/FinancialAccounts';
+import Fuel from './pages/Fuel';
+import Home from './pages/Home';
 import ITAssets from './pages/ITAssets';
-import Reports from './pages/Reports';
-import SaleWithdrawals from './pages/SaleWithdrawals';
+import Products from './pages/Products';
+import Profile from './pages/Profile';
 import Quotes from './pages/Quotes';
-import Users from './pages/Users';
 import Receivables from './pages/Receivables';
+import Reports from './pages/Reports';
+import Requisitions from './pages/Requisitions';
+import SaleWithdrawals from './pages/SaleWithdrawals';
+import Sales from './pages/Sales';
+import Settings from './pages/Settings';
+import Transactions from './pages/Transactions';
+import Transfers from './pages/Transfers';
+import Users from './pages/Users';
+import Vehicles from './pages/Vehicles';
+import Warehouse from './pages/Warehouse';
+import Weighing from './pages/Weighing';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "CompanySelector": CompanySelector,
-    "Dashboard": Dashboard,
-    "Products": Products,
-    "Warehouse": Warehouse,
-    "Transfers": Transfers,
-    "Vehicles": Vehicles,
-    "Contacts": Contacts,
-    "Profile": Profile,
     "ActivityLogs": ActivityLogs,
-    "Settings": Settings,
-    "Requisitions": Requisitions,
-    "Weighing": Weighing,
-    "Fuel": Fuel,
-    "FinancialAccounts": FinancialAccounts,
-    "Transactions": Transactions,
-    "Sales": Sales,
+    "CompanySelector": CompanySelector,
+    "Contacts": Contacts,
+    "Dashboard": Dashboard,
     "EPIs": EPIs,
+    "FinancialAccounts": FinancialAccounts,
+    "Fuel": Fuel,
+    "Home": Home,
     "ITAssets": ITAssets,
-    "Reports": Reports,
-    "SaleWithdrawals": SaleWithdrawals,
+    "Products": Products,
+    "Profile": Profile,
     "Quotes": Quotes,
-    "Users": Users,
     "Receivables": Receivables,
+    "Reports": Reports,
+    "Requisitions": Requisitions,
+    "SaleWithdrawals": SaleWithdrawals,
+    "Sales": Sales,
+    "Settings": Settings,
+    "Transactions": Transactions,
+    "Transfers": Transfers,
+    "Users": Users,
+    "Vehicles": Vehicles,
+    "Warehouse": Warehouse,
+    "Weighing": Weighing,
 }
 
 export const pagesConfig = {
