@@ -432,6 +432,7 @@ export default function Transactions() {
             }
         }
 
+        await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
         queryClient.invalidateQueries(['transactions']);
         queryClient.invalidateQueries(['accounts']);
         setIsImportDialogOpen(false);
