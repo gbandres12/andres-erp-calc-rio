@@ -185,7 +185,9 @@ export default function Transactions() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Transaction.update(id, data),
     onSuccess: () => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
+      queryClient.invalidateQueries(['accounts']);
       setIsDialogOpen(false);
       resetForm();
       toast.success("Lançamento atualizado!");
