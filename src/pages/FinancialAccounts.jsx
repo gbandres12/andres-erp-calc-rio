@@ -344,13 +344,23 @@ export default function FinancialAccounts() {
           <h1 className="text-3xl font-bold text-slate-900">Contas Financeiras</h1>
           <p className="text-slate-500 mt-1">Gestão de contas bancárias e caixa</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Conta
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            className="gap-2"
+          >
+            <RotateCcw className={`w-4 h-4 ${recalculateMutation.isPending ? 'animate-spin' : ''}`} />
+            {recalculateMutation.isPending ? 'Recalculando...' : 'Recalcular Saldos'}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Conta
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
