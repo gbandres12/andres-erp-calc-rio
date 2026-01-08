@@ -210,6 +210,26 @@ export default function FinancialAccounts() {
     }
   });
 
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['all-transactions']);
+      const updatedCount = data.results.filter(r => r.updated).length;
+      if (updatedCount > 0) {
+        toast.success(`${updatedCount} contas tiveram seus saldos corrigidos!`);
+      } else {
+        toast.success("Saldos verificados e estão corretos.");
+      }
+    },
+    onError: (error) => {
+      toast.error("Erro ao recalcular saldos: " + error.message);
+    }
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
