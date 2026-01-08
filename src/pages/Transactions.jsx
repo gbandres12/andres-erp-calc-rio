@@ -173,6 +173,7 @@ export default function Transactions() {
       return transaction;
     },
     onSuccess: () => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       setIsDialogOpen(false);
