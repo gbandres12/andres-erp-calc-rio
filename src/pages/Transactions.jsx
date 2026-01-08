@@ -267,6 +267,7 @@ export default function Transactions() {
       return { transaction, newStatus, newPaidAmount, remainingAmount };
     },
     onSuccess: ({ newStatus, remainingAmount }) => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
