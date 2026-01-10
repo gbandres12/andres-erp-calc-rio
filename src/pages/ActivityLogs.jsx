@@ -69,14 +69,14 @@ export default function ActivityLogs() {
               </div>
             ) : (
               filteredLogs.map((log) => (
-                <div key={log.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50">
-                  <div className="flex items-start gap-4 flex-1">
+                <div key={log.id} className="flex flex-col md:flex-row items-start justify-between p-4 border rounded-lg hover:bg-slate-50 gap-4">
+                  <div className="flex items-start gap-4 flex-1 min-w-0 w-full">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <User className="w-5 h-5 text-blue-600" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-slate-900">{log.user_name || log.user_email}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <p className="font-semibold text-slate-900 truncate">{log.user_name || log.user_email}</p>
                         <Badge className={actionColors[log.action] || "bg-slate-100 text-slate-800"}>
                           {log.action}
                         </Badge>
@@ -85,9 +85,9 @@ export default function ActivityLogs() {
                         )}
                       </div>
                       {log.details && (
-                        <p className="text-sm text-slate-600">{log.details}</p>
+                        <p className="text-sm text-slate-600 break-words">{log.details}</p>
                       )}
-                      <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-slate-500">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           <span>{new Date(log.created_date).toLocaleString('pt-BR')}</span>
