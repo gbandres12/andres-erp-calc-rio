@@ -213,13 +213,6 @@ export default function Sales() {
             notes: `Venda: ${sale.reference} - ${payment.payment_method}`
           });
 
-          const account = accounts.find(a => a.id === payment.account_id);
-          if (account) {
-            await base44.entities.FinancialAccount.update(payment.account_id, {
-              current_balance: account.current_balance + payment.amount
-            });
-          }
-
           await base44.entities.SalePayment.create({
             sale_id: sale.id,
             sale_reference: sale.reference,
@@ -269,6 +262,7 @@ export default function Sales() {
       return sale;
     },
     onSuccess: () => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['sales']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['transactions']);

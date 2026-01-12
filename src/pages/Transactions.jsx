@@ -149,11 +149,6 @@ export default function Transactions() {
       if (data.status === 'pago' && data.account_id) {
         const account = accounts.find(a => a.id === data.account_id);
         if (account) {
-          const adjustment = data.type === 'receita' ? data.amount : -data.amount;
-          await base44.entities.FinancialAccount.update(data.account_id, {
-            current_balance: account.current_balance + adjustment
-          });
-
           // Registrar histórico de pagamento inicial
           const user = await base44.auth.me();
           await base44.entities.TransactionPayment.create({
@@ -256,13 +251,6 @@ export default function Transactions() {
         notes: notes || '',
         company_id: selectedCompanyId
       });
-
-      if (accountId && account) {
-        const adjustment = transaction.type === 'receita' ? amount : -amount;
-        await base44.entities.FinancialAccount.update(accountId, {
-          current_balance: account.current_balance + adjustment
-        });
-      }
 
       return { transaction, newStatus, newPaidAmount, remainingAmount };
     },
@@ -422,16 +410,6 @@ export default function Transactions() {
           successCount++;
         }
 
-        // Update Financial Account Balance
-        if (successCount > 0 && importAccountId) {
-            const account = accounts.find(a => a.id === importAccountId);
-            if (account) {
-                await base44.entities.FinancialAccount.update(importAccountId, {
-                    current_balance: account.current_balance + totalAdjustment
-                });
-            }
-        }
-
         await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
         queryClient.invalidateQueries(['transactions']);
         queryClient.invalidateQueries(['accounts']);
@@ -505,11 +483,6 @@ export default function Transactions() {
 
       const account = accounts.find(a => a.id === data.account_id);
       if (account) {
-        const adjustment = data.type === 'receita' ? data.amount : -data.amount;
-        await base44.entities.FinancialAccount.update(data.account_id, {
-          current_balance: account.current_balance + adjustment
-        });
-
         const user = await base44.auth.me();
         await base44.entities.TransactionPayment.create({
           transaction_id: transaction.id,
