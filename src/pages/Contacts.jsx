@@ -45,14 +45,14 @@ export default function Contacts() {
     queryFn: async () => {
       // Busca todos os contatos ativos para garantir que contatos antigos (sem filial) também apareçam
       console.log('🔄 Buscando contatos...');
+      // Aumentando limite para 1000 e otimizando filtro
       const result = await base44.entities.Contact.filter({ 
         is_active: true,
-      }, '-created_date');
+      }, '-created_date', 1000);
       
       // Filtra para mostrar contatos desta filial OU contatos sem filial definida (legado/global)
       const filtered = result.filter(c => !c.company_id || c.company_id === selectedCompanyId);
       
-      console.log(`✅ Total: ${result.length}, Filtrados para esta filial: ${filtered.length}`);
       return filtered;
     },
     enabled: !!selectedCompanyId,
@@ -121,10 +121,16 @@ export default function Contacts() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    const dataToSubmit = {
+        ...formData,
+        credit_balance: formData.credit_balance === '' ? 0 : parseFloat(formData.credit_balance)
+    };
+
     if (editingContact) {
-      updateMutation.mutate({ id: editingContact.id, data: formData });
+      updateMutation.mutate({ id: editingContact.id, data: dataToSubmit });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(dataToSubmit);
     }
   };
 
@@ -747,7 +753,7 @@ export default function Contacts() {
                       type="number"
                       step="0.01"
                       value={formData.credit_balance}
-                      onChange={(e) => setFormData({ ...formData, credit_balance: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setFormData({ ...formData, credit_balance: e.target.value })}
                     />
                   </div>
                   <div className="col-span-2 space-y-2">
