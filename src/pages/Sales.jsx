@@ -326,9 +326,9 @@ export default function Sales() {
       }
     }
 
-    const quantity = parseFloat(newItems[index].quantity) || 0;
-    const unitPrice = parseFloat(newItems[index].unit_price) || 0;
-    const discount = parseFloat(newItems[index].discount) || 0;
+    const quantity = newItems[index].quantity === '' ? 0 : parseFloat(newItems[index].quantity) || 0;
+    const unitPrice = newItems[index].unit_price === '' ? 0 : parseFloat(newItems[index].unit_price) || 0;
+    const discount = newItems[index].discount === '' ? 0 : parseFloat(newItems[index].discount) || 0;
     newItems[index].total = (quantity * unitPrice) - discount;
 
     setFormData({ ...formData, items: newItems });
@@ -350,7 +350,9 @@ export default function Sales() {
     
     const dataToSend = {
       ...formData,
-      initial_payment: paymentData.initial_payment,
+      discount: formData.discount === '' ? 0 : parseFloat(formData.discount),
+      shipping: formData.shipping === '' ? 0 : parseFloat(formData.shipping),
+      initial_payment: paymentData.initial_payment === '' ? 0 : parseFloat(paymentData.initial_payment),
       payment_method: paymentData.payment_method,
       account_id: paymentData.account_id,
       installments: paymentData.installments,
@@ -627,7 +629,7 @@ export default function Sales() {
                               step="0.01"
                               required
                               value={item.quantity}
-                              onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                              onChange={(e) => updateItem(index, 'quantity', e.target.value === '' ? '' : e.target.value)}
                             />
                           </div>
                           <div className="space-y-2">
@@ -637,7 +639,7 @@ export default function Sales() {
                               step="0.01"
                               required
                               value={item.unit_price}
-                              onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+                              onChange={(e) => updateItem(index, 'unit_price', e.target.value === '' ? '' : e.target.value)}
                             />
                           </div>
                           <div className="space-y-2">
@@ -646,7 +648,7 @@ export default function Sales() {
                               type="number"
                               step="0.01"
                               value={item.discount}
-                              onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                              onChange={(e) => updateItem(index, 'discount', e.target.value === '' ? '' : e.target.value)}
                             />
                           </div>
                           <div className="space-y-2">
@@ -688,8 +690,9 @@ export default function Sales() {
                             step="0.01"
                             value={formData.discount}
                             onChange={(e) => {
-                              const newDiscount = parseFloat(e.target.value) || 0;
-                              setFormData({ ...formData, discount: newDiscount });
+                              const val = e.target.value === '' ? '' : e.target.value;
+                              const newDiscount = val === '' ? 0 : parseFloat(val) || 0;
+                              setFormData({ ...formData, discount: val });
                               recalculateTotals(formData.items, newDiscount, formData.shipping);
                             }}
                           />
@@ -701,9 +704,10 @@ export default function Sales() {
                             step="0.01"
                             value={formData.shipping}
                             onChange={(e) => {
-                              const newShipping = parseFloat(e.target.value) || 0;
-                              setFormData({ ...formData, shipping: newShipping });
-                              recalculateTotals(formData.items, formData.discount, newShipping);
+                              const val = e.target.value === '' ? '' : e.target.value;
+                              const newShipping = val === '' ? 0 : parseFloat(val) || 0;
+                              setFormData({ ...formData, shipping: val });
+                              recalculateTotals(formData.items, formData.discount || 0, newShipping);
                             }}
                           />
                         </div>
@@ -734,7 +738,7 @@ export default function Sales() {
                         step="0.01"
                         required
                         value={paymentData.initial_payment}
-                        onChange={(e) => setPaymentData({ ...paymentData, initial_payment: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => setPaymentData({ ...paymentData, initial_payment: e.target.value === '' ? '' : e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">

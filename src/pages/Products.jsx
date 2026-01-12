@@ -167,6 +167,10 @@ export default function Products() {
   };
 
   const handleCostPriceChange = (value) => {
+    if (value === '') {
+      setFormData(prev => ({ ...prev, cost_price: '' }));
+      return;
+    }
     const cost = parseFloat(value) || 0;
     setFormData(prev => ({
       ...prev,
@@ -176,20 +180,28 @@ export default function Products() {
   };
 
   const handleMarginChange = (value) => {
+    if (value === '') {
+      setFormData(prev => ({ ...prev, profit_margin: '' }));
+      return;
+    }
     const margin = parseFloat(value) || 0;
     setFormData(prev => ({
       ...prev,
       profit_margin: margin,
-      sale_price: calculateSalePrice(prev.cost_price, margin)
+      sale_price: calculateSalePrice(prev.cost_price || 0, margin)
     }));
   };
 
   const handleSalePriceChange = (value) => {
+    if (value === '') {
+      setFormData(prev => ({ ...prev, sale_price: '' }));
+      return;
+    }
     const sale = parseFloat(value) || 0;
     setFormData(prev => ({
       ...prev,
       sale_price: sale,
-      profit_margin: calculateMargin(prev.cost_price, sale)
+      profit_margin: calculateMargin(prev.cost_price || 0, sale)
     }));
   };
 

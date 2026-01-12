@@ -298,10 +298,16 @@ export default function Transactions() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    const dataToSubmit = {
+       ...formData,
+       amount: formData.amount === '' ? 0 : parseFloat(formData.amount)
+    };
+
     if (editingTransaction) {
-      updateMutation.mutate({ id: editingTransaction.id, data: formData });
+      updateMutation.mutate({ id: editingTransaction.id, data: dataToSubmit });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(dataToSubmit);
     }
   };
 
@@ -517,11 +523,14 @@ export default function Transactions() {
 
   const handleQuickEntry = (e) => {
     e.preventDefault();
-    if (!quickFormData.description || !quickFormData.account_id || quickFormData.amount <= 0) {
+
+    const amount = quickFormData.amount === '' ? 0 : parseFloat(quickFormData.amount);
+
+    if (!quickFormData.description || !quickFormData.account_id || amount <= 0) {
       toast.error("Preencha todos os campos obrigatórios!");
       return;
     }
-    quickEntryMutation.mutate(quickFormData);
+    quickEntryMutation.mutate({ ...quickFormData, amount });
   };
 
   // ATUALIZAR: Adicionar pesquisa ao filtro
@@ -677,7 +686,7 @@ export default function Transactions() {
                       step="0.01"
                       required
                       value={quickFormData.amount}
-                      onChange={(e) => setQuickFormData({ ...quickFormData, amount: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => setQuickFormData({ ...quickFormData, amount: e.target.value === '' ? '' : e.target.value })}
                       autoFocus
                     />
                   </div>
@@ -851,7 +860,7 @@ export default function Transactions() {
                         step="0.01"
                         required
                         value={formData.amount}
-                        onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => setFormData({ ...formData, amount: e.target.value === '' ? '' : e.target.value })}
                       />
                     </div>
                   </div>
@@ -1096,7 +1105,7 @@ export default function Transactions() {
                     step="0.01"
                     required
                     value={paymentFormData.amount}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value === '' ? '' : e.target.value })}
                     max={selectedTransaction.amount - (selectedTransaction.paid_amount || 0)}
                   />
                   <p className="text-xs text-slate-500">
