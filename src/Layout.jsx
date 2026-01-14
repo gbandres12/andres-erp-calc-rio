@@ -53,7 +53,6 @@ const navigationGroups = [
       { title: "Contas", url: "FinancialAccounts", icon: CreditCard },
       { title: "Contas a Receber", url: "Receivables", icon: ArrowDownToLine },
       { title: "Contas a Pagar", url: "Payables", icon: ArrowUpFromLine },
-      { title: "Contas a Pagar", url: "Payables", icon: ArrowUpToLine },
       { title: "Lançamentos", url: "Transactions", icon: FileText },
       { title: "Clientes/Fornecedores", url: "Contacts", icon: Users }
     ]
