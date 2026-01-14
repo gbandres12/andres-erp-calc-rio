@@ -6,7 +6,7 @@ import {
   Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
   BarChart3, Settings, LogOut, Menu, X, ChevronDown,
-  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine
+  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
