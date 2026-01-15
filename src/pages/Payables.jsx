@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, TrendingDown, Calendar, CheckCircle2, History, Upload, ChevronsUpDown, ArrowUpFromLine, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingDown, Calendar, CheckCircle2, History, Upload, ChevronsUpDown, ArrowUpFromLine, AlertCircle, BarChart3, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
+import { subDays, isBefore, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 
 export default function Payables() {
   const queryClient = useQueryClient();
@@ -23,12 +25,14 @@ export default function Payables() {
   // Filters
   const [tabFilter, setTabFilter] = useState('pending'); // Default to pending (A Pagar)
   const [supplierFilter, setSupplierFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all'); // all, week, month, very_overdue
   const [searchTerm, setSearchTerm] = useState('');
 
   // UI States
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [viewingHistory, setViewingHistory] = useState(null);
   
@@ -242,6 +246,24 @@ export default function Payables() {
     return payables.filter(t => {
       const statusLabel = getStatusLabel(t.status, t.due_date).toLowerCase();
       const overdue = isOverdue(t.due_date) && t.status !== 'pago';
+      const dueDate = parseISO(t.due_date);
+      const today = new Date();
+
+      // Date Filters
+      if (dateFilter === 'week') {
+        const start = startOfWeek(today);
+        const end = endOfWeek(today);
+        if (!isWithinInterval(dueDate, { start, end }) && t.status !== 'pago') return false;
+      }
+      if (dateFilter === 'month') {
+        const start = startOfMonth(today);
+        const end = endOfMonth(today);
+        if (!isWithinInterval(dueDate, { start, end }) && t.status !== 'pago') return false;
+      }
+      if (dateFilter === 'very_overdue') {
+        const limit = subDays(today, 30);
+        if (!(isBefore(dueDate, limit) && t.status !== 'pago')) return false;
+      }
 
       // Tab Filters
       if (tabFilter === 'pending' && t.status === 'pago') return false; // Hide paid in pending tab
@@ -261,7 +283,22 @@ export default function Payables() {
 
       return true;
     });
-  }, [payables, tabFilter, supplierFilter, searchTerm]);
+  }, [payables, tabFilter, supplierFilter, searchTerm, dateFilter]);
+
+  // Analysis Data
+  const categoryData = useMemo(() => {
+    const data = {};
+    payables.filter(t => t.status === 'pago').forEach(t => {
+      const cat = t.category || 'Outros';
+      data[cat] = (data[cat] || 0) + t.amount;
+    });
+    return Object.entries(data)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [payables]);
+
+  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F'];
 
   // Stats
   const stats = useMemo(() => {
@@ -295,6 +332,9 @@ export default function Payables() {
           <p className="text-slate-500">Gestão de despesas e pagamentos a fornecedores</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsAnalysisOpen(true)} className="gap-2">
+            <BarChart3 className="w-4 h-4" /> Relatórios
+          </Button>
           <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -364,6 +404,19 @@ export default function Payables() {
                 onChange={e => setSearchTerm(e.target.value)} 
               />
             </div>
+
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-[200px]">
+                <Filter className="w-4 h-4 mr-2 text-slate-400" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo o Período</SelectItem>
+                <SelectItem value="week">Vence esta Semana</SelectItem>
+                <SelectItem value="month">Vence este Mês</SelectItem>
+                <SelectItem value="very_overdue" className="text-red-600 font-medium">Muito Atrasadas (+30 dias)</SelectItem>
+              </SelectContent>
+            </Select>
             
             <Popover>
               <PopoverTrigger asChild>
@@ -397,8 +450,13 @@ export default function Payables() {
                const statusClass = getStatusColor(t.status, t.due_date);
                const remaining = t.amount - (t.paid_amount || 0);
 
+               const isVeryOverdue = !t.payment_date && isBefore(parseISO(t.due_date), subDays(new Date(), 30));
+
                return (
-                 <div key={t.id} className="flex flex-col md:flex-row justify-between items-center gap-4 p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                 <div key={t.id} className={cn(
+                   "flex flex-col md:flex-row justify-between items-center gap-4 p-4 border rounded-lg transition-colors",
+                   isVeryOverdue ? "bg-red-50 border-red-100" : "hover:bg-slate-50"
+                 )}>
                    <div className="flex items-center gap-4 flex-1 w-full">
                      <div className={cn("w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0", 
                        t.status === 'pago' ? "bg-green-100" : "bg-red-100"
@@ -412,7 +470,10 @@ export default function Payables() {
                           <span className="hidden md:inline">•</span>
                           <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(t.due_date)}</span>
                        </div>
-                       <Badge className={cn("mt-2", statusClass)} variant="outline">{statusLabel}</Badge>
+                       <div className="flex gap-2 mt-2">
+                         <Badge className={cn(statusClass)} variant="outline">{statusLabel}</Badge>
+                         {isVeryOverdue && <Badge variant="destructive" className="bg-red-600">Crítico: +30 dias</Badge>}
+                       </div>
                      </div>
                    </div>
 
@@ -519,6 +580,55 @@ export default function Payables() {
                 </div>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Análise */}
+      <Dialog open={isAnalysisOpen} onOpenChange={setIsAnalysisOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>Análise de Despesas</DialogTitle></DialogHeader>
+          <div className="py-4">
+             <div className="grid md:grid-cols-2 gap-6">
+                <Card className="border-0 shadow-none">
+                  <CardHeader><CardTitle className="text-base">Por Categoria (Pago)</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {categoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(value) => formatBRL(value)} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-slate-700 mb-4">Top Gastos</h4>
+                  {categoryData.map((cat, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="text-sm font-medium">{cat.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-700">{formatBRL(cat.value)}</span>
+                    </div>
+                  ))}
+                </div>
+             </div>
           </div>
         </DialogContent>
       </Dialog>

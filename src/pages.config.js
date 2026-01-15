@@ -7,6 +7,7 @@ import FinancialAccounts from './pages/FinancialAccounts';
 import Fuel from './pages/Fuel';
 import Home from './pages/Home';
 import ITAssets from './pages/ITAssets';
+import Payables from './pages/Payables';
 import Products from './pages/Products';
 import Profile from './pages/Profile';
 import Quotes from './pages/Quotes';
@@ -22,7 +23,6 @@ import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
-import Payables from './pages/Payables';
 import __Layout from './Layout.jsx';
 
 
@@ -36,6 +36,7 @@ export const PAGES = {
     "Fuel": Fuel,
     "Home": Home,
     "ITAssets": ITAssets,
+    "Payables": Payables,
     "Products": Products,
     "Profile": Profile,
     "Quotes": Quotes,
@@ -51,7 +52,6 @@ export const PAGES = {
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
-    "Payables": Payables,
 }
 
 export const pagesConfig = {
