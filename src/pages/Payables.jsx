@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, TrendingDown, Calendar, CheckCircle2, History, Upload, ChevronsUpDown, ArrowUpFromLine, AlertCircle, BarChart3, Filter } from "lucide-react";
+import { DollarSign, TrendingDown, Calendar, CheckCircle2, History, Upload, ChevronsUpDown, ArrowUpFromLine, AlertCircle, BarChart3, Filter, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -33,6 +33,16 @@ export default function Payables() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+
+  const [addForm, setAddForm] = useState({
+    description: "",
+    amount: 0,
+    category: "",
+    due_date: getTodayDate(),
+    contact_id: "",
+    notes: ""
+  });
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [viewingHistory, setViewingHistory] = useState(null);
   
@@ -148,6 +158,32 @@ export default function Payables() {
       toast.success(newStatus === 'pago' ? "Pagamento concluído!" : `Pagamento parcial registrado. Restante: ${formatBRL(remaining)}`);
     },
     onError: (err) => toast.error("Erro ao registrar pagamento: " + err.message)
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data) => {
+       await base44.entities.Transaction.create({
+          ...data,
+          type: 'despesa',
+          status: 'pendente',
+          paid_amount: 0,
+          company_id: selectedCompanyId
+       });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['payables']);
+      setIsAddOpen(false);
+      setAddForm({
+        description: "",
+        amount: 0,
+        category: "",
+        due_date: getTodayDate(),
+        contact_id: "",
+        notes: ""
+      });
+      toast.success("Conta a pagar adicionada com sucesso!");
+    },
+    onError: (err) => toast.error("Erro ao adicionar conta: " + err.message)
   });
 
   // Import Logic
@@ -377,6 +413,9 @@ export default function Payables() {
           <p className="text-slate-500">Gestão de despesas e pagamentos a fornecedores</p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setIsAddOpen(true)} className="bg-red-600 hover:bg-red-700 gap-2">
+            <Plus className="w-4 h-4" /> Nova Conta
+          </Button>
           <Button variant="outline" onClick={() => setIsAnalysisOpen(true)} className="gap-2">
             <BarChart3 className="w-4 h-4" /> Relatórios
           </Button>
@@ -628,6 +667,80 @@ export default function Payables() {
                 </div>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Nova Conta */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nova Conta a Pagar</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Input 
+                value={addForm.description} 
+                onChange={e => setAddForm({...addForm, description: e.target.value})}
+                placeholder="Ex: Aluguel, Fornecedor X..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valor (R$)</Label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={addForm.amount} 
+                  onChange={e => setAddForm({...addForm, amount: parseFloat(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Vencimento</Label>
+                <Input 
+                  type="date" 
+                  value={addForm.due_date} 
+                  onChange={e => setAddForm({...addForm, due_date: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={addForm.category} onValueChange={v => setAddForm({...addForm, category: v})}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Fornecedores">Fornecedores</SelectItem>
+                  <SelectItem value="Aluguel">Aluguel</SelectItem>
+                  <SelectItem value="Energia">Energia</SelectItem>
+                  <SelectItem value="Internet">Internet</SelectItem>
+                  <SelectItem value="Salários">Salários</SelectItem>
+                  <SelectItem value="Impostos">Impostos</SelectItem>
+                  <SelectItem value="Manutenção">Manutenção</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Fornecedor (Opcional)</Label>
+              <Select value={addForm.contact_id} onValueChange={v => setAddForm({...addForm, contact_id: v === 'none' ? '' : v})}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {contacts.filter(c => c.type === 'fornecedor' || c.type === 'ambos').map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Input 
+                value={addForm.notes} 
+                onChange={e => setAddForm({...addForm, notes: e.target.value})}
+              />
+            </div>
+            <Button className="w-full bg-red-600 hover:bg-red-700" onClick={() => createMutation.mutate(addForm)} disabled={createMutation.isPending || !addForm.description || addForm.amount <= 0}>
+              {createMutation.isPending ? 'Salvando...' : 'Adicionar Conta'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
