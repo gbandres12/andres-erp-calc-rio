@@ -159,24 +159,64 @@ export default function Payables() {
     reader.onload = async (e) => {
       try {
         const text = e.target.result;
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+        // Divide linhas lidando com diferentes quebras de linha
+        const lines = text.split(/\r?\n/);
+        
+        if (lines.length < 2) {
+           throw new Error("Arquivo vazio ou sem cabeçalho");
+        }
+
+        // Detectar separador (vírgula ou ponto e vírgula)
+        const firstLine = lines[0];
+        const delimiter = firstLine.includes(';') ? ';' : ',';
+        
+        const headers = firstLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
         
         let count = 0;
         
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
-          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+          
+          const values = line.split(delimiter).map(v => v.trim().replace(/"/g, ''));
           if (values.length < 2) continue;
 
           const row = {};
-          headers.forEach((h, idx) => row[h] = values[idx]);
+          headers.forEach((h, idx) => {
+             if (idx < values.length) row[h] = values[idx];
+          });
 
-          const description = row['descricao'] || row['descrição'] || 'Importado';
-          const amount = parseFloat((row['valor'] || '0').replace('R$', '').replace('.', '').replace(',', '.'));
-          const dueDate = row['vencimento'] || row['data'] || getTodayDate();
-          const category = row['categoria'] || 'Despesas';
+          const description = row['descricao'] || row['descrição'] || row['description'] || 'Importado';
+          
+          // Tratamento robusto de valores numéricos (1.000,00 ou 1000.00)
+          let valStr = (row['valor'] || row['amount'] || '0').replace('R$', '').trim();
+          if (valStr.includes(',') && valStr.includes('.')) {
+             // Assume formato brasileiro se o último for vírgula (ex: 1.000,00)
+             if (valStr.lastIndexOf(',') > valStr.lastIndexOf('.')) {
+                valStr = valStr.replace(/\./g, '').replace(',', '.');
+             } else {
+                valStr = valStr.replace(/,/g, '');
+             }
+          } else if (valStr.includes(',')) {
+             valStr = valStr.replace(',', '.');
+          }
+          const amount = parseFloat(valStr);
+
+          // Tratamento de data (DD/MM/YYYY para YYYY-MM-DD)
+          let dueDate = row['vencimento'] || row['data'] || row['due_date'] || getTodayDate();
+          if (dueDate.includes('/')) {
+             const parts = dueDate.split('/');
+             if (parts.length === 3) { // Assume DD/MM/YYYY
+                dueDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+             }
+          }
+          
+          // Fallback para data válida se falhar
+          if (isNaN(new Date(dueDate).getTime())) {
+             dueDate = getTodayDate();
+          }
+
+          const category = row['categoria'] || row['category'] || 'Despesas';
 
           if (amount > 0) {
              await base44.entities.Transaction.create({
@@ -197,8 +237,13 @@ export default function Payables() {
         queryClient.invalidateQueries(['payables']);
         setIsImportOpen(false);
         setImportFile(null);
-        toast.success(`${count} contas a pagar importadas!`);
+        if (count > 0) {
+           toast.success(`${count} contas importadas com sucesso!`);
+        } else {
+           toast.warning("Nenhuma conta válida encontrada no arquivo.");
+        }
       } catch (err) {
+        console.error(err);
         toast.error("Erro na importação: " + err.message);
       } finally {
         setIsImporting(false);
@@ -346,9 +391,12 @@ export default function Payables() {
                 <DialogTitle>Importar Contas a Pagar</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded">
-                  CSV: descricao, valor, vencimento, categoria
-                </p>
+                <div className="bg-slate-50 p-3 rounded text-sm text-slate-600">
+                  <p className="font-semibold mb-1">Formato CSV Aceito:</p>
+                  <p>descricao, valor, vencimento, categoria</p>
+                  <p className="text-xs text-slate-500 mt-1">Aceita separador vírgula (,) ou ponto-e-vírgula (;)</p>
+                  <p className="text-xs text-slate-500">Datas: DD/MM/AAAA ou AAAA-MM-DD</p>
+                </div>
                 <Input type="file" accept=".csv" onChange={e => setImportFile(e.target.files[0])} />
                 <Button onClick={handleImport} disabled={!importFile || isImporting} className="w-full">
                   {isImporting ? 'Processando...' : 'Importar'}
