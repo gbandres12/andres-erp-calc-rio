@@ -29,9 +29,21 @@ export default function Receivables() {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false); // NOVO: Estado para criar conta
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [viewingHistory, setViewingHistory] = useState(null);
   
+  // Create Form State
+  const [createForm, setCreateForm] = useState({
+    description: "",
+    contact_id: "",
+    amount: 0,
+    remaining_amount: 0,
+    due_date: getTodayDate(),
+    category: "Vendas",
+    notes: ""
+  });
+
   // Import States
   const [importFile, setImportFile] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -85,6 +97,49 @@ export default function Receivables() {
   });
 
   // Mutations
+  const createMutation = useMutation({
+    mutationFn: async (data) => {
+        const total = parseFloat(data.amount);
+        const remaining = parseFloat(data.remaining_amount);
+        const paid = total - remaining;
+        
+        let status = 'pendente';
+        if (remaining <= 0.005) status = 'pago';
+        else if (paid > 0.005) status = 'parcial';
+
+        const contactName = contacts.find(c => c.id === data.contact_id)?.name || "";
+
+        await base44.entities.Transaction.create({
+            description: data.description,
+            amount: total,
+            paid_amount: paid,
+            type: 'receita',
+            category: data.category,
+            status: status,
+            due_date: data.due_date,
+            contact_id: data.contact_id,
+            contact_name: contactName,
+            company_id: selectedCompanyId,
+            notes: data.notes
+        });
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries(['receivables']);
+        setIsCreateOpen(false);
+        setCreateForm({
+          description: "",
+          contact_id: "",
+          amount: 0,
+          remaining_amount: 0,
+          due_date: getTodayDate(),
+          category: "Vendas",
+          notes: ""
+        });
+        toast.success("Conta a receber criada com sucesso!");
+    },
+    onError: (err) => toast.error("Erro ao criar conta: " + err.message)
+  });
+
   const receiveMutation = useMutation({
     mutationFn: async ({ id, amount, date, accountId, paymentMethod, notes }) => {
       const transaction = receivables.find(t => t.id === id);
@@ -312,6 +367,97 @@ export default function Receivables() {
           <p className="text-slate-500">Gerenciamento de recebimentos e cobranças</p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" /> Nova Conta
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nova Conta a Receber</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Descrição</Label>
+                  <Input 
+                    placeholder="Ex: Venda de Produtos"
+                    value={createForm.description}
+                    onChange={e => setCreateForm({...createForm, description: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Cliente</Label>
+                  <Select value={createForm.contact_id} onValueChange={v => setCreateForm({...createForm, contact_id: v})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o cliente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                       {contacts.filter(c => c.type === 'cliente' || c.type === 'ambos').map(c => (
+                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Valor Total Vendido</Label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      value={createForm.amount}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setCreateForm({...createForm, amount: val, remaining_amount: val})
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valor a Receber</Label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      value={createForm.remaining_amount}
+                      onChange={e => setCreateForm({...createForm, remaining_amount: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Vencimento</Label>
+                    <Input 
+                      type="date"
+                      value={createForm.due_date}
+                      onChange={e => setCreateForm({...createForm, due_date: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Categoria</Label>
+                    <Input 
+                      value={createForm.category}
+                      onChange={e => setCreateForm({...createForm, category: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Observações</Label>
+                  <Textarea 
+                    value={createForm.notes}
+                    onChange={e => setCreateForm({...createForm, notes: e.target.value})}
+                  />
+                </div>
+
+                <Button className="w-full" onClick={() => createMutation.mutate(createForm)} disabled={createMutation.isPending || !createForm.description || !createForm.amount}>
+                  {createMutation.isPending ? 'Criando...' : 'Criar Conta'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
