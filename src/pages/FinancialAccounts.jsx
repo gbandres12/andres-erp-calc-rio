@@ -73,11 +73,15 @@ export default function FinancialAccounts() {
 
     // Processa todas as transações
     allTransactions.forEach(t => {
-      if (balances[t.account_id] !== undefined) {
-        if (t.type === 'receita') {
-          balances[t.account_id] += (t.paid_amount || 0);
-        } else {
-          balances[t.account_id] -= (t.paid_amount || 0);
+      if (t.account_id && balances[t.account_id] !== undefined) {
+        // Usa paid_amount preferencialmente, fallback para amount
+        const valor = Number(t.paid_amount || t.amount || 0);
+        if (!isNaN(valor)) {
+          if (t.type === 'receita') {
+            balances[t.account_id] += valor;
+          } else {
+            balances[t.account_id] -= valor;
+          }
         }
       }
     });
@@ -95,9 +99,10 @@ export default function FinancialAccounts() {
     allTransactions.forEach(t => {
       if (t.payment_date && t.payment_date >= limitStr) {
         const date = t.payment_date;
+        const valor = Number(t.paid_amount || t.amount || 0);
         if (!grouped[date]) grouped[date] = { date, receita: 0, despesa: 0 };
-        if (t.type === 'receita') grouped[date].receita += (t.paid_amount || 0);
-        else grouped[date].despesa += (t.paid_amount || 0);
+        if (t.type === 'receita') grouped[date].receita += valor;
+        else grouped[date].despesa += valor;
       }
     });
 
@@ -159,13 +164,15 @@ export default function FinancialAccounts() {
 
   // NOVO: Calcular totais do período filtrado usando paid_amount
   const periodStats = useMemo(() => {
+    if (!filteredTransactions) return { entradas: 0, saidas: 0, saldo: 0 };
+    
     const entradas = filteredTransactions
       .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+      .reduce((sum, t) => sum + Number(t.paid_amount || t.amount || 0), 0);
     
     const saidas = filteredTransactions
       .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+      .reduce((sum, t) => sum + Number(t.paid_amount || t.amount || 0), 0);
 
     return {
       entradas,
@@ -323,7 +330,7 @@ export default function FinancialAccounts() {
   };
 
   // Usa o saldo calculado dinamicamente em vez do armazenado
-  const totalBalance = Object.values(accountBalances).reduce((sum, val) => sum + val, 0);
+  const totalBalance = Object.values(accountBalances || {}).reduce((sum, val) => sum + (val || 0), 0);
 
   const typeIcons = {
     banco: Building,
@@ -594,12 +601,13 @@ export default function FinancialAccounts() {
 
       {/* ATUALIZAR: Dialog de Extrato da Conta */}
       <Dialog open={isStatementDialogOpen} onOpenChange={setIsStatementDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Extrato - {viewingAccount?.name}
+              Extrato - {viewingAccount?.name || 'Conta'}
             </DialogTitle>
           </DialogHeader>
+          {viewingAccount && (
           <div className="space-y-4">
             {/* Resumo da Conta */}
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
@@ -608,23 +616,23 @@ export default function FinancialAccounts() {
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Saldo Inicial</p>
                     <p className="text-xl font-bold text-slate-900">
-                      {formatBRL(viewingAccount?.initial_balance || 0)}
+                      {formatBRL(viewingAccount.initial_balance || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Saldo Real (Calculado)</p>
                     <p className={`text-xl font-bold ${
-                      (accountBalances[viewingAccount?.id] || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                      (accountBalances[viewingAccount.id] || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatBRL(accountBalances[viewingAccount?.id] || 0)}
+                      {formatBRL(accountBalances[viewingAccount.id] || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-600 mb-1">Movimentação Total</p>
                     <p className={`text-xl font-bold ${
-                      ((accountBalances[viewingAccount?.id] || 0) - (viewingAccount?.initial_balance || 0)) >= 0 ? 'text-green-600' : 'text-red-600'
+                      ((accountBalances[viewingAccount.id] || 0) - (viewingAccount.initial_balance || 0)) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatBRL((accountBalances[viewingAccount?.id] || 0) - (viewingAccount?.initial_balance || 0))}
+                      {formatBRL((accountBalances[viewingAccount.id] || 0) - (viewingAccount.initial_balance || 0))}
                     </p>
                   </div>
                 </div>
@@ -843,6 +851,7 @@ export default function FinancialAccounts() {
               )}
             </div>
           </div>
+          )}
         </DialogContent>
       </Dialog>
 
