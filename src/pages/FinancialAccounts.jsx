@@ -122,40 +122,43 @@ export default function FinancialAccounts() {
       return base44.entities.Transaction.filter({ 
         account_id: viewingAccount.id,
         status: 'pago'
-      }, '-payment_date');
+      }, '-payment_date', 1000); // Increased limit to ensure we get enough history
     },
     enabled: !!viewingAccount?.id,
     initialData: []
   });
 
-  // NOVO: Filtrar transações por data
+  // NOVO: Filtrar transações por data (compara strings YYYY-MM-DD para evitar fusos horários)
   const filteredTransactions = useMemo(() => {
     if (!startDate && !endDate) return accountTransactions;
 
+    const formatYMD = (date) => {
+       if (!date) return null;
+       // Create local date string YYYY-MM-DD manually to match DB storage
+       const d = new Date(date);
+       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+
+    const startStr = formatYMD(startDate);
+    const endStr = formatYMD(endDate);
+
     return accountTransactions.filter(transaction => {
       if (!transaction.payment_date) return false;
+      
+      // transaction.payment_date is typically "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ss..."
+      // We take the first 10 chars to get YYYY-MM-DD
+      const transDateStr = String(transaction.payment_date).substring(0, 10);
 
-      const paymentDate = new Date(transaction.payment_date);
-      paymentDate.setHours(0, 0, 0, 0);
-
-      if (startDate && endDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        return paymentDate >= start && paymentDate <= end;
+      if (startStr && endStr) {
+        return transDateStr >= startStr && transDateStr <= endStr;
       }
 
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        return paymentDate >= start;
+      if (startStr) {
+        return transDateStr >= startStr;
       }
 
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        return paymentDate <= end;
+      if (endStr) {
+        return transDateStr <= endStr;
       }
 
       return true;
