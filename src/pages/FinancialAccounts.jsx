@@ -664,28 +664,52 @@ export default function FinancialAccounts() {
                   {/* Atalhos de Período */}
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      variant={startDate && endDate && startDate.toDateString() === new Date().setHours(0,0,0,0).toDateString() && endDate.toDateString() === new Date().setHours(0,0,0,0).toDateString() ? 'default' : 'outline'}
+                      variant={(() => {
+                        if (!startDate || !endDate) return 'outline';
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        return startDate.getTime() === today.getTime() && endDate.getTime() === today.getTime() ? 'default' : 'outline';
+                      })()}
                       size="sm"
                       onClick={() => setQuickPeriod('hoje')}
                     >
                       Hoje
                     </Button>
                     <Button
-                      variant={startDate && endDate && startDate.toDateString() === new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).setHours(0,0,0,0).toDateString() && endDate.toDateString() === new Date().setHours(0,0,0,0).toDateString() ? 'default' : 'outline'}
+                      variant={(() => {
+                        if (!startDate || !endDate) return 'outline';
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const startOfWeek = new Date(today);
+                        startOfWeek.setDate(today.getDate() - today.getDay());
+                        return startDate.getTime() === startOfWeek.getTime() && endDate.getTime() === today.getTime() ? 'default' : 'outline';
+                      })()}
                       size="sm"
                       onClick={() => setQuickPeriod('semana')}
                     >
                       Esta Semana
                     </Button>
                     <Button
-                      variant={startDate && endDate && startDate.toDateString() === new Date(new Date().getFullYear(), new Date().getMonth(), 1).setHours(0,0,0,0).toDateString() && endDate.toDateString() === new Date().setHours(0,0,0,0).toDateString() ? 'default' : 'outline'}
+                      variant={(() => {
+                        if (!startDate || !endDate) return 'outline';
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                        return startDate.getTime() === startOfMonth.getTime() && endDate.getTime() === today.getTime() ? 'default' : 'outline';
+                      })()}
                       size="sm"
                       onClick={() => setQuickPeriod('mes')}
                     >
                       Este Mês
                     </Button>
                     <Button
-                      variant={startDate && endDate && startDate.toDateString() === new Date(new Date().getFullYear(), 0, 1).setHours(0,0,0,0).toDateString() && endDate.toDateString() === new Date().setHours(0,0,0,0).toDateString() ? 'default' : 'outline'}
+                      variant={(() => {
+                        if (!startDate || !endDate) return 'outline';
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const startOfYear = new Date(today.getFullYear(), 0, 1);
+                        return startDate.getTime() === startOfYear.getTime() && endDate.getTime() === today.getTime() ? 'default' : 'outline';
+                      })()}
                       size="sm"
                       onClick={() => setQuickPeriod('ano')}
                     >
