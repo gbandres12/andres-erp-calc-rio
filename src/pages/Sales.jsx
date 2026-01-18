@@ -30,6 +30,15 @@ export default function Sales() {
   const [openClientCombobox, setOpenClientCombobox] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
+  // Novo Cliente State
+  const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    name: "",
+    phone: "",
+    document: "",
+    email: ""
+  });
+
   const [receiptSale, setReceiptSale] = useState(null); 
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false); 
   const [receiptType, setReceiptType] = useState('thermal');
@@ -91,6 +100,30 @@ export default function Sales() {
       company_id: selectedCompanyId
     }, '-created_date'),
     initialData: []
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: (data) => base44.entities.Contact.create({
+      ...data,
+      type: 'cliente',
+      company_id: selectedCompanyId,
+      is_active: true
+    }),
+    onSuccess: (newClient) => {
+      queryClient.invalidateQueries(['contacts']);
+      setFormData({
+        ...formData,
+        client_id: newClient.id,
+        client_name: newClient.name
+      });
+      setIsNewClientDialogOpen(false);
+      setOpenClientCombobox(false);
+      setNewClientData({ name: "", phone: "", document: "", email: "" });
+      toast.success("Cliente cadastrado e selecionado com sucesso!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao cadastrar cliente: " + error.message);
+    }
   });
 
   const createSaleMutation = useMutation({
@@ -533,7 +566,18 @@ export default function Sales() {
                 <TabsContent value="dados" className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 flex flex-col">
-                      <Label>Cliente *</Label>
+                      <div className="flex justify-between items-center">
+                        <Label>Cliente *</Label>
+                        <Button 
+                          type="button" 
+                          variant="link" 
+                          size="sm" 
+                          className="h-auto p-0 text-blue-600"
+                          onClick={() => setIsNewClientDialogOpen(true)}
+                        >
+                          + Novo Cliente
+                        </Button>
+                      </div>
                       <Popover open={openClientCombobox} onOpenChange={setOpenClientCombobox}>
                         <PopoverTrigger asChild>
                           <Button
@@ -552,7 +596,19 @@ export default function Sales() {
                           <Command>
                             <CommandInput placeholder="Pesquisar cliente..." />
                             <CommandList>
-                              <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                              <CommandEmpty>
+                                <div className="p-2 text-center">
+                                  <p className="text-sm text-slate-500 mb-2">Cliente não encontrado</p>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="w-full"
+                                    onClick={() => setIsNewClientDialogOpen(true)}
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" /> Cadastrar Novo
+                                  </Button>
+                                </div>
+                              </CommandEmpty>
                               <CommandGroup>
                                 {contacts.map((contact) => (
                                   <CommandItem
@@ -1039,6 +1095,59 @@ export default function Sales() {
               previousPayments={paymentReceiptData.previousPayments}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Novo Cliente Rápido */}
+      <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastro Rápido de Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome Completo *</Label>
+              <Input 
+                value={newClientData.name}
+                onChange={(e) => setNewClientData({...newClientData, name: e.target.value})}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone / WhatsApp</Label>
+              <Input 
+                value={newClientData.phone}
+                onChange={(e) => setNewClientData({...newClientData, phone: e.target.value})}
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CPF / CNPJ</Label>
+              <Input 
+                value={newClientData.document}
+                onChange={(e) => setNewClientData({...newClientData, document: e.target.value})}
+                placeholder="000.000.000-00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input 
+                type="email"
+                value={newClientData.email}
+                onChange={(e) => setNewClientData({...newClientData, email: e.target.value})}
+                placeholder="cliente@email.com"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setIsNewClientDialogOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={() => createClientMutation.mutate(newClientData)}
+                disabled={!newClientData.name || createClientMutation.isPending}
+              >
+                {createClientMutation.isPending ? "Cadastrando..." : "Cadastrar e Selecionar"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
