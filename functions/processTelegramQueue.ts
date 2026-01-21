@@ -4,9 +4,15 @@ export async function processTelegramQueue(req) {
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
-    if (!BOT_Token) return Response.json({ error: "No Token" }, { status: 500 });
+    if (!BOT_Token) {
+        console.error("[Queue] Missing TELEGRAM_BOT_TOKEN");
+        return Response.json({ error: "No Token" }, { status: 500 });
+    }
+    
+    console.log(`[Queue] Token present: ${BOT_Token.substring(0, 5)}...`);
 
     const sendTelegram = async (chatId, text) => {
+        console.log(`[Queue] Sending to ${chatId}: ${text.substring(0, 20)}...`);
         try {
             await fetch(`https://api.telegram.org/bot${BOT_Token}/sendMessage`, {
                 method: 'POST',
@@ -82,22 +88,31 @@ export async function processTelegramQueue(req) {
         `;
 
         // 4. Invoke AI
-        const response = await base44.integrations.Core.InvokeLLM({
-            prompt: prompt,
-            response_json_schema: {
-                type: "object",
-                properties: {
-                    action: { type: "string", enum: ["reply", "create_transaction", "read_transactions", "read_balance"] },
-                    reply_text: { type: "string" },
-                    transaction_data: { type: "object", additionalProperties: true },
-                    filter_data: { type: "object", additionalProperties: true }
-                },
-                required: ["action", "reply_text"]
-            }
-        });
+        let response;
+        try {
+            console.log("[Queue] Invoking LLM...");
+            response = await base44.integrations.Core.InvokeLLM({
+                prompt: prompt,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        action: { type: "string", enum: ["reply", "create_transaction", "read_transactions", "read_balance"] },
+                        reply_text: { type: "string" },
+                        transaction_data: { type: "object", additionalProperties: true },
+                        filter_data: { type: "object", additionalProperties: true }
+                    },
+                    required: ["action", "reply_text"]
+                }
+            });
+            console.log("[Queue] LLM Response:", JSON.stringify(response));
+        } catch (llmError) {
+            console.error("[Queue] LLM Error:", llmError);
+            await sendTelegram(chat_id, "Desculpe, tive um problema ao processar seu pedido. Tente novamente.");
+            return Response.json({ status: "llm_error" });
+        }
 
         // 5. Execute & Prepare Reply
-        let finalReply = response.reply_text;
+        let finalReply = response.reply_text || "Entendido.";
 
         if (response.action === "create_transaction") {
             const data = response.transaction_data;

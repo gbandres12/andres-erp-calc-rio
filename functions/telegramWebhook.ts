@@ -28,13 +28,14 @@ export async function telegramWebhook(req) {
             raw_data: JSON.stringify(msg)
         });
 
+        console.log(`[Webhook] Queued message from ${msg.chat.id}`);
         // Respond immediately to Telegram
         return Response.json({ status: "queued" });
 
     } catch (error) {
-        console.error("Webhook Error:", error);
+        console.error("[Webhook] Error:", error);
         // Still return 200 to prevent Telegram from retrying endlessly on bad logic
-        return Response.json({ error: "internal_error" }); 
+        return Response.json({ status: "error", message: "internal_error" }); 
     }
 }
 
