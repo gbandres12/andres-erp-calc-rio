@@ -14,11 +14,17 @@ export async function processTelegramQueue(req) {
     const sendTelegram = async (chatId, text) => {
         console.log(`[Queue] Sending to ${chatId}: ${text.substring(0, 20)}...`);
         try {
-            await fetch(`https://api.telegram.org/bot${BOT_Token}/sendMessage`, {
+            const res = await fetch(`https://api.telegram.org/bot${BOT_Token}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: chatId, text: text })
             });
+            const data = await res.json();
+            if (!data.ok) {
+                console.error("[Queue] Telegram Send Failed:", data);
+            } else {
+                console.log("[Queue] Telegram Sent OK");
+            }
         } catch (e) { console.error("Send Error:", e); }
     };
 
@@ -151,18 +157,25 @@ export async function processTelegramQueue(req) {
             }
         }
 
-        // 6. Send Response
-        await sendTelegram(chat_id, finalReply);
-
-        // 7. Update History
+        // 6. Send Response & Update History & Cleanup (Parallelish)
+        // We update history first to ensure we have record, then send, then delete queue
+        
         history.push({ role: "user", content: user_text });
         history.push({ role: "assistant", content: finalReply });
+        
+        // Save history first
         await base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history });
 
-        // --- CORE LOGIC END ---
+        // Send to Telegram
+        await sendTelegram(chat_id, finalReply);
 
-        // 8. Cleanup Queue
-        await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId);
+        // Cleanup Queue
+        try {
+            await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId);
+            console.log(`[Queue] Deleted queue item ${queueId}`);
+        } catch (e) {
+            console.error(`[Queue] Failed to delete queue item ${queueId}:`, e);
+        }
 
         return Response.json({ status: "success" });
 
