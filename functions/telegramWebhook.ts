@@ -1,6 +1,7 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.11';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 
 export async function telegramWebhook(req) {
+    console.log("Webhook v3 starting");
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
@@ -79,7 +80,7 @@ export async function telegramWebhook(req) {
                  return Response.json({ error: "Conversation not found" }, { status: 404 });
             }
 
-            // Ensure messages array exists (fix for SDK potential issue)
+            // Ensure messages array exists
             if (!conversation.messages) {
                 conversation.messages = [];
             }
@@ -89,17 +90,13 @@ export async function telegramWebhook(req) {
             console.log("Adding message to conversation...");
             
             try {
-                // Send user message
-                // Note: We're passing the conversation object. 
-                // If SDK fails here, we catch it.
                 await base44.asServiceRole.agents.addMessage(conversation, {
                     role: "user",
                     content: text
                 });
             } catch (err) {
-                console.error("Error in addMessage:", err);
-                // If it's the specific map error, maybe the message was added but local update failed?
-                // We'll proceed to polling anyway to see if we get a response.
+                // Catch the specific SDK error and ignore it if possible, assuming the API call might have succeeded
+                console.error("Error in addMessage (ignoring to proceed):", err.message);
             }
 
             // 3. Polling for response
@@ -113,14 +110,9 @@ export async function telegramWebhook(req) {
                 const messages = updatedConv.messages || [];
                 
                 if (messages.length > initialMsgCount) {
-                    // Find the latest assistant message
-                    // We iterate backwards to find the last assistant message that is NOT a tool call
-                    // Actually, we just want the last message if it's assistant and has content.
-                    
+                    // Find the last assistant message
                     const lastMsg = messages[messages.length - 1];
                     
-                    console.log("New message detected:", lastMsg.role, lastMsg.content ? "has content" : "no content");
-
                     if (lastMsg.role === 'assistant' && lastMsg.content) {
                         console.log("Response found, sending to Telegram");
                         await sendTelegramMessage(chatId, lastMsg.content);
