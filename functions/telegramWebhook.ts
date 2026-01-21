@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.3';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.11';
 
 export async function telegramWebhook(req) {
     const base44 = createClientFromRequest(req);
@@ -69,6 +69,8 @@ export async function telegramWebhook(req) {
             
             // Get conversation state
             const conversation = await base44.asServiceRole.agents.getConversation(conversationId);
+            console.log("Conversation fetched:", conversation ? "yes" : "no", "ID:", conversation?.id);
+            
             const initialMsgCount = conversation.messages ? conversation.messages.length : 0;
 
             // Send user message
