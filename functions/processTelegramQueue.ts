@@ -62,8 +62,10 @@ export async function processTelegramQueue(req) {
         
         // 3. Construct Prompt
         const historyText = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join("\n");
+        const todayStr = new Date().toLocaleDateString('pt-BR');
         
         let prompt = `Você é um assistente financeiro inteligente e direto.
+        Data de hoje: ${todayStr}
         
         CONTEXTO:
         ${historyText}
@@ -72,6 +74,13 @@ export async function processTelegramQueue(req) {
         DIRETRIZES:
         - Identifique a filial (Company) para qualquer lançamento.
         - Se o usuário não informou a filial, e não está claro no contexto, PERGUNTE.
+        - DATA: Assuma a data de hoje para 'due_date' e 'payment_date' se não informada explicitamente.
+        - STATUS: Identifique se é 'pago', 'pendente' ou 'parcial'.
+          - Se o usuário disser "pago", status='pago', paid_amount=valor total.
+          - Se disser "gastei", assuma 'pago'.
+          - Se disser "conta para pagar" ou "lançar boleto", assuma 'pendente'.
+          - Se for ambíguo, pergunte.
+          - Se for 'parcial', extraia o 'paid_amount'. Se não tiver o valor pago, PERGUNTE.
         - Responda em JSON estrito.
         
         DADOS:
@@ -79,8 +88,8 @@ export async function processTelegramQueue(req) {
         Contas: ${JSON.stringify(accounts.map(a => ({id: a.id, name: a.name, company_id: a.company_id, balance: a.current_balance})))}
 
         AÇÕES:
-        1. "reply": Responder texto simples.
-        2. "create_transaction": Criar lançamento (apenas com: valor, tipo, categoria, filial_id).
+        1. "reply": Responder texto simples (use para perguntas de clarificação).
+        2. "create_transaction": Criar lançamento.
         3. "read_transactions": Listar últimos lançamentos (filtro opcional).
         4. "read_balance": Consultar saldo de conta.
 
@@ -88,7 +97,17 @@ export async function processTelegramQueue(req) {
         {
             "action": "reply" | "create_transaction" | "read_transactions" | "read_balance",
             "reply_text": "Texto para o usuário",
-            "transaction_data": { ... } (if create),
+            "transaction_data": { 
+                "amount": number, 
+                "description": string, 
+                "type": "receita"|"despesa", 
+                "category": string, 
+                "company_id": string,
+                "status": "pago"|"pendente"|"parcial",
+                "paid_amount": number (optional),
+                "due_date": string (YYYY-MM-DD),
+                "payment_date": string (YYYY-MM-DD)
+            } (if create),
             "filter_data": { ... } (if read/balance)
         }
         `;
@@ -121,19 +140,41 @@ export async function processTelegramQueue(req) {
         let finalReply = response.reply_text || "Entendido.";
 
         if (response.action === "create_transaction") {
-            const data = response.transaction_data;
+            let data = response.transaction_data;
+            
+            // Validation Logic
             if (!data.company_id) {
                 finalReply = "Para qual filial devo lançar? (" + companies.map(c => c.name).join(", ") + ")";
-            } else {
+            } 
+            else if (data.status === 'parcial' && (data.paid_amount === undefined || data.paid_amount === null)) {
+                finalReply = "Entendido, pagamento parcial. Qual foi o valor pago até agora?";
+            }
+            else {
+                // Defaults and Logic adjustments
+                const today = new Date().toISOString().split('T')[0];
+                
+                if (!data.due_date) data.due_date = today;
+                
+                if (data.status === 'pago') {
+                    data.paid_amount = data.amount;
+                    if (!data.payment_date) data.payment_date = today;
+                } else if (data.status === 'parcial') {
+                    if (!data.payment_date) data.payment_date = today;
+                } else {
+                    // pendente
+                    data.paid_amount = 0;
+                    data.payment_date = null;
+                }
+
                 const tx = await base44.asServiceRole.entities.Transaction.create({
-                    ...data,
-                    status: data.status || 'pendente',
-                    due_date: data.due_date || new Date().toISOString().split('T')[0]
+                    ...data
                 });
-                // Trigger recalc asynchronously (fire and forget via function call if needed, or just let it be)
+                
+                // Trigger recalc asynchronously
                 base44.functions.invoke('recalculateBalance', { company_id: data.company_id });
                 
-                finalReply = `✅ *Lançamento Criado*\n${tx.description}\nValor: R$ ${tx.amount}\nFilial: ${companies.find(c=>c.id===tx.company_id)?.name}`;
+                let statusIcon = data.status === 'pago' ? '🟢' : data.status === 'parcial' ? '🟡' : '🔴';
+                finalReply = `✅ *Lançamento Criado*\n${tx.description}\nValor: R$ ${tx.amount}\nStatus: ${statusIcon} ${data.status}\nFilial: ${companies.find(c=>c.id===tx.company_id)?.name}`;
             }
         } 
         else if (response.action === "read_transactions") {
