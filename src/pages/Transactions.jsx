@@ -100,6 +100,7 @@ export default function Transactions() {
     payment_date: "",
     account_id: "",
     contact_id: "",
+    cost_center: "",
     notes: ""
   });
 
@@ -291,6 +292,7 @@ export default function Transactions() {
       payment_date: "",
       account_id: "",
       contact_id: "",
+      cost_center: "",
       notes: ""
     });
     setEditingTransaction(null);
@@ -334,6 +336,7 @@ export default function Transactions() {
         payment_date: transaction.payment_date || "",
         account_id: transaction.account_id || "",
         contact_id: transaction.contact_id || "",
+        cost_center: transaction.cost_center || "",
         notes: transaction.notes || ""
       });
       setIsDialogOpen(true);
