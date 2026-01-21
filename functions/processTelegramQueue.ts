@@ -24,6 +24,14 @@ export async function processTelegramQueue(req) {
 
     try {
         const payload = await req.json();
+
+        // DEBUG MODE: Check Webhook Info
+        if (payload.action === "debug_webhook") {
+            const response = await fetch(`https://api.telegram.org/bot${BOT_Token}/getWebhookInfo`);
+            const data = await response.json();
+            return Response.json({ webhook_info: data });
+        }
+
         // payload = { event: { type: 'create', ... }, data: { ...entity_data... } }
         
         const queueItem = payload.data;
