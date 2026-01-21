@@ -12,11 +12,15 @@ export async function telegramWebhook(req) {
     const sendTelegramMessage = async (chatId, text) => {
         try {
             const url = `https://api.telegram.org/bot${BOT_Token}/sendMessage`;
-            await fetch(url, {
+            const resp = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: chatId, text: text })
             });
+            const data = await resp.json();
+            if (!data.ok) {
+                console.error("Telegram API Error:", data);
+            }
         } catch (e) {
             console.error("Error sending Telegram message:", e);
         }
@@ -68,16 +72,35 @@ export async function telegramWebhook(req) {
             console.log(`Using conversation ID: ${conversationId}`);
             
             // Get conversation state
-            const conversation = await base44.asServiceRole.agents.getConversation(conversationId);
-            console.log("Conversation fetched:", conversation ? "yes" : "no", "ID:", conversation?.id);
+            let conversation = await base44.asServiceRole.agents.getConversation(conversationId);
             
-            const initialMsgCount = conversation.messages ? conversation.messages.length : 0;
+            if (!conversation) {
+                 console.error("Conversation not found!");
+                 return Response.json({ error: "Conversation not found" }, { status: 404 });
+            }
 
-            // Send user message
-            await base44.asServiceRole.agents.addMessage(conversation, {
-                role: "user",
-                content: text
-            });
+            // Ensure messages array exists (fix for SDK potential issue)
+            if (!conversation.messages) {
+                conversation.messages = [];
+            }
+            
+            const initialMsgCount = conversation.messages.length;
+
+            console.log("Adding message to conversation...");
+            
+            try {
+                // Send user message
+                // Note: We're passing the conversation object. 
+                // If SDK fails here, we catch it.
+                await base44.asServiceRole.agents.addMessage(conversation, {
+                    role: "user",
+                    content: text
+                });
+            } catch (err) {
+                console.error("Error in addMessage:", err);
+                // If it's the specific map error, maybe the message was added but local update failed?
+                // We'll proceed to polling anyway to see if we get a response.
+            }
 
             // 3. Polling for response
             let attempts = 0;
@@ -90,10 +113,14 @@ export async function telegramWebhook(req) {
                 const messages = updatedConv.messages || [];
                 
                 if (messages.length > initialMsgCount) {
-                    // Check the last message
+                    // Find the latest assistant message
+                    // We iterate backwards to find the last assistant message that is NOT a tool call
+                    // Actually, we just want the last message if it's assistant and has content.
+                    
                     const lastMsg = messages[messages.length - 1];
                     
-                    // If it's the assistant and it has content (and is not a tool call in progress which usually has null content or specific status)
+                    console.log("New message detected:", lastMsg.role, lastMsg.content ? "has content" : "no content");
+
                     if (lastMsg.role === 'assistant' && lastMsg.content) {
                         console.log("Response found, sending to Telegram");
                         await sendTelegramMessage(chatId, lastMsg.content);
@@ -103,7 +130,7 @@ export async function telegramWebhook(req) {
                 attempts++;
             }
 
-            // Timeout or no response
+            console.log("Timeout waiting for agent response");
             return Response.json({ status: "timeout_or_processing" });
 
         } catch (error) {
