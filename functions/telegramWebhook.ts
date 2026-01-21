@@ -6,7 +6,6 @@ export async function telegramWebhook(req) {
 
     if (!BOT_Token) return Response.json({ error: "No Token" }, { status: 500 });
 
-    // Helper to send message
     const sendTelegram = async (chatId, text) => {
         try {
             await fetch(`https://api.telegram.org/bot${BOT_Token}/sendMessage`, {
@@ -26,95 +25,102 @@ export async function telegramWebhook(req) {
             const userText = body.message.text;
             const username = body.message.from.first_name || "User";
 
-            console.log(`Msg: ${userText}`);
+            console.log(`Msg from ${username}: ${userText}`);
 
-            // 1. Context Loading
-            const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
-            const accounts = await base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true });
-            
-            // 2. Construct Prompt
-            let prompt = `Você é um assistente financeiro. 
-            Diretrizes:
-            - Sistema multi-filial. Identifique a filial (Company) para transações.
-            - Se não souber a filial, PERGUNTE.
-            - Responda em JSON estrito.
-            
-            Dados Disponíveis:
-            Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name})))}
-            Contas: ${JSON.stringify(accounts.map(a => ({id: a.id, name: a.name, company_id: a.company_id, balance: a.current_balance})))}
+            // 1. Session Management
+            const sessions = await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id: chatId });
+            let conversationId;
 
-            User Input: "${userText}"
-
-            Output Format (JSON only):
-            {
-                "action": "reply" | "create_transaction" | "read_transactions",
-                "reply_text": "text to user (required if action is reply)",
-                "transaction_data": { ...fields for Transaction entity... } (if create),
-                "filter_data": { ...fields... } (if read)
+            if (sessions.length > 0) {
+                conversationId = sessions[0].conversation_id;
+            } else {
+                console.log("Creating conversation...");
+                const conversation = await base44.asServiceRole.agents.createConversation({
+                    agent_name: "financeiro",
+                    metadata: { name: `Telegram ${chatId}`, telegram_chat_id: chatId }
+                });
+                conversationId = conversation.id;
+                await base44.asServiceRole.entities.TelegramChatSession.create({
+                    chat_id: chatId, conversation_id: conversationId
+                });
             }
-            Para criar transação, campos: description, amount, type (receita/despesa), category, company_id (OBRIGATÓRIO), account_id (opcional), status (pendente/pago), due_date.
-            `;
 
-            // 3. Call LLM
-            const response = await base44.integrations.Core.InvokeLLM({
-                prompt: prompt,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        action: { type: "string", enum: ["reply", "create_transaction", "read_transactions"] },
-                        reply_text: { type: "string" },
-                        transaction_data: { type: "object", additionalProperties: true },
-                        filter_data: { type: "object", additionalProperties: true }
-                    },
-                    required: ["action"]
-                }
-            });
+            // 2. Retrieve Conversation
+            // We fetch the conversation to get the current state
+            let conversation = await base44.asServiceRole.agents.getConversation(conversationId);
+            
+            // Fix for potential SDK issue: ensure messages is an array
+            if (!conversation.messages) conversation.messages = [];
+            
+            const initialMsgCount = conversation.messages.length;
 
-            console.log("LLM Decision:", response);
-
-            // 4. Execute Action
-            if (response.action === "reply") {
-                await sendTelegram(chatId, response.reply_text || "Entendido.");
-            } 
-            else if (response.action === "create_transaction") {
-                const data = response.transaction_data;
-                if (!data.company_id) {
-                     await sendTelegram(chatId, "Preciso saber para qual filial lançar essa transação. " + companies.map(c => c.name).join(", "));
-                } else {
-                    // Create
-                    const tx = await base44.asServiceRole.entities.Transaction.create({
-                        ...data,
-                        status: data.status || 'pendente',
-                        due_date: data.due_date || new Date().toISOString().split('T')[0]
-                    });
-                    
-                    // Recalculate balance if needed
-                    base44.functions.invoke('recalculateBalance', { company_id: data.company_id });
-                    
-                    await sendTelegram(chatId, `✅ Transação criada!\n${tx.description} - R$ ${tx.amount}\nFilial: ${companies.find(c=>c.id===tx.company_id)?.name}`);
-                }
+            // 3. Send Message to Agent
+            // Using asServiceRole to ensure we have permissions
+            try {
+                await base44.asServiceRole.agents.addMessage(conversation, {
+                    role: "user", 
+                    content: userText
+                });
+            } catch (error) {
+                console.error("SDK addMessage error:", error);
+                // If the error is 'Cannot read properties of undefined', it might be a bug in the SDK response handling
+                // BUT the message might have been sent to the server.
+                // We will proceed to poll for the response anyway.
             }
-            else if (response.action === "read_transactions") {
-                // Simple list
-                const filters = response.filter_data || {};
-                const list = await base44.asServiceRole.entities.Transaction.filter(filters, '-created_date', 5);
+
+            // 4. Poll for Response
+            let attempts = 0;
+            const maxAttempts = 40; // 60 seconds
+            let lastProcessedMsgId = null;
+
+            // If we have messages, track the last one to know what's new
+            if (initialMsgCount > 0) {
+                // This is a naive check, ideally we use IDs
+                // But let's stick to count + role check for now
+            }
+
+            while (attempts < maxAttempts) {
+                await new Promise(r => setTimeout(r, 1500));
                 
-                if (list.length === 0) {
-                    await sendTelegram(chatId, "Nenhuma transação encontrada recentemente.");
-                } else {
-                    const msg = list.map(t => `${t.description}: R$ ${t.amount} (${t.type})`).join("\n");
-                    await sendTelegram(chatId, "Últimas transações:\n" + msg);
+                const updatedConv = await base44.asServiceRole.agents.getConversation(conversationId);
+                const messages = updatedConv.messages || [];
+                
+                if (messages.length > initialMsgCount) {
+                    // Look at the new messages
+                    const newMessages = messages.slice(initialMsgCount);
+                    
+                    // Find the last assistant message
+                    // We want to send the FINAL response, or intermediate ones?
+                    // Usually the last one is the response.
+                    
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    
+                    // Check if it's from assistant and has content (not just a tool call)
+                    if (lastMsg.role === 'assistant' && lastMsg.content) {
+                        
+                        // Check if we are done (not strictly possible to know if "done" without status, 
+                        // but usually if content is present and it's the last msg, it's the answer)
+                        
+                        // Also check if there are any tool calls in the last message that are pending?
+                        // The SDK usually handles the tool loop. When we see a text response, it's usually the answer.
+                        
+                        // We avoid sending duplicates if we loop (though we break immediately)
+                        console.log("Response found:", lastMsg.content);
+                        await sendTelegram(chatId, lastMsg.content);
+                        return Response.json({ status: "success" });
+                    }
                 }
+                attempts++;
             }
-
-            return Response.json({ status: "processed" });
+            
+            return Response.json({ status: "timeout" });
 
         } catch (error) {
             console.error("Error:", error);
-            await sendTelegram(String(req.body?.message?.chat?.id), "Ocorreu um erro interno.");
             return Response.json({ error: error.message }, { status: 500 });
         }
     }
+
     return new Response("OK");
 }
 
