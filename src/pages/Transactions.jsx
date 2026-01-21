@@ -874,12 +874,13 @@ export default function Transactions() {
                       required
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder={formData.type === 'receita' ? "Ex: Venda de Mercadoria" : "Ex: Compra de Material"}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 flex flex-col">
-                      <Label>Categoria</Label>
+                      <Label>{formData.type === 'receita' ? 'Categoria de Receita' : 'Categoria de Despesa'}</Label>
                       <Popover open={openCategoryCombobox} onOpenChange={setOpenCategoryCombobox}>
                         <PopoverTrigger asChild>
                           <Button
@@ -888,7 +889,7 @@ export default function Transactions() {
                             aria-expanded={openCategoryCombobox}
                             className="justify-between w-full font-normal"
                           >
-                            {formData.category || "Selecione ou digite..."}
+                            {formData.category || "Selecione..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -898,13 +899,12 @@ export default function Transactions() {
                               placeholder="Buscar categoria..." 
                               onValueChange={(search) => {
                                 if (search && !defaultCategories.includes(search)) {
-                                  // Permite digitar nova categoria
                                   setFormData(prev => ({ ...prev, category: search }));
                                 }
                               }}
                             />
                             <CommandList>
-                              <CommandEmpty>Digite para criar nova categoria.</CommandEmpty>
+                              <CommandEmpty>Digite para criar nova.</CommandEmpty>
                               <CommandGroup heading="Sugestões">
                                 {defaultCategories.map((category) => (
                                   <CommandItem
@@ -931,7 +931,7 @@ export default function Transactions() {
                       </Popover>
                     </div>
                     <div className="space-y-2 flex flex-col">
-                      <Label>Contato</Label>
+                      <Label>{formData.type === 'receita' ? 'Cliente' : 'Fornecedor'}</Label>
                       <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                         <PopoverTrigger asChild>
                           <Button
@@ -942,17 +942,22 @@ export default function Transactions() {
                           >
                             {formData.contact_id
                               ? contacts.find((contact) => contact.id === formData.contact_id)?.name
-                              : "Selecione o contato..."}
+                              : "Selecione..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Pesquisar contato..." />
+                            <CommandInput placeholder="Pesquisar..." />
                             <CommandList>
-                              <CommandEmpty>Nenhum contato encontrado.</CommandEmpty>
+                              <CommandEmpty>Nenhum encontrado.</CommandEmpty>
                               <CommandGroup>
-                                {contacts.map((contact) => (
+                                {contacts
+                                  .filter(c => {
+                                    if (formData.type === 'receita') return c.type === 'cliente' || c.type === 'ambos';
+                                    return c.type === 'fornecedor' || c.type === 'ambos';
+                                  })
+                                  .map((contact) => (
                                   <CommandItem
                                     key={contact.id}
                                     value={contact.name}
@@ -977,6 +982,17 @@ export default function Transactions() {
                       </Popover>
                     </div>
                   </div>
+
+                  {formData.type === 'despesa' && (
+                    <div className="space-y-2">
+                       <Label>Centro de Custo</Label>
+                       <Input 
+                          value={formData.cost_center} 
+                          onChange={e => setFormData({...formData, cost_center: e.target.value})} 
+                          placeholder="Ex: Administrativo, Frota, Obras..."
+                       />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Data de Vencimento *</Label>
