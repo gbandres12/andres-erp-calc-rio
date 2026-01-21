@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap, ScanLine, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -48,6 +48,11 @@ export default function Transactions() {
   const [isImporting, setIsImporting] = useState(false);
   const [importType, setImportType] = useState('receita');
   const [importAccountId, setImportAccountId] = useState("");
+
+  // Upload Receipt States
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [isReadingReceipt, setIsReadingReceipt] = useState(false);
 
   // Quick Entry States
   const [isQuickEntryOpen, setIsQuickEntryOpen] = useState(false);
@@ -344,6 +349,81 @@ export default function Transactions() {
       toast.success("Acesso autorizado!");
     } else {
       toast.error("Senha incorreta!");
+    }
+  };
+
+  const handleReadReceipt = async () => {
+    if (!receiptFile) {
+      toast.error("Selecione uma imagem ou PDF do comprovante");
+      return;
+    }
+
+    setIsReadingReceipt(true);
+    try {
+      // 1. Upload file
+      const { file_url } = await base44.integrations.Core.UploadFile({
+        file: receiptFile
+      });
+
+      // 2. Extract Data using AI
+      const extractionSchema = {
+        type: "object",
+        properties: {
+          description: { type: "string", description: "Breve descrição do que foi gasto/comprado" },
+          amount: { type: "number", description: "Valor total da transação" },
+          date: { type: "string", format: "date", description: "Data da transação (YYYY-MM-DD)" },
+          supplier_name: { type: "string", description: "Nome do estabelecimento/fornecedor" },
+          category_suggestion: { type: "string", description: "Sugestão de categoria para despesa" }
+        },
+        required: ["amount", "description"]
+      };
+
+      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+        file_url: file_url,
+        json_schema: extractionSchema
+      });
+
+      if (result.status === 'success' && result.output) {
+        const data = result.output;
+        
+        // Find existing contact or use name
+        let contactId = "";
+        if (data.supplier_name) {
+            const existingContact = contacts.find(c => 
+                c.name.toLowerCase().includes(data.supplier_name.toLowerCase()) || 
+                data.supplier_name.toLowerCase().includes(c.name.toLowerCase())
+            );
+            if (existingContact) contactId = existingContact.id;
+        }
+
+        // Pre-fill form
+        setFormData({
+            description: data.description || "Despesa importada",
+            amount: data.amount || 0,
+            type: "despesa",
+            category: data.category_suggestion || "",
+            status: "pago", // Usually receipts are already paid
+            due_date: data.date || getTodayDate(),
+            payment_date: data.date || getTodayDate(),
+            account_id: "", // User must select
+            contact_id: contactId,
+            cost_center: "",
+            notes: `Importado de comprovante: ${data.supplier_name || 'Desconhecido'}`
+        });
+
+        setIsUploadDialogOpen(false);
+        setIsDialogOpen(true); // Open the main create dialog with data
+        toast.success("Dados extraídos! Revise e salve o lançamento.");
+      } else {
+        throw new Error("Não foi possível ler os dados do comprovante.");
+      }
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao ler comprovante: " + error.message);
+    } finally {
+      setIsReadingReceipt(false);
+      setReceiptFile(null);
     }
   };
 
@@ -650,6 +730,62 @@ export default function Transactions() {
           <p className="text-slate-500 mt-1">Receitas e despesas</p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200">
+                <ScanLine className="w-4 h-4" />
+                Ler Comprovante
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <ScanLine className="w-5 h-5 text-blue-600" />
+                  Ler Comprovante com IA
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                 <div className="p-4 bg-blue-50 text-blue-800 rounded-lg text-sm flex gap-3">
+                    <FileText className="w-8 h-8 flex-shrink-0" />
+                    <div>
+                        <p className="font-semibold mb-1">Como funciona?</p>
+                        <p>Envie uma foto ou PDF do seu comprovante de pagamento. Nossa IA irá ler os dados automaticamente e preencher o lançamento para você.</p>
+                    </div>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <Label>Arquivo (Imagem ou PDF)</Label>
+                   <Input 
+                     type="file" 
+                     accept="image/*,.pdf"
+                     onChange={(e) => setReceiptFile(e.target.files[0])}
+                   />
+                 </div>
+
+                 <div className="flex justify-end gap-2">
+                   <Button variant="ghost" onClick={() => setIsUploadDialogOpen(false)}>Cancelar</Button>
+                   <Button 
+                     onClick={handleReadReceipt} 
+                     disabled={isReadingReceipt || !receiptFile}
+                     className="bg-blue-600 hover:bg-blue-700"
+                   >
+                     {isReadingReceipt ? (
+                        <>
+                            <ScanLine className="w-4 h-4 mr-2 animate-pulse" />
+                            Lendo Comprovante...
+                        </>
+                     ) : (
+                        <>
+                            <ScanLine className="w-4 h-4 mr-2" />
+                            Processar
+                        </>
+                     )}
+                   </Button>
+                 </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={isQuickEntryOpen} onOpenChange={setIsQuickEntryOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200">

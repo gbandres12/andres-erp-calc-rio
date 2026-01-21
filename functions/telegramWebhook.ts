@@ -5,28 +5,31 @@ export async function telegramWebhook(req) {
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
     if (!BOT_Token) {
+        console.error("TELEGRAM_BOT_TOKEN missing");
         return Response.json({ error: "TELEGRAM_BOT_TOKEN not configured" }, { status: 500 });
     }
 
-    // Helper to send message to Telegram
     const sendTelegramMessage = async (chatId, text) => {
-        const url = `https://api.telegram.org/bot${BOT_Token}/sendMessage`;
-        await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text: text })
-        });
+        try {
+            const url = `https://api.telegram.org/bot${BOT_Token}/sendMessage`;
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: text })
+            });
+        } catch (e) {
+            console.error("Error sending Telegram message:", e);
+        }
     };
 
     if (req.method === "GET") {
-        return new Response("Telegram Webhook is active. Please register this URL with the Telegram Bot API.");
+        return new Response("Telegram Webhook is active.");
     }
 
     if (req.method === "POST") {
         try {
             const body = await req.json();
             
-            // Check if it's a message
             if (!body.message || !body.message.text) {
                 return Response.json({ status: "ignored" });
             }
@@ -35,20 +38,16 @@ export async function telegramWebhook(req) {
             const text = body.message.text;
             const username = body.message.from.first_name || "User";
 
-            // 1. Find or Create Session using Service Role (to access the mapping entity securely if needed, though regular user might work if public)
-            // Using service role for the session mapping to ensure consistency
+            console.log(`Processing message from ${username} (${chatId}): ${text}`);
+
+            // 1. Session Management
             const sessions = await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id: chatId });
-            
             let conversationId;
 
             if (sessions.length > 0) {
                 conversationId = sessions[0].conversation_id;
             } else {
-                // Create new conversation
-                // Note: The conversation itself is associated with the authenticated user context.
-                // Since this is a webhook without a user session, the conversation might be created anonymously or we need to impersonate/handle context.
-                // Agents usually run in the context of the user. Here, we might want to treat the telegram user as a specific system user or just use the agent anonymously if allowed.
-                // For now, we'll create it via the SDK.
+                console.log("Creating new conversation...");
                 const conversation = await base44.asServiceRole.agents.createConversation({
                     agent_name: "financeiro",
                     metadata: {
@@ -65,54 +64,49 @@ export async function telegramWebhook(req) {
                 });
             }
 
-            // 2. Send message to Agent
-            // We need to fetch the conversation object first to pass it to addMessage, or pass the ID if SDK supports it.
-            // Based on instructions: base44.agents.addMessage(conversation, message)
-            const conversation = await base44.asServiceRole.agents.getConversation(conversationId);
+            // 2. Interaction
+            console.log(`Using conversation ID: ${conversationId}`);
             
+            // Get conversation state
+            const conversation = await base44.asServiceRole.agents.getConversation(conversationId);
+            const initialMsgCount = conversation.messages ? conversation.messages.length : 0;
+
+            // Send user message
             await base44.asServiceRole.agents.addMessage(conversation, {
                 role: "user",
                 content: text
             });
 
-            // 3. Poll for response
-            // We'll poll for a few seconds to see if we get a response
+            // 3. Polling for response
             let attempts = 0;
-            const maxAttempts = 20; // 20 * 1.5s = 30s max
-            let lastMessageCount = conversation.messages.length + 1; // +1 for the user message we just added
-
-            // We need to loop getting the conversation and checking for new messages
+            const maxAttempts = 30; // 45 seconds max
+            
             while (attempts < maxAttempts) {
                 await new Promise(r => setTimeout(r, 1500));
                 
                 const updatedConv = await base44.asServiceRole.agents.getConversation(conversationId);
-                const messages = updatedConv.messages;
+                const messages = updatedConv.messages || [];
                 
-                // Check if we have a new assistant message that is done (not tool call in progress)
-                // We look for the last message
-                const lastMsg = messages[messages.length - 1];
-
-                if (messages.length > conversation.messages.length) {
-                    // We have new messages.
-                    // If the last message is from assistant and has content, we can send it.
-                    // Note: The agent might do tool calls intermediate steps.
-                    // We want to capture the final text response.
+                if (messages.length > initialMsgCount) {
+                    // Check the last message
+                    const lastMsg = messages[messages.length - 1];
                     
+                    // If it's the assistant and it has content (and is not a tool call in progress which usually has null content or specific status)
                     if (lastMsg.role === 'assistant' && lastMsg.content) {
+                        console.log("Response found, sending to Telegram");
                         await sendTelegramMessage(chatId, lastMsg.content);
-                        break;
+                        return Response.json({ status: "success" });
                     }
                 }
-                
                 attempts++;
             }
 
-            return Response.json({ status: "success" });
+            // Timeout or no response
+            return Response.json({ status: "timeout_or_processing" });
 
         } catch (error) {
-            console.error("Webhook Error:", error);
-            // Don't send error details to Telegram user, just log
-            return Response.json({ error: error.message }, { status: 500 });
+            console.error("Webhook Critical Error:", error);
+            return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
         }
     }
 
