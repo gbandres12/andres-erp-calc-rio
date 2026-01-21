@@ -1,7 +1,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 
 export async function telegramWebhook(req) {
-    if (req.method !== "POST") return new Response("OK");
+    // Allow GET for connectivity check
+    if (req.method !== "POST") {
+        console.log("[Webhook] GET request received - Endpoint is accessible.");
+        return new Response("Webhook is running! Send POST requests from Telegram here.");
+    }
 
     try {
         const base44 = createClientFromRequest(req);
