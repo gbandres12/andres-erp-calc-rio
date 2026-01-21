@@ -72,15 +72,13 @@ export async function processTelegramQueue(req) {
         User: "${user_text}"
 
         DIRETRIZES:
-        - Identifique a filial (Company) para qualquer lançamento.
-        - Se o usuário não informou a filial, e não está claro no contexto, PERGUNTE.
-        - DATA: Assuma a data de hoje para 'due_date' e 'payment_date' se não informada explicitamente.
-        - STATUS: Identifique se é 'pago', 'pendente' ou 'parcial'.
-          - Se o usuário disser "pago", status='pago', paid_amount=valor total.
-          - Se disser "gastei", assuma 'pago'.
-          - Se disser "conta para pagar" ou "lançar boleto", assuma 'pendente'.
-          - Se for ambíguo, pergunte.
-          - Se for 'parcial', extraia o 'paid_amount'. Se não tiver o valor pago, PERGUNTE.
+        - FILIAL: Identifique a filial (Company) sempre que possível. Se não informado e necessário, PERGUNTE.
+        - DATA (Lançamentos): Assuma hoje para 'due_date'/'payment_date' se não explícito.
+        - STATUS: 'pago' (gastei, paguei), 'pendente' (boleto, conta), ou 'parcial'. Pergunte se faltar valor parcial.
+        - CONSULTAS (read_transactions):
+          - Identifique filtros de tempo: "hoje", "ontem", "este mês", "semana passada".
+          - Converta esses períodos para 'start_date' e 'end_date' (YYYY-MM-DD) com base na data de hoje (${todayStr}).
+          - Identifique filtros de: 'company_id', 'category', 'type' (receita/despesa).
         - Responda em JSON estrito.
         
         DADOS:
@@ -88,10 +86,10 @@ export async function processTelegramQueue(req) {
         Contas: ${JSON.stringify(accounts.map(a => ({id: a.id, name: a.name, company_id: a.company_id, balance: a.current_balance})))}
 
         AÇÕES:
-        1. "reply": Responder texto simples (use para perguntas de clarificação).
+        1. "reply": Responder texto simples.
         2. "create_transaction": Criar lançamento.
-        3. "read_transactions": Listar últimos lançamentos (filtro opcional).
-        4. "read_balance": Consultar saldo de conta.
+        3. "read_transactions": Consultar transações com filtros.
+        4. "read_balance": Consultar saldo.
 
         JSON FORMAT:
         {
@@ -104,11 +102,19 @@ export async function processTelegramQueue(req) {
                 "category": string, 
                 "company_id": string,
                 "status": "pago"|"pendente"|"parcial",
-                "paid_amount": number (optional),
-                "due_date": string (YYYY-MM-DD),
-                "payment_date": string (YYYY-MM-DD)
-            } (if create),
-            "filter_data": { ... } (if read/balance)
+                "paid_amount": number,
+                "due_date": string,
+                "payment_date": string
+            },
+            "filter_data": {
+                "start_date": string (YYYY-MM-DD),
+                "end_date": string (YYYY-MM-DD),
+                "company_id": string,
+                "category": string,
+                "type": "receita"|"despesa",
+                "status": string,
+                "account_id": string
+            }
         }
         `;
 
@@ -178,11 +184,40 @@ export async function processTelegramQueue(req) {
             }
         } 
         else if (response.action === "read_transactions") {
-            const list = await base44.asServiceRole.entities.Transaction.filter(response.filter_data || {}, '-created_date', 5);
+            const f = response.filter_data || {};
+            const query = {};
+            
+            // Build Query
+            if (f.company_id) query.company_id = f.company_id;
+            if (f.category) query.category = { $regex: f.category, $options: 'i' }; // Simple partial match if supported, or exact
+            if (f.type) query.type = f.type;
+            if (f.status) query.status = f.status;
+            
+            // Date Range (using due_date as the reference)
+            if (f.start_date || f.end_date) {
+                query.due_date = {};
+                if (f.start_date) query.due_date.$gte = f.start_date;
+                if (f.end_date) query.due_date.$lte = f.end_date;
+            }
+
+            console.log("[Queue] Querying Transactions:", JSON.stringify(query));
+
+            const list = await base44.asServiceRole.entities.Transaction.filter(query, '-due_date', 15); // Increased limit to 15
+            
             if (list.length > 0) {
-                finalReply += "\n\n" + list.map(t => `▫️ ${t.description}: R$ ${t.amount} (${t.type})`).join("\n");
+                const total = list.reduce((acc, t) => acc + (t.type === 'receita' ? t.amount : -t.amount), 0);
+                
+                finalReply = response.reply_text || "Aqui estão as transações encontradas:";
+                finalReply += "\n\n" + list.map(t => {
+                    const icon = t.type === 'receita' ? '💰' : '💸';
+                    const date = t.due_date ? t.due_date.split('-').reverse().slice(0,2).join('/') : '?';
+                    return `${icon} ${date} - ${t.description}\n   R$ ${t.amount} (${t.status})`;
+                }).join("\n\n");
+                
+                finalReply += `\n\n*Resultado Líquido (desta lista): R$ ${total.toFixed(2)}*`;
             } else {
-                finalReply += "\n(Sem lançamentos recentes)";
+                finalReply = response.reply_text || "Não encontrei transações com esses filtros.";
+                finalReply += "\n(Tente mudar o período ou a filial)";
             }
         }
         else if (response.action === "read_balance") {
