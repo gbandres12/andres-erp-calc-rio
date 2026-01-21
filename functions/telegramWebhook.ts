@@ -4,21 +4,17 @@ export async function telegramWebhook(req) {
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
-    if (!BOT_Token) {
-        return Response.json({ error: "TELEGRAM_BOT_TOKEN not configured" }, { status: 500 });
-    }
+    if (!BOT_Token) return Response.json({ error: "No Token" }, { status: 500 });
 
-    const sendTelegramMessage = async (chatId, text) => {
+    // Helper to send message
+    const sendTelegram = async (chatId, text) => {
         try {
-            const url = `https://api.telegram.org/bot${BOT_Token}/sendMessage`;
-            await fetch(url, {
+            await fetch(`https://api.telegram.org/bot${BOT_Token}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: chatId, text: text })
             });
-        } catch (e) {
-            console.error("Error sending Telegram message:", e);
-        }
+        } catch (e) { console.error("Send Error:", e); }
     };
 
     if (req.method === "POST") {
@@ -27,75 +23,98 @@ export async function telegramWebhook(req) {
             if (!body.message || !body.message.text) return Response.json({ status: "ignored" });
 
             const chatId = String(body.message.chat.id);
-            const text = body.message.text;
+            const userText = body.message.text;
             const username = body.message.from.first_name || "User";
 
-            console.log(`Msg from ${username}: ${text}`);
+            console.log(`Msg: ${userText}`);
 
-            // 1. Session
-            const sessions = await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id: chatId });
-            let conversationId;
-
-            if (sessions.length > 0) {
-                conversationId = sessions[0].conversation_id;
-            } else {
-                console.log("Creating conversation...");
-                const conversation = await base44.asServiceRole.agents.createConversation({
-                    agent_name: "financeiro",
-                    metadata: { name: `Telegram ${chatId}`, telegram_chat_id: chatId }
-                });
-                conversationId = conversation.id;
-                await base44.asServiceRole.entities.TelegramChatSession.create({
-                    chat_id: chatId, conversation_id: conversationId
-                });
-            }
-
-            // 2. Add Message
-            let conversation = await base44.asServiceRole.agents.getConversation(conversationId);
+            // 1. Context Loading
+            const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
+            const accounts = await base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true });
             
-            // Clean object to avoid SDK internal errors
-            const cleanConv = JSON.parse(JSON.stringify(conversation));
-            if (!cleanConv.messages) cleanConv.messages = [];
+            // 2. Construct Prompt
+            let prompt = `Você é um assistente financeiro. 
+            Diretrizes:
+            - Sistema multi-filial. Identifique a filial (Company) para transações.
+            - Se não souber a filial, PERGUNTE.
+            - Responda em JSON estrito.
             
-            const initialMsgCount = cleanConv.messages.length;
+            Dados Disponíveis:
+            Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name})))}
+            Contas: ${JSON.stringify(accounts.map(a => ({id: a.id, name: a.name, company_id: a.company_id, balance: a.current_balance})))}
 
-            try {
-                await base44.asServiceRole.agents.addMessage(cleanConv, {
-                    role: "user", content: text
-                });
-            } catch (err) {
-                console.error("addMessage error (ignoring):", err.message);
+            User Input: "${userText}"
+
+            Output Format (JSON only):
+            {
+                "action": "reply" | "create_transaction" | "read_transactions",
+                "reply_text": "text to user (required if action is reply)",
+                "transaction_data": { ...fields for Transaction entity... } (if create),
+                "filter_data": { ...fields... } (if read)
             }
+            Para criar transação, campos: description, amount, type (receita/despesa), category, company_id (OBRIGATÓRIO), account_id (opcional), status (pendente/pago), due_date.
+            `;
 
-            // 3. Poll
-            let attempts = 0;
-            while (attempts < 30) {
-                await new Promise(r => setTimeout(r, 1000));
-                
-                const updatedConv = await base44.asServiceRole.agents.getConversation(conversationId);
-                const messages = updatedConv.messages || [];
-                
-                if (messages.length > initialMsgCount) {
-                    const lastMsg = messages[messages.length - 1];
-                    // Log for debug
-                    console.log(`Poll ${attempts}: Found msg role=${lastMsg.role}`);
-                    
-                    if (lastMsg.role === 'assistant' && lastMsg.content) {
-                        await sendTelegramMessage(chatId, lastMsg.content);
-                        return Response.json({ status: "success" });
-                    }
+            // 3. Call LLM
+            const response = await base44.integrations.Core.InvokeLLM({
+                prompt: prompt,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        action: { type: "string", enum: ["reply", "create_transaction", "read_transactions"] },
+                        reply_text: { type: "string" },
+                        transaction_data: { type: "object", additionalProperties: true },
+                        filter_data: { type: "object", additionalProperties: true }
+                    },
+                    required: ["action"]
                 }
-                attempts++;
+            });
+
+            console.log("LLM Decision:", response);
+
+            // 4. Execute Action
+            if (response.action === "reply") {
+                await sendTelegram(chatId, response.reply_text || "Entendido.");
+            } 
+            else if (response.action === "create_transaction") {
+                const data = response.transaction_data;
+                if (!data.company_id) {
+                     await sendTelegram(chatId, "Preciso saber para qual filial lançar essa transação. " + companies.map(c => c.name).join(", "));
+                } else {
+                    // Create
+                    const tx = await base44.asServiceRole.entities.Transaction.create({
+                        ...data,
+                        status: data.status || 'pendente',
+                        due_date: data.due_date || new Date().toISOString().split('T')[0]
+                    });
+                    
+                    // Recalculate balance if needed
+                    base44.functions.invoke('recalculateBalance', { company_id: data.company_id });
+                    
+                    await sendTelegram(chatId, `✅ Transação criada!\n${tx.description} - R$ ${tx.amount}\nFilial: ${companies.find(c=>c.id===tx.company_id)?.name}`);
+                }
             }
-            
-            return Response.json({ status: "timeout" });
+            else if (response.action === "read_transactions") {
+                // Simple list
+                const filters = response.filter_data || {};
+                const list = await base44.asServiceRole.entities.Transaction.filter(filters, '-created_date', 5);
+                
+                if (list.length === 0) {
+                    await sendTelegram(chatId, "Nenhuma transação encontrada recentemente.");
+                } else {
+                    const msg = list.map(t => `${t.description}: R$ ${t.amount} (${t.type})`).join("\n");
+                    await sendTelegram(chatId, "Últimas transações:\n" + msg);
+                }
+            }
+
+            return Response.json({ status: "processed" });
 
         } catch (error) {
             console.error("Error:", error);
+            await sendTelegram(String(req.body?.message?.chat?.id), "Ocorreu um erro interno.");
             return Response.json({ error: error.message }, { status: 500 });
         }
     }
-
     return new Response("OK");
 }
 
