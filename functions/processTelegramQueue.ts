@@ -108,7 +108,21 @@ export async function processTelegramQueue(req) {
                     properties: {
                         action: { type: "string" },
                         reply_text: { type: "string" },
-                        transaction_data: { type: "object", additionalProperties: true },
+                        transaction_data: { 
+                            type: "object", 
+                            properties: {
+                                description: { type: "string" },
+                                amount: { type: "number" },
+                                type: { type: "string", enum: ["receita", "despesa"] },
+                                category: { type: "string" },
+                                company_id: { type: "string" },
+                                status: { type: "string", enum: ["pago", "pendente", "parcial"] },
+                                paid_amount: { type: "number" },
+                                due_date: { type: "string" },
+                                payment_date: { type: "string" }
+                            },
+                            required: ["description", "amount", "type", "category"] 
+                        },
                         filter_data: { type: "object", additionalProperties: true },
                         search_query: { type: "string" },
                         contact_data: { type: "object", additionalProperties: true },
