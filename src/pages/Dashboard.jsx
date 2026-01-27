@@ -110,14 +110,47 @@ export default function Dashboard() {
       }));
   }, [allPaidTransactions]);
 
-  const { data: transfers = [], isLoading: loadingTransfers } = useQuery({
-    queryKey: ['transfers'],
-    queryFn: () => base44.entities.Transfer.filter({ 
-      status: 'enviado'
-    }, '-created_date', 5),
+  const { data: sales = [], isLoading: loadingSales } = useQuery({
+    queryKey: ['sales', selectedCompanyId],
+    queryFn: () => base44.entities.Sale.filter({ 
+      company_id: selectedCompanyId 
+    }, '-sale_date', 100),
     initialData: [],
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
+
+  const salesChartData = useMemo(() => {
+    const grouped = {};
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - 30);
+    limitDate.setHours(0, 0, 0, 0);
+    
+    // Inicializa os últimos 30 dias com zero
+    for (let i = 0; i <= 30; i++) {
+      const d = new Date(limitDate);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      grouped[dateStr] = { date: dateStr, total: 0 };
+    }
+
+    sales.forEach(sale => {
+      if (sale.sale_date && sale.status !== 'cancelada') {
+        const sDate = new Date(sale.sale_date);
+        const dateStr = sale.sale_date.split('T')[0];
+        
+        if (sDate >= limitDate && grouped[dateStr]) {
+          grouped[dateStr].total += (sale.total || 0);
+        }
+      }
+    });
+
+    return Object.values(grouped)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(item => ({
+         ...item,
+         formattedDate: formatDate(item.date).slice(0, 5) // DD/MM
+      }));
+  }, [sales]);
 
   const { data: contacts = [] } = useQuery({
     queryKey: ['contacts', selectedCompanyId],
@@ -237,7 +270,7 @@ export default function Dashboard() {
 
   const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 
-  const isLoading = loadingProducts || loadingStock || loadingVehicles || loadingTransactions;
+  const isLoading = loadingProducts || loadingStock || loadingVehicles || loadingTransactions || loadingSales;
 
   if (isLoading) {
     return (
@@ -494,39 +527,40 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Transferências Pendentes */}
+          {/* Evolução de Vendas */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Transferências Pendentes</CardTitle>
-              <Link to={createPageUrl('Transfers')}>
+              <CardTitle className="text-lg">Vendas (30 dias)</CardTitle>
+              <Link to={createPageUrl('Sales')}>
                 <Button variant="ghost" size="sm">
                   Ver todas <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
             </CardHeader>
             <CardContent>
-              {transfers.length > 0 ? (
-                <div className="space-y-3">
-                  {transfers.map((transfer) => (
-                    <div key={transfer.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{transfer.product_name}</p>
-                        <p className="text-sm text-slate-500">
-                          {transfer.origin_name} → {transfer.destination_name}
-                        </p>
-                      </div>
-                      <Badge variant="secondary">
-                        {transfer.quantity} {transfer.unit}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500">
-                  <TruckIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>Nenhuma transferência pendente</p>
-                </div>
-              )}
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={salesChartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="formattedDate" tick={{fontSize: 12}} />
+                    <YAxis tick={{fontSize: 12}} />
+                    <Tooltip 
+                      formatter={(value) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                    />
+                    <Legend wrapperStyle={{fontSize: '12px'}} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="total" 
+                      name="Total Vendido" 
+                      stroke="#8b5cf6" 
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </div>
