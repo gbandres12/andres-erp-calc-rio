@@ -19,7 +19,6 @@ export async function processTelegramQueue(req) {
         } catch (e) { console.error("Send Error:", e); }
     };
 
-    // New helper for typing status
     const sendAction = async (chatId, action = "typing") => {
         try {
             await fetch(`https://api.telegram.org/bot${BOT_Token}/sendChatAction`, {
@@ -39,10 +38,10 @@ export async function processTelegramQueue(req) {
 
         const { chat_id, user_text, id: queueId } = queueItem;
 
-        // 0. Immediate Feedback: Show "Typing..." to user
+        // Feedback imediato
         sendAction(chat_id, "typing");
 
-        // 1. Session & History
+        // 1. Carregar ou Criar Sessão
         let session = (await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id: chat_id }))[0];
         if (!session) {
             session = await base44.asServiceRole.entities.TelegramChatSession.create({ chat_id: chat_id, history: [] });
@@ -51,12 +50,21 @@ export async function processTelegramQueue(req) {
         let history = session.history || [];
         if (history.length > 10) history = history.slice(-10);
         
-        // 2. Load Context Data
+        // 2. Dados de Contexto
         const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
         const accounts = await base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true });
         
+        // Recuperar filial da sessão ou tentar resolver
+        let currentCompanyId = session.selected_company_id;
+        const currentCompanyName = companies.find(c => c.id === currentCompanyId)?.name || "Nenhuma";
+
         const resolveCompanyId = (id) => {
-            if (id) return id;
+            if (id) {
+                // Validar se ID existe
+                const exists = companies.find(c => c.id === id);
+                return exists ? id : null;
+            }
+            if (currentCompanyId) return currentCompanyId;
             if (companies.length === 1) return companies[0].id;
             return null;
         };
@@ -64,41 +72,42 @@ export async function processTelegramQueue(req) {
         const todayStr = new Date().toLocaleDateString('pt-BR');
         const historyText = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join("\n");
         
-        // 3. Prompt - Optimized for humanization and conciseness
-        let prompt = `Você é um assistente financeiro e de vendas SUPER AMIGÁVEL e EFICIENTE. ⚡️
-        Personalidade: Use emojis (✅, 📊, 💰, etc), seja cordial, mas direto. Não seja robótico.
+        // 3. Prompt Refinado
+        let prompt = `Você é o "FinanceiroBot" 🤖, assistente das filiais: ${companies.map(c => c.name).join(", ")}.
         
-        Data de hoje: ${todayStr}
+        Data: ${todayStr}
+        Filial Ativa na Sessão: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
         
-        CONTEXTO RECENTE:
+        CONTEXTO:
         ${historyText}
         User: "${user_text}"
 
-        DIRETRIZES:
-        1. MULTI-FILIAL: Identifique a 'company_id' para ações. Se não souber, PERGUNTE com jeito (ex: "Para qual filial seria isso? 🏢").
-        2. VENDAS: Siga o fluxo (Produto -> Cliente -> Valor -> Venda).
-        3. RESPOSTAS: Gere o texto final no campo 'reply_text' já formatado para o usuário ler.
+        REGRAS CRÍTICAS:
+        1. **FILIAL OBRIGATÓRIA**: Para gravar ou ler dados (transações, produtos, etc), você PRECISA de uma 'company_id'. 
+           - Se o usuário NÃO disse a filial e NÃO tem "Filial Ativa", PERGUNTE.
+           - Se o usuário mencionou uma filial, use o ID dela no JSON.
+           - Se o usuário pediu para "mudar para filial X", atualize a filial.
+        2. **DADOS COMPLETOS**: Não invente IDs. Use os fornecidos abaixo.
 
-        DADOS DISPONÍVEIS:
-        Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name})))}
+        DADOS:
+        Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name, code: c.code})))}
         Contas: ${JSON.stringify(accounts.map(a => ({id: a.id, name: a.name, company_id: a.company_id})))}
 
-        AÇÕES POSSÍVEIS:
-        "reply" (conversa geral/perguntas), "create_transaction", "read_transactions", "read_balance", "search_products", "search_contacts", "create_contact", "create_sale".
+        AÇÕES: "reply", "set_company", "create_transaction", "read_transactions", "read_balance", "search_products", "create_sale".
 
-        JSON RETORNO:
+        RETORNO JSON (Estrito):
         {
-            "action": "ação_escolhida",
-            "reply_text": "Sua resposta amigável aqui...",
-            "transaction_data": { ... },
-            "filter_data": { "company_id": "...", ... },
+            "action": "...",
+            "reply_text": "...",
+            "target_company_id": "ID da filial se identificada/alterada nesta mensagem (ou null)",
+            "transaction_data": { "description": "...", "amount": 0.00, "type": "receita|despesa", "category": "...", "status": "...", "company_id": "..." },
+            "filter_data": { "company_id": "..." },
             "search_query": "...",
-            "contact_data": { ... },
             "sale_data": { ... }
         }
         `;
 
-        // 4. Invoke AI
+        // 4. Chamar LLM
         let response;
         try {
             response = await base44.integrations.Core.InvokeLLM({
@@ -108,6 +117,7 @@ export async function processTelegramQueue(req) {
                     properties: {
                         action: { type: "string" },
                         reply_text: { type: "string" },
+                        target_company_id: { type: "string" },
                         transaction_data: { 
                             type: "object", 
                             properties: {
@@ -125,136 +135,121 @@ export async function processTelegramQueue(req) {
                         },
                         filter_data: { type: "object", additionalProperties: true },
                         search_query: { type: "string" },
-                        contact_data: { type: "object", additionalProperties: true },
                         sale_data: { type: "object", additionalProperties: true }
                     },
                     required: ["action", "reply_text"]
                 }
             });
         } catch (llmError) {
-            await sendTelegram(chat_id, "Ops! Tive um probleminha técnico rápido. Pode repetir? 😅");
-            return Response.json({ status: "llm_error" });
+            console.error("LLM Error:", llmError);
+            await sendTelegram(chat_id, "😵‍💫 Minha mente deu um nó (Erro na IA). Pode repetir por favor?");
+            // Importante: Deletar da fila para não travar, pois é erro de IA temporário
+            try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
+            return Response.json({ status: "llm_error_handled" });
         }
 
-        // 5. Execute Logic
-        let finalReply = response.reply_text; // Default to LLM's humanized text
+        // 5. Executar Lógica
+        let finalReply = response.reply_text;
         const action = response.action;
-        const filter = response.filter_data || {};
+        let cid = resolveCompanyId(response.target_company_id || response.transaction_data?.company_id || response.filter_data?.company_id);
 
-        // Resolve Company
-        const cid = resolveCompanyId(
-            (response.transaction_data?.company_id) || 
-            (filter.company_id) || 
-            (response.contact_data?.company_id) || 
-            (response.sale_data?.company_id)
-        );
+        // Atualizar sessão se mudou de filial
+        if (response.target_company_id && response.target_company_id !== currentCompanyId) {
+             const newCompany = companies.find(c => c.id === response.target_company_id);
+             if (newCompany) {
+                 await base44.asServiceRole.entities.TelegramChatSession.update(session.id, { selected_company_id: newCompany.id });
+                 currentCompanyId = newCompany.id;
+                 cid = newCompany.id; // Garantir uso
+             }
+        }
 
-        const needsCompany = ["create_transaction", "read_transactions", "read_balance", "search_products", "search_contacts", "create_contact", "create_sale"].includes(action);
+        const needsCompany = ["create_transaction", "read_transactions", "read_balance", "search_products", "create_sale"].includes(action);
 
         if (needsCompany && !cid) {
-            finalReply = `Claro! Mas para qual filial devo olhar? 🏢\nOpções: ${companies.map(c => c.name).join(", ")}`;
+            finalReply = `🏢 *Qual filial?* Não sei em qual filial devo executar isso.\nOpções: ${companies.map(c => c.name).join(", ")}`;
         } 
         else {
-            if (action === "create_transaction") {
-                const data = response.transaction_data;
-                data.company_id = cid;
+            try {
+                if (action === "create_transaction") {
+                    const data = response.transaction_data;
+                    data.company_id = cid; // Forçar ID resolvido/validado
+                    
+                    const today = new Date().toISOString().split('T')[0];
+                    if (!data.due_date) data.due_date = today;
+                    if (data.status === 'pago') {
+                        data.paid_amount = data.amount;
+                        if (!data.payment_date) data.payment_date = today;
+                    }
+
+                    const tx = await base44.asServiceRole.entities.Transaction.create(data);
+                    base44.functions.invoke('recalculateBalance', { company_id: cid });
+                    
+                    finalReply = `✅ *Lançamento Criado na ${companies.find(c=>c.id===cid)?.name}*\n📝 ${tx.description}\n💰 R$ ${tx.amount} (${tx.type})`;
+                }
                 
-                // Defaults
-                const today = new Date().toISOString().split('T')[0];
-                if (!data.due_date) data.due_date = today;
-                if (data.status === 'pago') {
-                    data.paid_amount = data.amount;
-                    if (!data.payment_date) data.payment_date = today;
+                else if (action === "read_transactions") {
+                    const query = { company_id: cid };
+                    if (response.filter_data?.status) query.status = response.filter_data.status;
+                    const list = await base44.asServiceRole.entities.Transaction.filter(query, '-due_date', 8);
+                    
+                    if (list.length > 0) {
+                        finalReply = `📊 *Extrato ${companies.find(c=>c.id===cid)?.name}*\n` + 
+                            list.map(t => `▪️ ${t.description} | R$ ${t.amount} (${t.status})`).join("\n");
+                    } else {
+                        finalReply = `Nada recente encontrado na filial ${companies.find(c=>c.id===cid)?.name}. 🦗`;
+                    }
                 }
 
-                const tx = await base44.asServiceRole.entities.Transaction.create(data);
-                base44.functions.invoke('recalculateBalance', { company_id: cid });
-                
-                // Humanized confirmation
-                finalReply = `✅ Feito! Lançamento de *R$ ${tx.amount}* criado em *${companies.find(c=>c.id===cid)?.name}*.\n📝 ${tx.description}`;
-            }
-            
-            else if (action === "read_transactions") {
-                const query = { company_id: cid };
-                if (filter.status) query.status = filter.status;
-                // Simple date filter if provided
-                if (filter.start_date) query.due_date = { $gte: filter.start_date };
-
-                const list = await base44.asServiceRole.entities.Transaction.filter(query, '-due_date', 10);
-                
-                if (list.length > 0) {
-                    finalReply = `📊 *Extrato Recente (${companies.find(c=>c.id===cid)?.name})*\n\n` + 
-                        list.map(t => `${t.type==='receita'?'💰':'💸'} ${t.description}\n   R$ ${t.amount} (${t.status})`).join("\n\n");
-                } else {
-                    finalReply = `Não encontrei transações recentes nesta filial com esses filtros. 🧐`;
-                }
-            }
-            
-            else if (action === "read_balance") {
-                const companyAccounts = accounts.filter(a => a.company_id === cid);
-                if (companyAccounts.length === 0) {
-                    finalReply = `Não achei contas cadastradas na filial ${companies.find(c=>c.id===cid)?.name}. 😕`;
-                } else {
+                else if (action === "read_balance") {
+                    const companyAccounts = accounts.filter(a => a.company_id === cid);
                     const total = companyAccounts.reduce((sum, a) => sum + (a.current_balance || 0), 0);
-                    finalReply = `🏦 *Saldo Atual (${companies.find(c=>c.id===cid)?.name})*\n\n` + 
-                        companyAccounts.map(a => `▫️ ${a.name}: R$ ${a.current_balance?.toFixed(2)}`).join("\n") +
-                        `\n\n💰 *Total: R$ ${total.toFixed(2)}*`;
+                    finalReply = `🏦 *Saldo ${companies.find(c=>c.id===cid)?.name}*\nTotal: *R$ ${total.toFixed(2)}*\n\n` + 
+                        companyAccounts.map(a => `▫️ ${a.name}: R$ ${a.current_balance?.toFixed(2)}`).join("\n");
                 }
-            }
 
-            else if (action === "search_products") {
-                const query = response.search_query || "";
-                const products = await base44.asServiceRole.entities.Product.filter({ 
-                    name: { $regex: query, $options: 'i' },
-                    company_id: cid,
-                    is_active: true
-                }, '-name', 10);
-                
-                if (products.length > 0) {
-                    finalReply = `📦 *Produtos Encontrados (${companies.find(c=>c.id===cid)?.name})*:\n\n` + 
-                        products.map(p => `▫️ ${p.name}\n   💲 R$ ${p.sale_price} | Estoque: ${p.current_stock} ${p.unit}`).join("\n\n");
-                } else {
-                    finalReply = `Não encontrei produtos com "${query}" aqui. 🔎`;
+                else if (action === "search_products") {
+                    const query = response.search_query || "";
+                    const products = await base44.asServiceRole.entities.Product.filter({ 
+                        name: { $regex: query, $options: 'i' },
+                        company_id: cid,
+                        is_active: true
+                    }, '-name', 10);
+                    
+                    if (products.length > 0) {
+                        finalReply = `📦 *Produtos (${companies.find(c=>c.id===cid)?.name})*:\n` + 
+                            products.map(p => `▫️ ${p.name} | R$ ${p.sale_price} | Est: ${p.current_stock}`).join("\n");
+                    } else {
+                        finalReply = `Nenhum produto "${query}" encontrado nesta filial.`;
+                    }
                 }
-            }
-            
-            // ... (Other actions like contacts/sales follow similar pattern, kept brief for this update)
-            else if (action === "create_sale") {
-                // Logic kept simple, assuming success creates a sale
-                 const s = response.sale_data;
-                 s.company_id = cid;
-                 if (s.client_id && s.items?.length > 0) {
-                    const ref = `V-${Date.now().toString().slice(-6)}`;
-                    await base44.asServiceRole.entities.Sale.create({
-                        reference: ref,
-                        company_id: s.company_id,
-                        client_id: s.client_id,
-                        client_name: s.client_name,
-                        items: s.items,
-                        total: s.total,
-                        status: 'concluida',
-                        sale_date: new Date().toISOString().split('T')[0]
-                    });
-                    finalReply = `🎉 Venda *${ref}* registrada com sucesso na ${companies.find(c=>c.id===cid)?.name}!\nValor Total: R$ ${s.total}`;
-                 } else {
-                     finalReply = "Preciso de mais dados (cliente ou itens) para fechar a venda! 🛒";
-                 }
+            } catch (logicError) {
+                console.error("Logic/DB Error:", logicError);
+                finalReply = `⚠️ *Erro ao processar*\nNão consegui concluir a ação no banco de dados. Verifique se os dados (valor, nome) estão corretos.`;
             }
         }
 
-        // 6. Response & Cleanup
+        // 6. Finalizar
         history.push({ role: "user", content: user_text });
         history.push({ role: "assistant", content: finalReply });
-        await base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history });
-        await sendTelegram(chat_id, finalReply);
-
-        try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch (e) {}
+        
+        // Atualiza histórico e deleta da fila SEMPRE (para não travar)
+        await Promise.all([
+            base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history }),
+            sendTelegram(chat_id, finalReply),
+            base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId)
+        ]);
 
         return Response.json({ status: "success" });
 
-    } catch (error) {
-        console.error("Processor Error:", error);
-        return Response.json({ error: error.message }, { status: 500 });
+    } catch (criticalError) {
+        console.error("Critical System Error:", criticalError);
+        // Se algo muito grave acontecer, tente limpar a fila se possível para não gerar loop
+        try { 
+            const payload = await req.json().catch(()=>null);
+            if(payload?.data?.id) await base44.asServiceRole.entities.TelegramMessageQueue.delete(payload.data.id);
+        } catch(e){}
+        
+        return Response.json({ error: criticalError.message }, { status: 500 });
     }
 }
 
