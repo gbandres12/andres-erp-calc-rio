@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,8 +28,30 @@ export default function Weighing() {
     gross: 0,
     operator: "",
     client_id: "",
-    notes: ""
+    notes: "",
+    purpose: "saida_venda"
   });
+
+  const { data: scaleState } = useQuery({
+    queryKey: ['scaleState', selectedCompanyId],
+    queryFn: () => base44.entities.ScaleState.filter({ company_id: selectedCompanyId }),
+    refetchInterval: 2000, // Poll every 2s
+    initialData: []
+  });
+
+  const liveWeight = scaleState[0]?.current_weight || 0;
+  const lastUpdate = scaleState[0]?.last_update;
+  const isScaleActive = lastUpdate && (new Date() - new Date(lastUpdate)) < 30000; // 30s timeout
+
+  // Update local state when live weight changes
+  useEffect(() => {
+    if (isScaleActive) {
+      setCurrentWeight(liveWeight);
+      setIsConnected(true);
+    } else {
+      setIsConnected(false);
+    }
+  }, [liveWeight, isScaleActive]);
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles', selectedCompanyId],
@@ -111,13 +133,14 @@ export default function Weighing() {
     createMutation.mutate(formData);
   };
 
-  // Simular leitura da balança
+  // Leitura manual (fallback ou confirmação)
   const readScale = () => {
-    // Em produção, isso faria uma chamada HTTP para a balança
-    const simulatedWeight = Math.floor(Math.random() * 50000) + 1000;
-    setCurrentWeight(simulatedWeight);
-    setIsConnected(true);
-    toast.success(`Peso capturado: ${simulatedWeight.toLocaleString()} kg`);
+    if (isScaleActive) {
+      setCurrentWeight(liveWeight);
+      toast.success(`Peso atualizado: ${liveWeight.toLocaleString()} kg`);
+    } else {
+      toast.error("Balança desconectada ou sem dados recentes.");
+    }
   };
 
   const captureTare = () => {
@@ -166,8 +189,8 @@ export default function Weighing() {
                 <CardContent className="pt-6">
                   <div className="text-center mb-4">
                     <div className="flex items-center justify-center gap-3 mb-2">
-                      <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <span className="text-sm">{isConnected ? 'Balança Conectada' : 'Balança Desconectada'}</span>
+                      <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} ${isConnected ? 'animate-pulse' : ''}`}></div>
+                      <span className="text-sm">{isConnected ? 'Balança Online (Ao Vivo)' : 'Balança Offline'}</span>
                     </div>
                     <div className="text-6xl font-bold font-mono">
                       {currentWeight.toLocaleString()} kg
@@ -189,6 +212,21 @@ export default function Weighing() {
               </Card>
 
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label>Finalidade da Pesagem</Label>
+                  <Select
+                    value={formData.purpose}
+                    onValueChange={(value) => setFormData({ ...formData, purpose: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="saida_venda">Saída para Venda</SelectItem>
+                      <SelectItem value="entrada_estoque">Entrada de Estoque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label>Veículo *</Label>
                   <Select
@@ -388,6 +426,9 @@ export default function Weighing() {
                         <p className="font-semibold text-slate-900">{weighing.reference}</p>
                         <Badge className={statusColors[weighing.status]}>
                           {weighing.status}
+                        </Badge>
+                        <Badge variant="outline" className="ml-2">
+                          {weighing.purpose === 'entrada_estoque' ? 'Entrada' : 'Saída'}
                         </Badge>
                       </div>
                       <p className="text-sm text-slate-600">
