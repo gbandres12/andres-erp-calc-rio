@@ -62,7 +62,8 @@ const navigationGroups = [
     items: [
       { title: "Orçamentos", url: "Quotes", icon: FileText },
       { title: "Vendas", url: "Sales", icon: ShoppingCart },
-      { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck }
+      { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck },
+      { title: "CRM", url: "CRM", icon: Users }
     ]
   },
   {

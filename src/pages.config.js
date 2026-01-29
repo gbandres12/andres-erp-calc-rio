@@ -72,6 +72,7 @@ import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
+import CRM from './pages/CRM';
 import __Layout from './Layout.jsx';
 
 
@@ -101,6 +102,7 @@ export const PAGES = {
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
+    "CRM": CRM,
 }
 
 export const pagesConfig = {
