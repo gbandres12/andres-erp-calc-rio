@@ -700,13 +700,9 @@ export default function Transactions() {
   // Dados do gráfico de fluxo de caixa diário
   const dailyCashFlow = React.useMemo(() => {
     const grouped = {};
-    // Pega últimos 30 dias para o gráfico não ficar gigante
-    const limitDate = new Date();
-    limitDate.setDate(limitDate.getDate() - 30);
-    const limitStr = limitDate.toISOString().split('T')[0];
 
-    transactions.forEach(t => {
-      if (t.status === 'pago' && t.payment_date && t.payment_date >= limitStr) {
+    filteredTransactions.forEach(t => {
+      if (t.status === 'pago' && t.payment_date) {
         const date = t.payment_date;
         if (!grouped[date]) grouped[date] = { date, receita: 0, despesa: 0 };
         if (t.type === 'receita') grouped[date].receita += (t.paid_amount || 0);
@@ -720,7 +716,7 @@ export default function Transactions() {
          ...item,
          formattedDate: formatDate(item.date).slice(0, 5) // DD/MM
       }));
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -1517,7 +1513,7 @@ export default function Transactions() {
       {/* Gráfico de Movimentação Diária */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Movimentação de Caixa Diária (Últimos 30 dias)</CardTitle>
+          <CardTitle>Movimentação de Caixa Diária</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] w-full">
