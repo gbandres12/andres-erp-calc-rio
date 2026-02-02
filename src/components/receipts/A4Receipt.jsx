@@ -286,7 +286,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         {/* RODAPÉ */}
         <div style={{ marginTop: '30px', textAlign: 'center', fontSize: '8pt', color: '#666', borderTop: '1px solid #E2E8F0', paddingTop: '12px' }}>
           <p style={{ margin: '0' }}>Este documento é uma via do pedido de venda e serve como comprovante da transação.</p>
-          <p style={{ margin: '5px 0 0 0' }}>Emitido em {formatDate(new Date().toISOString())}</p>
+          <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Emitido em {formatDate(new Date().toISOString())}</p>
         </div>
       </div>
     );
@@ -645,7 +645,7 @@ export default function A4Receipt({ type, data, onPrint }) {
         {/* RODAPÉ */}
         <div style={{ marginTop: '30px', textAlign: 'center', fontSize: '8pt', color: '#666', borderTop: '1px solid #E2E8F0', paddingTop: '12px' }}>
           <p style={{ margin: '0' }}>Este documento é um orçamento e não constitui uma venda final.</p>
-          <p style={{ margin: '5px 0 0 0' }}>Emitido em {formatDate(new Date().toISOString())}</p>
+          <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Emitido em {formatDate(new Date().toISOString())}</p>
         </div>
       </div>
     );
