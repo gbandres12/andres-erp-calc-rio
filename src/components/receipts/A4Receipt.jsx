@@ -243,7 +243,7 @@ export default function A4Receipt({ type, data, onPrint }) {
               {paymentRows.map((row, idx) => (
                 <tr key={idx}>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px' }}>{row.descricao}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center' }}>{row.vencimento}</td>
+                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{row.vencimento}</td>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center' }}>{row.pagamento}</td>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? '#DC2626' : '#059669' }}>
@@ -602,7 +602,7 @@ export default function A4Receipt({ type, data, onPrint }) {
               {paymentRows.map((row, idx) => (
                 <tr key={idx}>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px' }}>{row.descricao}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center' }}>{row.vencimento}</td>
+                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{row.vencimento}</td>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center' }}>{row.pagamento}</td>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
                   <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? '#DC2626' : '#059669' }}>
