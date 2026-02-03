@@ -69,6 +69,7 @@ export default function Transactions() {
     payment_date: getTodayDate(),
     account_id: "",
     payment_method: "dinheiro",
+    discount: 0,
     notes: ""
   });
 
@@ -196,18 +197,32 @@ export default function Transactions() {
   });
 
   const registerPaymentMutation = useMutation({
-    mutationFn: async ({ id, amount, date, accountId, paymentMethod, notes }) => {
+    mutationFn: async ({ id, amount, discount, date, accountId, paymentMethod, notes }) => {
       const transaction = transactions.find(t => t.id === id);
       if (!transaction) throw new Error("Transação não encontrada");
 
       const currentPaidAmount = transaction.paid_amount || 0;
+      const currentDiscount = transaction.discount || 0;
+      
       let newPaidAmount = currentPaidAmount + amount;
+      let newDiscount = currentDiscount + (discount || 0);
 
-      if (newPaidAmount > transaction.amount) {
-        newPaidAmount = transaction.amount;
+      const totalAccounted = newPaidAmount + newDiscount;
+      
+      // Se o total contabilizado passar do valor da transação, ajustamos o desconto
+      // (Priorizamos o valor pago real, o desconto é o que sobra)
+      if (totalAccounted > transaction.amount) {
+         // Se só o pago já passou, limitamos o pago
+         if (newPaidAmount > transaction.amount) {
+             newPaidAmount = transaction.amount;
+             newDiscount = 0;
+         } else {
+             // Se pago + desconto passou, reduzimos o desconto
+             newDiscount = transaction.amount - newPaidAmount;
+         }
       }
 
-      const remainingAmount = transaction.amount - newPaidAmount;
+      const remainingAmount = transaction.amount - newPaidAmount - newDiscount;
 
       let newStatus = 'pendente';
       if (remainingAmount <= 0.005) {
@@ -236,6 +251,7 @@ export default function Transactions() {
 
       await base44.entities.Transaction.update(id, {
         paid_amount: newPaidAmount,
+        discount: newDiscount,
         status: newStatus,
         payment_date: newStatus === 'pago' ? date : transaction.payment_date,
         account_id: accountId || transaction.account_id,
@@ -249,6 +265,7 @@ export default function Transactions() {
         transaction_id: id,
         transaction_reference: transaction.description,
         amount: amount,
+        discount: discount || 0,
         payment_date: date,
         account_id: accountId,
         account_name: account?.name || '',
@@ -268,11 +285,12 @@ export default function Transactions() {
       setIsReceivePayOpen(false);
       setSelectedTransaction(null);
       setPaymentFormData({
-        amount: 0,
-        payment_date: getTodayDate(),
-        account_id: "",
-        payment_method: "dinheiro",
-        notes: ""
+      amount: 0,
+      discount: 0,
+      payment_date: getTodayDate(),
+      account_id: "",
+      payment_method: "dinheiro",
+      notes: ""
       });
 
       if (newStatus === 'pago') {
@@ -546,7 +564,8 @@ export default function Transactions() {
 
     registerPaymentMutation.mutate({
       id: selectedTransaction.id,
-      amount: paymentFormData.amount,
+      amount: parseFloat(paymentFormData.amount),
+      discount: parseFloat(paymentFormData.discount || 0),
       date: paymentFormData.payment_date,
       accountId: paymentFormData.account_id,
       paymentMethod: paymentFormData.payment_method,
@@ -1238,10 +1257,16 @@ export default function Transactions() {
                       <span className="text-slate-600">Já Pago:</span>
                       <span className="text-green-600 font-medium">{formatBRL(selectedTransaction.paid_amount || 0)}</span>
                     </div>
+                    {(selectedTransaction.discount > 0) && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Descontos:</span>
+                        <span className="text-red-500 font-medium">{formatBRL(selectedTransaction.discount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-slate-600 font-medium">Saldo Restante:</span>
                       <span className="text-orange-600 font-bold text-lg">
-                        {formatBRL(selectedTransaction.amount - (selectedTransaction.paid_amount || 0))}
+                        {formatBRL(selectedTransaction.amount - (selectedTransaction.paid_amount || 0) - (selectedTransaction.discount || 0))}
                       </span>
                     </div>
                   </div>
@@ -1249,19 +1274,30 @@ export default function Transactions() {
               </Card>
 
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Valor a {selectedTransaction.type === 'receita' ? 'Receber' : 'Pagar'} *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={paymentFormData.amount}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value === '' ? '' : e.target.value })}
-                    max={selectedTransaction.amount - (selectedTransaction.paid_amount || 0)}
-                  />
-                  <p className="text-xs text-slate-500">
-                    Máximo: {formatBRL(selectedTransaction.amount - (selectedTransaction.paid_amount || 0))}
-                  </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Valor a {selectedTransaction.type === 'receita' ? 'Receber' : 'Pagar'} *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={paymentFormData.amount}
+                      onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value === '' ? '' : e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Desconto concedido</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={paymentFormData.discount}
+                      onChange={(e) => setPaymentFormData({ ...paymentFormData, discount: e.target.value === '' ? '' : e.target.value })}
+                      placeholder="0,00"
+                    />
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500 mb-2">
+                  Saldo Restante: {formatBRL(selectedTransaction.amount - (selectedTransaction.paid_amount || 0) - (selectedTransaction.discount || 0))}
                 </div>
 
                 <div className="space-y-2">
@@ -1401,10 +1437,8 @@ export default function Transactions() {
                       <p className="font-bold text-green-600">{formatBRL(viewingPayments.paid_amount || 0)}</p>
                     </div>
                     <div>
-                      <span className="text-slate-600">Saldo Restante:</span>
-                      <p className="font-bold text-orange-600">
-                        {formatBRL(viewingPayments.amount - (viewingPayments.paid_amount || 0))}
-                      </p>
+                      <span className="text-slate-600">Descontos:</span>
+                      <p className="font-bold text-red-500">{formatBRL(viewingPayments.discount || 0)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1447,6 +1481,11 @@ export default function Transactions() {
                               <p className="font-bold text-green-600 text-lg">
                                 {formatBRL(payment.amount)}
                               </p>
+                              {(payment.discount > 0) && (
+                                <p className="text-xs text-red-500">
+                                  Desc: {formatBRL(payment.discount)}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </CardContent>
@@ -1614,7 +1653,7 @@ export default function Transactions() {
         <CardContent>
           <div className="space-y-3">
             {filteredTransactions.map((transaction) => {
-              const remainingAmount = transaction.amount - (transaction.paid_amount || 0);
+              const remainingAmount = transaction.amount - (transaction.paid_amount || 0) - (transaction.discount || 0);
               const hasPayments = (transaction.paid_amount || 0) > 0;
               const dateStatus = getDateStatus(transaction);
 
