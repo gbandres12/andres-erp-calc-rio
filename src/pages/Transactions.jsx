@@ -537,7 +537,8 @@ export default function Transactions() {
   const handleReceivePay = (transaction) => {
     setSelectedTransaction(transaction);
     setPaymentFormData({
-      amount: transaction.amount - (transaction.paid_amount || 0),
+      amount: transaction.amount - (transaction.paid_amount || 0) - (transaction.discount || 0),
+      discount: 0,
       payment_date: new Date().toISOString().split('T')[0],
       account_id: transaction.account_id || "",
       payment_method: "dinheiro",
