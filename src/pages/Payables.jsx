@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, TrendingDown, Calendar, CheckCircle2, History, Upload, ChevronsUpDown, ArrowUpFromLine, AlertCircle, BarChart3, Filter, Plus } from "lucide-react";
+import { DollarSign, TrendingDown, Calendar, CheckCircle2, History, Upload, ChevronsUpDown, ArrowUpFromLine, AlertCircle, BarChart3, Filter, Plus, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -57,6 +57,21 @@ export default function Payables() {
     payment_method: "dinheiro",
     notes: ""
   });
+
+  // Edit & Delete States
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingPayable, setEditingPayable] = useState(null);
+  const [editForm, setEditForm] = useState({
+    description: "",
+    amount: 0,
+    category: "",
+    due_date: getTodayDate(),
+    contact_id: "",
+    notes: ""
+  });
+
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [payableToDelete, setPayableToDelete] = useState(null);
 
   // Queries
   const { data: payables = [] } = useQuery({
@@ -185,6 +200,50 @@ export default function Payables() {
     },
     onError: (err) => toast.error("Erro ao adicionar conta: " + err.message)
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      await base44.entities.Transaction.update(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['payables']);
+      setIsEditOpen(false);
+      setEditingPayable(null);
+      toast.success("Conta atualizada com sucesso!");
+    },
+    onError: (err) => toast.error("Erro ao atualizar conta: " + err.message)
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      await base44.entities.Transaction.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['payables']);
+      setIsDeleteOpen(false);
+      setPayableToDelete(null);
+      toast.success("Conta removida com sucesso!");
+    },
+    onError: (err) => toast.error("Erro ao remover conta: " + err.message)
+  });
+
+  const handleEdit = (payable) => {
+    setEditingPayable(payable);
+    setEditForm({
+      description: payable.description,
+      amount: payable.amount,
+      category: payable.category || "",
+      due_date: payable.due_date,
+      contact_id: payable.contact_id || "",
+      notes: payable.notes || ""
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleDelete = (payable) => {
+    setPayableToDelete(payable);
+    setIsDeleteOpen(true);
+  };
 
   // Import Logic
   const handleImport = async () => {
@@ -574,16 +633,22 @@ export default function Payables() {
                      
                      <div className="flex gap-2">
                        {remaining > 0 && (
-                         <Button size="sm" onClick={() => openPayDialog(t)} className="bg-red-600 hover:bg-red-700">
-                           <DollarSign className="w-4 h-4 mr-1" /> Pagar
-                         </Button>
-                       )}
-                       {(t.paid_amount > 0) && (
-                          <Button size="sm" variant="ghost" onClick={() => { setViewingHistory(t); setIsHistoryOpen(true); }}>
-                            <History className="w-4 h-4" />
+                          <Button size="sm" onClick={() => openPayDialog(t)} className="bg-red-600 hover:bg-red-700">
+                            <DollarSign className="w-4 h-4 mr-1" /> Pagar
                           </Button>
-                       )}
-                     </div>
+                        )}
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(t)}>
+                          <Pencil className="w-4 h-4 text-slate-500" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDelete(t)}>
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                        {(t.paid_amount > 0) && (
+                           <Button size="sm" variant="ghost" onClick={() => { setViewingHistory(t); setIsHistoryOpen(true); }}>
+                             <History className="w-4 h-4" />
+                           </Button>
+                        )}
+                       </div>
                    </div>
                  </div>
                );
@@ -741,6 +806,105 @@ export default function Payables() {
             <Button className="w-full bg-red-600 hover:bg-red-700" onClick={() => createMutation.mutate(addForm)} disabled={createMutation.isPending || !addForm.description || addForm.amount <= 0}>
               {createMutation.isPending ? 'Salvando...' : 'Adicionar Conta'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Editar Conta */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Conta</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Input 
+                value={editForm.description} 
+                onChange={e => setEditForm({...editForm, description: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valor (R$)</Label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={editForm.amount} 
+                  onChange={e => setEditForm({...editForm, amount: parseFloat(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Vencimento</Label>
+                <Input 
+                  type="date" 
+                  value={editForm.due_date} 
+                  onChange={e => setEditForm({...editForm, due_date: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={editForm.category} onValueChange={v => setEditForm({...editForm, category: v})}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Fornecedores">Fornecedores</SelectItem>
+                  <SelectItem value="Aluguel">Aluguel</SelectItem>
+                  <SelectItem value="Energia">Energia</SelectItem>
+                  <SelectItem value="Internet">Internet</SelectItem>
+                  <SelectItem value="Salários">Salários</SelectItem>
+                  <SelectItem value="Impostos">Impostos</SelectItem>
+                  <SelectItem value="Manutenção">Manutenção</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Fornecedor (Opcional)</Label>
+              <Select value={editForm.contact_id} onValueChange={v => setEditForm({...editForm, contact_id: v === 'none' ? '' : v})}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {contacts.filter(c => c.type === 'fornecedor' || c.type === 'ambos').map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Input 
+                value={editForm.notes} 
+                onChange={e => setEditForm({...editForm, notes: e.target.value})}
+              />
+            </div>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => updateMutation.mutate({ id: editingPayable.id, data: editForm })} disabled={updateMutation.isPending || !editForm.description || editForm.amount <= 0}>
+              {updateMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Excluir Conta */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Excluir Conta</DialogTitle></DialogHeader>
+          <div className="py-4">
+            <p className="text-slate-600 mb-4">Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.</p>
+            {payableToDelete && (
+              <div className="bg-red-50 p-3 rounded border border-red-100 mb-4">
+                <p className="font-medium text-red-800">{payableToDelete.description}</p>
+                <p className="text-sm text-red-600">{formatBRL(payableToDelete.amount)} - {formatDate(payableToDelete.due_date)}</p>
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancelar</Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => deleteMutation.mutate(payableToDelete.id)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Excluindo...' : 'Excluir Definitivamente'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
