@@ -67,13 +67,13 @@ import Requisitions from './pages/Requisitions';
 import SaleWithdrawals from './pages/SaleWithdrawals';
 import Sales from './pages/Sales';
 import Settings from './pages/Settings';
+import SupplierQuotes from './pages/SupplierQuotes';
 import Transactions from './pages/Transactions';
 import Transfers from './pages/Transfers';
 import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
-import SupplierQuotes from './pages/SupplierQuotes';
 import __Layout from './Layout.jsx';
 
 
@@ -98,13 +98,13 @@ export const PAGES = {
     "SaleWithdrawals": SaleWithdrawals,
     "Sales": Sales,
     "Settings": Settings,
+    "SupplierQuotes": SupplierQuotes,
     "Transactions": Transactions,
     "Transfers": Transfers,
     "Users": Users,
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
-    "SupplierQuotes": SupplierQuotes,
 }
 
 export const pagesConfig = {

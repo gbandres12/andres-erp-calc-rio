@@ -71,6 +71,21 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // NOVO: Buscar transações pendentes/atrasadas/parciais para os cards de A Receber/A Pagar
+  const { data: pendingTransactions = [] } = useQuery({
+    queryKey: ['pendingTransactions', selectedCompanyId],
+    queryFn: async () => {
+      const [pendente, parcial, atrasado] = await Promise.all([
+        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'pendente' }),
+        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'parcial' }),
+        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'atrasado' })
+      ]);
+      return [...pendente, ...parcial, ...atrasado];
+    },
+    initialData: [],
+    staleTime: 5 * 60 * 1000,
+  });
+
   // NOVO: Processar dados para o gráfico de fluxo de caixa diário
   const dailyCashFlowData = useMemo(() => {
     const grouped = {};
@@ -190,13 +205,13 @@ export default function Dashboard() {
         new Date(t.payment_date).getMonth() === thisMonth)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const pendingReceivables = transactions
-      .filter(t => t.type === 'receita' && t.status === 'pendente')
-      .reduce((sum, t) => sum + t.amount, 0);
+    const pendingReceivables = pendingTransactions
+      .filter(t => t.type === 'receita')
+      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
 
-    const pendingPayables = transactions
-      .filter(t => t.type === 'despesa' && t.status === 'pendente')
-      .reduce((sum, t) => sum + t.amount, 0);
+    const pendingPayables = pendingTransactions
+      .filter(t => t.type === 'despesa')
+      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
 
     const clientsCount = contacts.filter(c => c.type === 'cliente' || c.type === 'ambos').length;
     const suppliersCount = contacts.filter(c => c.type === 'fornecedor' || c.type === 'ambos').length;
@@ -212,7 +227,7 @@ export default function Dashboard() {
       clientsCount,
       suppliersCount
     };
-  }, [stockEntries, products, transactions, contacts]);
+  }, [stockEntries, products, transactions, contacts, pendingTransactions]);
 
   // Dados para gráfico de receitas vs despesas (últimos 6 meses)
   const financialChartData = useMemo(() => {
