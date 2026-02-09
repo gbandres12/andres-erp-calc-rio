@@ -6,7 +6,7 @@ import {
   Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
   BarChart3, Settings, LogOut, Menu, X, ChevronDown,
-  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine
+  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine, Bot
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -60,6 +60,7 @@ const navigationGroups = [
   {
     title: "Comercial",
     items: [
+      { title: "Cotações com IA", url: "SupplierQuotes", icon: Bot },
       { title: "Orçamentos", url: "Quotes", icon: FileText },
       { title: "Vendas", url: "Sales", icon: ShoppingCart },
       { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck },
