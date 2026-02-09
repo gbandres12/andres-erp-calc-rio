@@ -18,14 +18,25 @@ export default function SupplierQuotes() {
   const queryClient = useQueryClient();
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   
   const [formData, setFormData] = useState({
     product_id: "",
     quantity: "",
     urgency: "media",
     notes: "",
-    requested_suppliers: []
+    requested_suppliers: [],
+    requester_name: ""
   });
+
+  useEffect(() => {
+    base44.auth.me().then(user => {
+      setCurrentUser(user);
+      if (user) {
+        setFormData(prev => ({ ...prev, requester_name: user.full_name || "" }));
+      }
+    }).catch(console.error);
+  }, []);
 
   // Queries
   const { data: quoteRequests = [] } = useQuery({
@@ -68,6 +79,7 @@ export default function SupplierQuotes() {
         quantity: parseFloat(data.quantity),
         urgency: data.urgency,
         notes: data.notes,
+        requester_name: data.requester_name,
         requested_suppliers: data.requested_suppliers,
         status: 'pendente',
         company_id: selectedCompanyId
@@ -91,7 +103,8 @@ export default function SupplierQuotes() {
       quantity: "",
       urgency: "media",
       notes: "",
-      requested_suppliers: []
+      requested_suppliers: [],
+      requester_name: currentUser?.full_name || ""
     });
   };
 
@@ -108,12 +121,14 @@ export default function SupplierQuotes() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.product_id || !formData.quantity || formData.requested_suppliers.length === 0) {
+    if (!formData.product_id || !formData.quantity || formData.requested_suppliers.length === 0 || !formData.requester_name) {
       toast.error("Preencha todos os campos obrigatórios e selecione pelo menos um fornecedor.");
       return;
     }
     createRequestMutation.mutate(formData);
   };
+
+  const selectedProduct = products.find(p => p.id === formData.product_id);
 
   const urgencyColors = {
     baixa: "bg-green-100 text-green-800",
@@ -151,6 +166,17 @@ export default function SupplierQuotes() {
               <DialogTitle>Nova Solicitação de Cotação</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+              {/* Informações do Solicitante */}
+              <div className="space-y-2">
+                <Label>Nome do Comprador (para apresentação) *</Label>
+                <Input 
+                  value={formData.requester_name}
+                  onChange={(e) => setFormData({...formData, requester_name: e.target.value})}
+                  placeholder="Seu nome ou como prefere ser chamado"
+                />
+                <p className="text-xs text-slate-500">A IA usará este nome para se apresentar aos fornecedores.</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Produto *</Label>
@@ -182,6 +208,34 @@ export default function SupplierQuotes() {
                   />
                 </div>
               </div>
+
+              {/* Detalhes do Produto Selecionado */}
+              {selectedProduct && (
+                <div className="bg-slate-50 p-4 rounded-lg border flex gap-4">
+                  {selectedProduct.image_url ? (
+                    <img 
+                      src={selectedProduct.image_url} 
+                      alt={selectedProduct.name} 
+                      className="w-24 h-24 object-cover rounded-md bg-white border"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 bg-white border rounded-md flex items-center justify-center text-slate-300">
+                      <Package className="w-8 h-8" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-slate-900">{selectedProduct.name}</h4>
+                    <p className="text-xs text-slate-500 mb-1">Cód: {selectedProduct.code}</p>
+                    <p className="text-sm text-slate-600 mb-2 line-clamp-2">
+                      {selectedProduct.description || "Sem descrição detalhada."}
+                    </p>
+                    <div className="flex gap-2">
+                       <Badge variant="outline" className="text-xs">Estoque Atual: {selectedProduct.current_stock} {selectedProduct.unit}</Badge>
+                       <Badge variant="outline" className="text-xs">Último Custo: R$ {selectedProduct.cost_price?.toFixed(2) || '0.00'}</Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Nível de Urgência *</Label>
@@ -276,13 +330,17 @@ export default function SupplierQuotes() {
                       </div>
                       <p className="text-sm text-slate-600 mb-2">
                         Quantidade: <span className="font-medium">{request.quantity}</span> • 
-                        Criado em: {formatDateTime(request.created_date)}
+                        Comprador: <span className="font-medium">{request.requester_name || "N/A"}</span>
                       </p>
                       
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <Users className="w-4 h-4" />
-                        <span>
-                          {request.requested_suppliers?.length || 0} fornecedores selecionados
+                      <div className="flex items-center gap-4 text-sm text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatDateTime(request.created_date)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {request.requested_suppliers?.length || 0} fornecedores
                         </span>
                       </div>
                     </div>
