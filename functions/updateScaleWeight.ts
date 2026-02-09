@@ -7,7 +7,7 @@ export async function updateScaleWeight(req) {
 
     try {
         const base44 = createClientFromRequest(req);
-        const { weight, company_id, secret_token } = await req.json();
+        const { weight, company_id, secret_token, device_id = 'default' } = await req.json();
 
         // Validar token simples para segurança básica (opcional, configurável via ENV)
         const EXPECTED_TOKEN = Deno.env.get("SCALE_API_TOKEN");
@@ -20,9 +20,10 @@ export async function updateScaleWeight(req) {
         }
 
         // Usar service role pois o script local não é um usuário logado
-        // Tenta encontrar estado existente para essa empresa
+        // Tenta encontrar estado existente para essa empresa e dispositivo
         const existingStates = await base44.asServiceRole.entities.ScaleState.filter({ 
-            company_id: company_id 
+            company_id: company_id,
+            device_id: device_id
         });
 
         const now = new Date().toISOString();
@@ -39,7 +40,7 @@ export async function updateScaleWeight(req) {
                 company_id: company_id,
                 current_weight: weight,
                 last_update: now,
-                device_id: 'default'
+                device_id: device_id
             });
         }
 
