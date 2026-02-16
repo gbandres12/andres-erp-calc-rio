@@ -291,148 +291,192 @@ export default function SupplierQuotes() {
             <DialogHeader>
               <DialogTitle>Nova Solicitação de Cotação</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-              {/* Informações do Solicitante */}
-              <div className="space-y-2">
-                <Label>Nome do Comprador (para apresentação) *</Label>
-                <Input 
-                  value={formData.requester_name}
-                  onChange={(e) => setFormData({...formData, requester_name: e.target.value})}
-                  placeholder="Seu nome ou como prefere ser chamado"
-                />
-                <p className="text-xs text-slate-500">A IA usará este nome para se apresentar aos fornecedores.</p>
-              </div>
+            <form onSubmit={handleSubmit} className="mt-4">
+              <Tabs defaultValue="products" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="products">
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Produtos ({quoteItems.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="details">
+                    <Users className="w-4 h-4 mr-2" />
+                    Fornecedores & Detalhes
+                  </TabsTrigger>
+                </TabsList>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Produto *</Label>
-                  <Select 
-                    value={formData.product_id} 
-                    onValueChange={(val) => setFormData({...formData, product_id: val})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o produto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map(product => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} ({product.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Quantidade *</Label>
-                  <Input 
-                    type="number" 
-                    step="0.01" 
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              {/* Detalhes do Produto Selecionado */}
-              {selectedProduct && (
-                <div className="bg-slate-50 p-4 rounded-lg border flex gap-4">
-                  {selectedProduct.image_url ? (
-                    <img 
-                      src={selectedProduct.image_url} 
-                      alt={selectedProduct.name} 
-                      className="w-24 h-24 object-cover rounded-md bg-white border"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 bg-white border rounded-md flex items-center justify-center text-slate-300">
-                      <Package className="w-8 h-8" />
+                <TabsContent value="products" className="space-y-4">
+                  <div className="bg-slate-50 p-4 rounded-lg border space-y-4">
+                    <h3 className="font-semibold text-sm text-slate-700">Adicionar Item à Cotação</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="col-span-2 space-y-1">
+                        <Label>Produto (Almoxarifado/Geral)</Label>
+                        <Select 
+                          value={currentItem.product_id} 
+                          onValueChange={(val) => setCurrentItem({...currentItem, product_id: val})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o produto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {products.map(product => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} ({product.unit})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Qtd</Label>
+                        <div className="flex gap-2">
+                           <Input 
+                             type="number" 
+                             step="0.01"
+                             value={currentItem.quantity}
+                             onChange={(e) => setCurrentItem({...currentItem, quantity: e.target.value})}
+                             placeholder="0.00"
+                           />
+                           <Button type="button" onClick={addItemToQuote} size="icon">
+                             <Plus className="w-4 h-4" />
+                           </Button>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-slate-900">{selectedProduct.name}</h4>
-                    <p className="text-xs text-slate-500 mb-1">Cód: {selectedProduct.code}</p>
-                    <p className="text-sm text-slate-600 mb-2 line-clamp-2">
-                      {selectedProduct.description || "Sem descrição detalhada."}
-                    </p>
-                    <div className="flex gap-2">
-                       <Badge variant="outline" className="text-xs">Estoque Atual: {selectedProduct.current_stock} {selectedProduct.unit}</Badge>
-                       <Badge variant="outline" className="text-xs">Último Custo: R$ {selectedProduct.cost_price?.toFixed(2) || '0.00'}</Badge>
+
+                    {/* Preview do Produto Selecionado */}
+                    {currentSelectedProduct && (
+                      <div className="flex gap-3 text-sm bg-white p-2 rounded border">
+                        {currentSelectedProduct.image_url && (
+                           <img src={currentSelectedProduct.image_url} className="w-10 h-10 object-cover rounded" alt="" />
+                        )}
+                        <div>
+                           <p className="font-medium">{currentSelectedProduct.name}</p>
+                           <p className="text-xs text-slate-500">
+                             Estoque: {currentSelectedProduct.current_stock} • Cód: {currentSelectedProduct.code}
+                           </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lista de Itens Adicionados */}
+                  <div className="space-y-2">
+                     <h3 className="font-semibold text-sm text-slate-700">Itens na Lista</h3>
+                     {quoteItems.length === 0 ? (
+                       <div className="text-center py-8 border-2 border-dashed rounded-lg text-slate-400">
+                         <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                         <p>Nenhum produto adicionado.</p>
+                       </div>
+                     ) : (
+                       <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                         {quoteItems.map((item, index) => (
+                           <div key={index} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                             <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 bg-purple-100 rounded flex items-center justify-center">
+                                 <span className="text-xs font-bold text-purple-700">{index + 1}</span>
+                               </div>
+                               <div>
+                                 <p className="font-medium text-sm">{item.product_name}</p>
+                                 <p className="text-xs text-slate-500">{item.quantity} {item.unit}</p>
+                               </div>
+                             </div>
+                             <Button 
+                               type="button" 
+                               variant="ghost" 
+                               size="icon" 
+                               className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                               onClick={() => removeItemFromQuote(index)}
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </Button>
+                           </div>
+                         ))}
+                       </div>
+                     )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="details" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nome do Comprador (para apresentação) *</Label>
+                    <Input 
+                      value={formData.requester_name}
+                      onChange={(e) => setFormData({...formData, requester_name: e.target.value})}
+                      placeholder="Seu nome ou como prefere ser chamado"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Nível de Urgência *</Label>
+                    <Select 
+                      value={formData.urgency} 
+                      onValueChange={(val) => setFormData({...formData, urgency: val})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="baixa">🟢 Baixa (Pode esperar)</SelectItem>
+                        <SelectItem value="media">🟡 Média (Normal)</SelectItem>
+                        <SelectItem value="alta">🔴 Alta (Urgente)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                       <Label>Fornecedores para Cotar *</Label>
+                       <Button 
+                         type="button" 
+                         variant="link" 
+                         size="sm" 
+                         className="h-auto p-0 text-purple-600 font-normal"
+                         onClick={() => navigate(createPageUrl('Contacts'))}
+                       >
+                         + Cadastrar Novo Fornecedor
+                       </Button>
+                    </div>
+                    <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2 bg-slate-50">
+                      {suppliers.length === 0 ? (
+                        <p className="text-sm text-slate-500 text-center">Nenhum fornecedor cadastrado.</p>
+                      ) : (
+                        suppliers.map(supplier => (
+                          <div key={supplier.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={supplier.id} 
+                              checked={formData.requested_suppliers.includes(supplier.id)}
+                              onCheckedChange={() => handleSupplierToggle(supplier.id)}
+                            />
+                            <label 
+                              htmlFor={supplier.id} 
+                              className="text-sm font-medium leading-none cursor-pointer"
+                            >
+                              {supplier.name}
+                            </label>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
 
-              <div className="space-y-2">
-                <Label>Nível de Urgência *</Label>
-                <Select 
-                  value={formData.urgency} 
-                  onValueChange={(val) => setFormData({...formData, urgency: val})}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="baixa">🟢 Baixa (Pode esperar)</SelectItem>
-                    <SelectItem value="media">🟡 Média (Normal)</SelectItem>
-                    <SelectItem value="alta">🔴 Alta (Urgente)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  <div className="space-y-2">
+                    <Label>Observações Gerais</Label>
+                    <Textarea 
+                      value={formData.notes}
+                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                      placeholder="Ex: Preciso que seja da marca X ou Y..."
+                      rows={3}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                   <Label>Fornecedores para Cotar *</Label>
-                   <Button 
-                     type="button" 
-                     variant="link" 
-                     size="sm" 
-                     className="h-auto p-0 text-purple-600 font-normal"
-                     onClick={() => navigate(createPageUrl('Contacts'))}
-                   >
-                     + Cadastrar Novo Fornecedor
-                   </Button>
-                </div>
-                <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2 bg-slate-50">
-                  {suppliers.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center">Nenhum fornecedor cadastrado.</p>
-                  ) : (
-                    suppliers.map(supplier => (
-                      <div key={supplier.id} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={supplier.id} 
-                          checked={formData.requested_suppliers.includes(supplier.id)}
-                          onCheckedChange={() => handleSupplierToggle(supplier.id)}
-                        />
-                        <label 
-                          htmlFor={supplier.id} 
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          {supplier.name} {supplier.phone ? `(${supplier.phone})` : ''}
-                        </label>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <p className="text-xs text-slate-500">Selecione quais fornecedores a IA deve contatar.</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Observações para a IA</Label>
-                <Textarea 
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Ex: Preciso que seja da marca X ou Y..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-end gap-3 pt-6 border-t mt-4">
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createRequestMutation.isPending} className="bg-purple-600 hover:bg-purple-700">
-                  {createRequestMutation.isPending ? "Criando..." : "Iniciar Cotação"}
+                <Button type="submit" disabled={createRequestMutation.isPending || quoteItems.length === 0} className="bg-purple-600 hover:bg-purple-700">
+                  {createRequestMutation.isPending ? "Processando..." : `Iniciar ${quoteItems.length} Cotação(ões)`}
                 </Button>
               </div>
             </form>
