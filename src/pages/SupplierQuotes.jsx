@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bot, Plus, Package, Users, Clock, Send, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Bot, Plus, Package, Users, Clock, Send, AlertCircle, CheckCircle2, DollarSign, Calendar, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTime } from "@/components/utils/formatters";
 
@@ -47,6 +48,17 @@ export default function SupplierQuotes() {
     initialData: []
   });
 
+  // Query para buscar respostas de cotação (poderia ser otimizado para buscar sob demanda, mas faremos simples)
+  const { data: allResponses = [] } = useQuery({
+    queryKey: ['supplier-quote-responses', selectedCompanyId],
+    queryFn: () => base44.entities.SupplierQuoteResponse.filter({ 
+      company_id: selectedCompanyId 
+    }),
+    enabled: !!selectedCompanyId
+  });
+
+  const getResponsesForRequest = (requestId) => allResponses.filter(r => r.quote_request_id === requestId);
+
   const { data: products = [] } = useQuery({
     queryKey: ['products', selectedCompanyId],
     queryFn: () => base44.entities.Product.filter({ 
@@ -73,7 +85,7 @@ export default function SupplierQuotes() {
     mutationFn: async (data) => {
       const product = products.find(p => p.id === data.product_id);
       
-      return base44.entities.SupplierQuoteRequest.create({
+      const newRequest = await base44.entities.SupplierQuoteRequest.create({
         product_id: data.product_id,
         product_name: product?.name || "Produto desconhecido",
         quantity: parseFloat(data.quantity),
@@ -84,6 +96,11 @@ export default function SupplierQuotes() {
         status: 'pendente',
         company_id: selectedCompanyId
       });
+
+      // Trigger manual da automação se necessário, mas como configuramos automação de entidade 'create',
+      // o backend já vai rodar handleNewQuoteRequest automaticamente.
+      // Opcional: toast avisando que os emails estão sendo enviados.
+      return newRequest;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['supplier-quote-requests']);
@@ -96,7 +113,69 @@ export default function SupplierQuotes() {
     }
   });
 
-  // Handlers
+    // Resposta Mutation
+  const registerResponseMutation = useMutation({
+    mutationFn: async (data) => {
+       return base44.entities.SupplierQuoteResponse.create({
+         ...data,
+         company_id: selectedCompanyId,
+         status: 'respondido'
+       });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['supplier-quote-responses']);
+      toast.success("Resposta registrada!");
+    }
+  });
+
+  const analyzeMutation = useMutation({
+    mutationFn: async (requestId) => {
+      const res = await base44.functions.invoke('analyzeQuoteResponses', { quote_request_id: requestId });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['supplier-quote-responses']);
+      queryClient.invalidateQueries(['supplier-quote-requests']);
+      toast.success("Análise da IA concluída! Vencedor identificado.");
+    },
+    onError: () => toast.error("Erro ao analisar propostas.")
+  });
+
+  // Estados locais para UI de resposta
+  const [responseDialogOpen, setResponseDialogOpen] = useState(false);
+  const [currentRequestForResponse, setCurrentRequestForResponse] = useState(null);
+  const [responseFormData, setResponseFormData] = useState({
+     supplier_id: "",
+     price: "",
+     delivery_date: "",
+     conditions: ""
+  });
+
+  const handleOpenResponseDialog = (request) => {
+     setCurrentRequestForResponse(request);
+     setResponseFormData(prev => ({ ...prev, supplier_id: request.requested_suppliers[0] || "" }));
+     setResponseDialogOpen(true);
+  };
+
+  const handleSubmitResponse = (e) => {
+    e.preventDefault();
+    if(!currentRequestForResponse) return;
+    
+    // Encontrar nome do fornecedor
+    const supplierName = suppliers.find(s => s.id === responseFormData.supplier_id)?.name || "Desconhecido";
+
+    registerResponseMutation.mutate({
+       quote_request_id: currentRequestForResponse.id,
+       supplier_id: responseFormData.supplier_id,
+       supplier_name: supplierName,
+       price: parseFloat(responseFormData.price),
+       delivery_date: responseFormData.delivery_date,
+       conditions: responseFormData.conditions
+    });
+    setResponseDialogOpen(false);
+  };
+
+// Handlers
   const resetForm = () => {
     setFormData({
       product_id: "",
@@ -303,6 +382,68 @@ export default function SupplierQuotes() {
         </Dialog>
       </div>
 
+      {/* Dialogo de Registro de Resposta Manual */}
+      <Dialog open={responseDialogOpen} onOpenChange={setResponseDialogOpen}>
+         <DialogContent>
+            <DialogHeader>
+               <DialogTitle>Registrar Proposta de Fornecedor</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmitResponse} className="space-y-4 mt-2">
+               <div className="space-y-2">
+                  <Label>Fornecedor</Label>
+                  <Select 
+                    value={responseFormData.supplier_id}
+                    onValueChange={(val) => setResponseFormData(prev => ({...prev, supplier_id: val}))}
+                  >
+                     <SelectTrigger>
+                        <SelectValue placeholder="Selecione quem respondeu" />
+                     </SelectTrigger>
+                     <SelectContent>
+                        {currentRequestForResponse?.requested_suppliers?.map(supId => {
+                           const s = suppliers.find(x => x.id === supId);
+                           return s ? <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem> : null;
+                        })}
+                     </SelectContent>
+                  </Select>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                     <Label>Preço Ofertado (R$)</Label>
+                     <Input 
+                        type="number" 
+                        step="0.01"
+                        value={responseFormData.price}
+                        onChange={(e) => setResponseFormData(prev => ({...prev, price: e.target.value}))}
+                        placeholder="0.00"
+                     />
+                  </div>
+                  <div className="space-y-2">
+                     <Label>Data de Entrega</Label>
+                     <Input 
+                        type="date"
+                        value={responseFormData.delivery_date}
+                        onChange={(e) => setResponseFormData(prev => ({...prev, delivery_date: e.target.value}))}
+                     />
+                  </div>
+               </div>
+
+               <div className="space-y-2">
+                  <Label>Condições / Obs</Label>
+                  <Input 
+                     value={responseFormData.conditions}
+                     onChange={(e) => setResponseFormData(prev => ({...prev, conditions: e.target.value}))}
+                     placeholder="Ex: Pagamento a vista, Frete incluso..."
+                  />
+               </div>
+
+               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                  Salvar Resposta
+               </Button>
+            </form>
+         </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {quoteRequests.length === 0 ? (
           <Card className="bg-slate-50 border-dashed">
@@ -351,12 +492,30 @@ export default function SupplierQuotes() {
                       {request.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                     
-                    {request.status === 'pendente' && (
-                      <Button size="sm" variant="outline" className="gap-2 text-purple-700 border-purple-200 bg-purple-50 hover:bg-purple-100">
-                        <Send className="w-3 h-3" />
-                        Acompanhar Envios
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleOpenResponseDialog(request)}
+                          className="gap-2 text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Registrar Resposta
+                        </Button>
+
+                        {getResponsesForRequest(request.id).length > 0 && (
+                           <Button 
+                             size="sm"
+                             variant="default"
+                             onClick={() => analyzeMutation.mutate(request.id)}
+                             disabled={analyzeMutation.isPending}
+                             className="gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-0"
+                           >
+                             <Bot className="w-3 h-3" />
+                             {analyzeMutation.isPending ? "Analisando..." : "Analisar com IA"}
+                           </Button>
+                        )}
+                    </div>
                   </div>
                 </div>
                 
@@ -364,6 +523,32 @@ export default function SupplierQuotes() {
                   <div className="mt-4 p-3 bg-white rounded border text-sm text-slate-600">
                     <span className="font-medium text-slate-700">Obs:</span> {request.notes}
                   </div>
+                )}
+
+                {/* Lista de Respostas */}
+                {getResponsesForRequest(request.id).length > 0 && (
+                   <div className="mt-4 space-y-2">
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Propostas Recebidas</h4>
+                      <div className="grid gap-2">
+                         {getResponsesForRequest(request.id).map(resp => (
+                            <div key={resp.id} className={`flex items-center justify-between p-3 rounded-lg border ${resp.is_winner ? 'bg-green-50 border-green-200' : 'bg-white border-slate-100'}`}>
+                               <div className="flex items-center gap-3">
+                                  {resp.is_winner && <Trophy className="w-4 h-4 text-green-600" />}
+                                  <div>
+                                     <p className="font-medium text-slate-900">{resp.supplier_name}</p>
+                                     <p className="text-xs text-slate-500">Prazo: {resp.delivery_date ? formatDateTime(resp.delivery_date) : 'N/D'}</p>
+                                  </div>
+                               </div>
+                               <div className="text-right">
+                                  <p className="font-bold text-slate-900">R$ {resp.price?.toFixed(2)}</p>
+                                  {resp.ai_analysis && resp.is_winner && (
+                                     <p className="text-xs text-green-700 max-w-[200px] truncate">{resp.ai_analysis}</p>
+                                  )}
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
                 )}
               </CardContent>
             </Card>
