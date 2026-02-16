@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bot, Plus, Package, Users, Clock, Send, AlertCircle, CheckCircle2, DollarSign, Calendar, Trophy } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Bot, Plus, Package, Users, Clock, Send, AlertCircle, CheckCircle2, DollarSign, Calendar, Trophy, Trash2, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTime } from "@/components/utils/formatters";
 
@@ -25,13 +26,14 @@ export default function SupplierQuotes() {
   const [currentUser, setCurrentUser] = useState(null);
   
   const [formData, setFormData] = useState({
-    product_id: "",
-    quantity: "",
     urgency: "media",
     notes: "",
     requested_suppliers: [],
     requester_name: ""
   });
+  
+  const [quoteItems, setQuoteItems] = useState([]);
+  const [currentItem, setCurrentItem] = useState({ product_id: "", quantity: "" });
 
   useEffect(() => {
     base44.auth.me().then(user => {
@@ -41,6 +43,24 @@ export default function SupplierQuotes() {
       }
     }).catch(console.error);
   }, []);
+
+  const addItemToQuote = () => {
+    if (!currentItem.product_id || !currentItem.quantity) {
+      toast.error("Selecione um produto e informe a quantidade.");
+      return;
+    }
+    
+    const product = products.find(p => p.id === currentItem.product_id);
+    setQuoteItems(prev => [
+      ...prev, 
+      { ...currentItem, product_name: product?.name || "Produto", unit: product?.unit }
+    ]);
+    setCurrentItem({ product_id: "", quantity: "" });
+  };
+
+  const removeItemFromQuote = (index) => {
+    setQuoteItems(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Queries
   const { data: quoteRequests = [] } = useQuery({
@@ -181,13 +201,13 @@ export default function SupplierQuotes() {
 // Handlers
   const resetForm = () => {
     setFormData({
-      product_id: "",
-      quantity: "",
       urgency: "media",
       notes: "",
       requested_suppliers: [],
       requester_name: currentUser?.full_name || ""
     });
+    setQuoteItems([]);
+    setCurrentItem({ product_id: "", quantity: "" });
   };
 
   const handleSupplierToggle = (supplierId) => {
@@ -201,16 +221,40 @@ export default function SupplierQuotes() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.product_id || !formData.quantity || formData.requested_suppliers.length === 0 || !formData.requester_name) {
-      toast.error("Preencha todos os campos obrigatórios e selecione pelo menos um fornecedor.");
+    if (quoteItems.length === 0) {
+      toast.error("Adicione pelo menos um produto para cotar.");
       return;
     }
-    createRequestMutation.mutate(formData);
+    if (formData.requested_suppliers.length === 0 || !formData.requester_name) {
+      toast.error("Preencha os dados do solicitante e selecione fornecedores.");
+      return;
+    }
+    
+    // Criar uma cotação para cada item
+    let successCount = 0;
+    for (const item of quoteItems) {
+      try {
+        await createRequestMutation.mutateAsync({
+           ...formData,
+           product_id: item.product_id,
+           quantity: item.quantity
+        });
+        successCount++;
+      } catch (err) {
+        console.error("Failed to create quote for item", item, err);
+      }
+    }
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} solicitações de cotação criadas!`);
+      setIsDialogOpen(false);
+      resetForm();
+    }
   };
 
-  const selectedProduct = products.find(p => p.id === formData.product_id);
+  const currentSelectedProduct = products.find(p => p.id === currentItem.product_id);
 
   const urgencyColors = {
     baixa: "bg-green-100 text-green-800",
