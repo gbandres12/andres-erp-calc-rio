@@ -33,7 +33,8 @@ export default function SupplierQuotes() {
   });
   
   const [quoteItems, setQuoteItems] = useState([]);
-  const [currentItem, setCurrentItem] = useState({ product_id: "", quantity: "" });
+  const [currentItem, setCurrentItem] = useState({ product_id: "", quantity: "", product_name: "", custom_name: "" });
+  const [itemMode, setItemMode] = useState("catalog"); // 'catalog' or 'custom'
 
   useEffect(() => {
     base44.auth.me().then(user => {
@@ -45,17 +46,39 @@ export default function SupplierQuotes() {
   }, []);
 
   const addItemToQuote = () => {
-    if (!currentItem.product_id || !currentItem.quantity) {
-      toast.error("Selecione um produto e informe a quantidade.");
+    if (itemMode === 'catalog' && !currentItem.product_id) {
+      toast.error("Selecione um produto do catálogo.");
+      return;
+    }
+    if (itemMode === 'custom' && !currentItem.custom_name) {
+      toast.error("Digite o nome do produto/serviço.");
+      return;
+    }
+    if (!currentItem.quantity) {
+      toast.error("Informe a quantidade.");
       return;
     }
     
-    const product = products.find(p => p.id === currentItem.product_id);
-    setQuoteItems(prev => [
-      ...prev, 
-      { ...currentItem, product_name: product?.name || "Produto", unit: product?.unit }
-    ]);
-    setCurrentItem({ product_id: "", quantity: "" });
+    let productData = {};
+    if (itemMode === 'catalog') {
+      const product = products.find(p => p.id === currentItem.product_id);
+      productData = {
+        product_id: currentItem.product_id,
+        product_name: product?.name || "Produto",
+        unit: product?.unit,
+        quantity: currentItem.quantity
+      };
+    } else {
+      productData = {
+        product_id: null,
+        product_name: currentItem.custom_name,
+        unit: 'UN',
+        quantity: currentItem.quantity
+      };
+    }
+
+    setQuoteItems(prev => [...prev, productData]);
+    setCurrentItem({ product_id: "", quantity: "", product_name: "", custom_name: "" });
   };
 
   const removeItemFromQuote = (index) => {
@@ -106,11 +129,17 @@ export default function SupplierQuotes() {
   // Mutation
   const createRequestMutation = useMutation({
     mutationFn: async (data) => {
-      const product = products.find(p => p.id === data.product_id);
+      let productName = data.product_name;
+      
+      // Se tiver ID, tenta pegar o nome do produto (fallback)
+      if (data.product_id) {
+        const product = products.find(p => p.id === data.product_id);
+        if (product) productName = product.name;
+      }
       
       const newRequest = await base44.entities.SupplierQuoteRequest.create({
-        product_id: data.product_id,
-        product_name: product?.name || "Produto desconhecido",
+        product_id: data.product_id || null,
+        product_name: productName || "Produto sem nome",
         quantity: parseFloat(data.quantity),
         urgency: data.urgency,
         notes: data.notes,
@@ -239,6 +268,7 @@ export default function SupplierQuotes() {
         await createRequestMutation.mutateAsync({
            ...formData,
            product_id: item.product_id,
+           product_name: item.product_name,
            quantity: item.quantity
         });
         successCount++;
@@ -306,25 +336,53 @@ export default function SupplierQuotes() {
 
                 <TabsContent value="products" className="space-y-4">
                   <div className="bg-slate-50 p-4 rounded-lg border space-y-4">
-                    <h3 className="font-semibold text-sm text-slate-700">Adicionar Item à Cotação</h3>
+                    <div className="flex justify-between items-center">
+                       <h3 className="font-semibold text-sm text-slate-700">Adicionar Item à Cotação</h3>
+                       <div className="flex gap-2 bg-white p-1 rounded border">
+                          <button
+                            type="button"
+                            onClick={() => setItemMode("catalog")}
+                            className={`text-xs px-3 py-1 rounded transition-colors ${itemMode === "catalog" ? "bg-purple-100 text-purple-700 font-medium" : "text-slate-500 hover:bg-slate-50"}`}
+                          >
+                            Catálogo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setItemMode("custom")}
+                            className={`text-xs px-3 py-1 rounded transition-colors ${itemMode === "custom" ? "bg-purple-100 text-purple-700 font-medium" : "text-slate-500 hover:bg-slate-50"}`}
+                          >
+                            Avulso / Outro
+                          </button>
+                       </div>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-3">
                       <div className="col-span-2 space-y-1">
-                        <Label>Produto (Almoxarifado/Geral)</Label>
-                        <Select 
-                          value={currentItem.product_id} 
-                          onValueChange={(val) => setCurrentItem({...currentItem, product_id: val})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o produto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map(product => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.unit})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>{itemMode === 'catalog' ? "Produto (Estoque)" : "Nome do Item / Serviço"}</Label>
+                        
+                        {itemMode === 'catalog' ? (
+                          <Select 
+                            value={currentItem.product_id} 
+                            onValueChange={(val) => setCurrentItem({...currentItem, product_id: val})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione do catálogo..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map(product => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name} ({product.unit})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input 
+                             value={currentItem.custom_name}
+                             onChange={(e) => setCurrentItem({...currentItem, custom_name: e.target.value})}
+                             placeholder="Ex: Material de Escritório, Serviço de Manutenção..."
+                          />
+                        )}
                       </div>
                       <div className="space-y-1">
                         <Label>Qtd</Label>
@@ -336,7 +394,7 @@ export default function SupplierQuotes() {
                              onChange={(e) => setCurrentItem({...currentItem, quantity: e.target.value})}
                              placeholder="0.00"
                            />
-                           <Button type="button" onClick={addItemToQuote} size="icon">
+                           <Button type="button" onClick={addItemToQuote} size="icon" className="bg-purple-600 hover:bg-purple-700">
                              <Plus className="w-4 h-4" />
                            </Button>
                         </div>
@@ -344,7 +402,7 @@ export default function SupplierQuotes() {
                     </div>
 
                     {/* Preview do Produto Selecionado */}
-                    {currentSelectedProduct && (
+                    {itemMode === 'catalog' && currentSelectedProduct && (
                       <div className="flex gap-3 text-sm bg-white p-2 rounded border">
                         {currentSelectedProduct.image_url && (
                            <img src={currentSelectedProduct.image_url} className="w-10 h-10 object-cover rounded" alt="" />
