@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +18,7 @@ import { toast } from "sonner";
 import { formatDateTime } from "@/components/utils/formatters";
 
 export default function SupplierQuotes() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -334,7 +337,18 @@ export default function SupplierQuotes() {
               </div>
 
               <div className="space-y-2">
-                <Label>Fornecedores para Cotar *</Label>
+                <div className="flex justify-between items-center">
+                   <Label>Fornecedores para Cotar *</Label>
+                   <Button 
+                     type="button" 
+                     variant="link" 
+                     size="sm" 
+                     className="h-auto p-0 text-purple-600 font-normal"
+                     onClick={() => navigate(createPageUrl('Contacts'))}
+                   >
+                     + Cadastrar Novo Fornecedor
+                   </Button>
+                </div>
                 <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2 bg-slate-50">
                   {suppliers.length === 0 ? (
                     <p className="text-sm text-slate-500 text-center">Nenhum fornecedor cadastrado.</p>
