@@ -1,8 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
+import OpenAI from 'npm:openai';
 
 export async function processTelegramQueue(req) {
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     if (!BOT_Token) {
         console.error("[Queue] Missing TELEGRAM_BOT_TOKEN");
@@ -36,7 +38,56 @@ export async function processTelegramQueue(req) {
             return Response.json({ status: "ignored", reason: "no_data" });
         }
 
-        const { chat_id, user_text, id: queueId } = queueItem;
+        let { chat_id, user_text, id: queueId, media_type, voice_file_id } = queueItem;
+
+        // --- Processamento de Voz (Whisper) ---
+        if (media_type === "voice" && voice_file_id) {
+            if (!OPENAI_API_KEY) {
+                await sendTelegram(chat_id, "⚠️ Preciso da chave da OpenAI (OPENAI_API_KEY) configurada para transcrever áudios.");
+                try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
+                return Response.json({ status: "missing_openai_key" });
+            }
+
+            await sendAction(chat_id, "record_voice"); // Mostra "gravando áudio..." como feedback
+
+            try {
+                // 1. Obter caminho do arquivo no Telegram
+                const fileRes = await fetch(`https://api.telegram.org/bot${BOT_Token}/getFile?file_id=${voice_file_id}`);
+                const fileData = await fileRes.json();
+                if (!fileData.ok) throw new Error("Failed to get file path from Telegram");
+                const filePath = fileData.result.file_path;
+
+                // 2. Baixar o áudio
+                const audioUrl = `https://api.telegram.org/file/bot${BOT_Token}/${filePath}`;
+                const audioRes = await fetch(audioUrl);
+                const audioBlob = await audioRes.blob();
+
+                // 3. Transcrever com OpenAI Whisper
+                const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+                const file = new File([audioBlob], "voice.ogg", { type: "audio/ogg" });
+
+                const transcription = await openai.audio.transcriptions.create({
+                    file: file,
+                    model: "whisper-1",
+                    language: "pt"
+                });
+
+                if (!transcription.text) throw new Error("Transcription empty");
+
+                // Atualizar texto do usuário com a transcrição
+                user_text = transcription.text;
+                
+                // Feedback visual do que foi entendido
+                await sendTelegram(chat_id, `🎤 *Ouvi:* "${user_text}"`);
+
+            } catch (voiceError) {
+                console.error("Voice Processing Error:", voiceError);
+                await sendTelegram(chat_id, "😓 Não consegui entender o áudio. Pode tentar escrever?");
+                try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
+                return Response.json({ status: "voice_error" });
+            }
+        }
+        // --------------------------------------
 
         // Feedback imediato
         sendAction(chat_id, "typing");

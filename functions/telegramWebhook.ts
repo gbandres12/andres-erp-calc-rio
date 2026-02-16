@@ -12,11 +12,24 @@ export async function telegramWebhook(req) {
         const body = await req.json();
 
         // Check for valid message
-        if (!body.message || !body.message.text) {
+        if (!body.message) {
             return Response.json({ status: "ignored" });
         }
 
         const msg = body.message;
+        let userText = msg.text;
+        let voiceFileId = null;
+        let mediaType = "text";
+
+        // Detectar tipo de mensagem
+        if (msg.voice) {
+            userText = "[Audio Message]";
+            voiceFileId = msg.voice.file_id;
+            mediaType = "voice";
+        } else if (!msg.text) {
+             // Ignorar se não for texto nem voz
+             return Response.json({ status: "ignored" });
+        }
         
         // Fast duplication check (optional, but good practice)
         // We'll skip it for speed -> Let the queue processor handle deduplication if needed, 
@@ -26,13 +39,15 @@ export async function telegramWebhook(req) {
         // Enqueue message
         await base44.asServiceRole.entities.TelegramMessageQueue.create({
             chat_id: String(msg.chat.id),
-            user_text: msg.text,
+            user_text: userText,
+            voice_file_id: voiceFileId,
+            media_type: mediaType,
             username: msg.from.first_name || "User",
             message_id: String(msg.message_id),
             raw_data: JSON.stringify(msg)
         });
 
-        console.log(`[Webhook] Queued message from ${msg.chat.id}`);
+        console.log(`[Webhook] Queued message from ${msg.chat.id} (${mediaType})`);
         // Respond immediately to Telegram
         return Response.json({ status: "queued" });
 
