@@ -66,7 +66,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Transaction.filter({ 
       company_id: selectedCompanyId,
       status: 'pago'
-    }),
+    }, '-payment_date', 1000),
     initialData: [],
     staleTime: 5 * 60 * 1000,
   });
@@ -76,9 +76,9 @@ export default function Dashboard() {
     queryKey: ['pendingTransactions', selectedCompanyId],
     queryFn: async () => {
       const [pendente, parcial, atrasado] = await Promise.all([
-        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'pendente' }),
-        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'parcial' }),
-        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'atrasado' })
+        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'pendente' }, '-due_date', 500),
+        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'parcial' }, '-due_date', 500),
+        base44.entities.Transaction.filter({ company_id: selectedCompanyId, status: 'atrasado' }, '-due_date', 500)
       ]);
       return [...pendente, ...parcial, ...atrasado];
     },
@@ -195,15 +195,15 @@ export default function Dashboard() {
     );
 
     const thisMonth = new Date().getMonth();
-    const thisMonthRevenue = transactions
-      .filter(t => t.type === 'receita' && t.status === 'pago' && 
+    const thisMonthRevenue = allPaidTransactions
+      .filter(t => t.type === 'receita' && 
         new Date(t.payment_date).getMonth() === thisMonth)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
 
-    const thisMonthExpenses = transactions
-      .filter(t => t.type === 'despesa' && t.status === 'pago' && 
+    const thisMonthExpenses = allPaidTransactions
+      .filter(t => t.type === 'despesa' && 
         new Date(t.payment_date).getMonth() === thisMonth)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
 
     const pendingReceivables = pendingTransactions
       .filter(t => t.type === 'receita')
@@ -240,21 +240,21 @@ export default function Dashboard() {
       const month = date.getMonth();
       const year = date.getFullYear();
       
-      const receitas = transactions
-        .filter(t => t.type === 'receita' && t.status === 'pago' && t.payment_date)
+      const receitas = allPaidTransactions
+        .filter(t => t.type === 'receita' && t.payment_date)
         .filter(t => {
           const payDate = new Date(t.payment_date);
           return payDate.getMonth() === month && payDate.getFullYear() === year;
         })
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
       
-      const despesas = transactions
-        .filter(t => t.type === 'despesa' && t.status === 'pago' && t.payment_date)
+      const despesas = allPaidTransactions
+        .filter(t => t.type === 'despesa' && t.payment_date)
         .filter(t => {
           const payDate = new Date(t.payment_date);
           return payDate.getMonth() === month && payDate.getFullYear() === year;
         })
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
       
       months.push({
         name: monthName,
@@ -265,23 +265,23 @@ export default function Dashboard() {
     }
     
     return months;
-  }, [transactions]);
+  }, [allPaidTransactions]);
 
   // Dados para gráfico de pizza de categorias de despesas
   const expensesCategoryData = useMemo(() => {
     const categories = {};
-    transactions
-      .filter(t => t.type === 'despesa' && t.status === 'pago')
+    allPaidTransactions
+      .filter(t => t.type === 'despesa')
       .forEach(t => {
         const cat = t.category || 'Sem categoria';
-        categories[cat] = (categories[cat] || 0) + t.amount;
+        categories[cat] = (categories[cat] || 0) + (t.paid_amount || t.amount);
       });
     
     return Object.entries(categories)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
-  }, [transactions]);
+  }, [allPaidTransactions]);
 
   const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 
