@@ -227,7 +227,7 @@ export default function Dashboard() {
       clientsCount,
       suppliersCount
     };
-  }, [stockEntries, products, transactions, contacts, pendingTransactions]);
+  }, [stockEntries, products, allPaidTransactions, contacts, pendingTransactions]);
 
   // Dados para gráfico de receitas vs despesas (últimos 6 meses)
   const financialChartData = useMemo(() => {
