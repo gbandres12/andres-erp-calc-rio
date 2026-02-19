@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Warehouse, TruckIcon, DollarSign, AlertTriangle, TrendingUp, TrendingDown, ArrowRight, Calendar } from "lucide-react";
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -534,8 +534,22 @@ export default function Dashboard() {
                       contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                     />
                     <Legend wrapperStyle={{fontSize: '12px'}} />
-                    <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]}>
+                      <LabelList 
+                        dataKey="receita" 
+                        position="top" 
+                        formatter={(value) => value > 0 ? value.toLocaleString('pt-BR', { notation: "compact", maximumFractionDigits: 1 }) : ""}
+                        style={{ fontSize: '10px', fill: '#64748b' }} 
+                      />
+                    </Bar>
+                    <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]}>
+                      <LabelList 
+                        dataKey="despesa" 
+                        position="top" 
+                        formatter={(value) => value > 0 ? value.toLocaleString('pt-BR', { notation: "compact", maximumFractionDigits: 1 }) : ""}
+                        style={{ fontSize: '10px', fill: '#64748b' }} 
+                      />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
