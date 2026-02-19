@@ -186,7 +186,25 @@ export async function processTelegramQueue(req) {
                         },
                         filter_data: { type: "object", additionalProperties: true },
                         search_query: { type: "string" },
-                        sale_data: { type: "object", additionalProperties: true }
+                        sale_data: { 
+                            type: "object", 
+                            properties: {
+                                client_name: { type: "string" },
+                                items: { 
+                                    type: "array", 
+                                    items: { 
+                                        type: "object", 
+                                        properties: {
+                                            product_name: { type: "string" },
+                                            quantity: { type: "number" }
+                                        },
+                                        required: ["product_name", "quantity"]
+                                    } 
+                                },
+                                payment_method: { type: "string" }
+                            },
+                            required: ["client_name", "items"]
+                        }
                     },
                     required: ["action", "reply_text"]
                 }
@@ -273,6 +291,72 @@ export async function processTelegramQueue(req) {
                         finalReply = `Nenhum produto "${query}" encontrado nesta filial.`;
                     }
                 }
+
+                else if (action === "create_sale") {
+                    const { client_name, items, payment_method } = response.sale_data;
+                    
+                    // 1. Buscar Cliente
+                    let client = (await base44.asServiceRole.entities.Contact.filter({
+                        name: { $regex: client_name, $options: 'i' },
+                        company_id: cid
+                    }))[0];
+
+                    if (!client) {
+                        // Tentar criar se não achar? Por enquanto, avisar.
+                        throw new Error(`Cliente "${client_name}" não encontrado. Cadastre-o primeiro.`);
+                    }
+
+                    // 2. Processar Itens
+                    let saleItems = [];
+                    let total = 0;
+                    
+                    for (const item of items) {
+                        const product = (await base44.asServiceRole.entities.Product.filter({
+                            name: { $regex: item.product_name, $options: 'i' },
+                            company_id: cid
+                        }))[0];
+
+                        if (!product) throw new Error(`Produto "${item.product_name}" não encontrado.`);
+
+                        const itemTotal = product.sale_price * item.quantity;
+                        total += itemTotal;
+
+                        saleItems.push({
+                            product_id: product.id,
+                            product_name: product.name,
+                            quantity: item.quantity,
+                            unit: product.unit,
+                            unit_price: product.sale_price,
+                            total: itemTotal,
+                            quantity_withdrawn: 0 // Pendente de retirada
+                        });
+
+                        // Atualizar estoque (opcional, pode ser feito via trigger ou aqui mesmo)
+                        // await base44.asServiceRole.entities.Product.update(product.id, { 
+                        //     current_stock: (product.current_stock || 0) - item.quantity 
+                        // });
+                    }
+
+                    // 3. Criar Venda
+                    const sale = await base44.asServiceRole.entities.Sale.create({
+                        reference: `VEN-${Date.now().toString().slice(-6)}`,
+                        company_id: cid,
+                        client_id: client.id,
+                        client_name: client.name,
+                        seller_name: "TelegramBot",
+                        sale_date: new Date().toISOString().split('T')[0],
+                        items: saleItems,
+                        subtotal: total,
+                        total: total,
+                        payment_method: payment_method || "dinheiro",
+                        status: "concluida",
+                        payment_status: "pendente",
+                        withdrawal_status: "aguardando"
+                    });
+
+                    finalReply = `✅ *Venda Realizada!* (Ref: ${sale.reference})\n👤 Cliente: ${client.name}\n💰 Total: R$ ${total.toFixed(2)}\n📦 Itens: ${saleItems.length}`;
+                }
+
             } catch (logicError) {
                 console.error("Logic/DB Error:", logicError);
                 finalReply = `⚠️ *Erro ao processar*\nNão consegui concluir a ação no banco de dados. Verifique se os dados (valor, nome) estão corretos.`;
