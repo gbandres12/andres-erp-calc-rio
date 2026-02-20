@@ -1,11 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 import OpenAI from 'npm:openai';
+import { GoogleGenerativeAI } from "npm:@google/generative-ai";
 
 export async function processSalesQueue(req) {
     const base44 = createClientFromRequest(req);
     const SALES_BOT_TOKEN = Deno.env.get("SALES_BOT_TOKEN");
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY"); // Opcional, mas preferido para velocidade
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     if (!SALES_BOT_TOKEN) return Response.json({ error: "Missing SALES_BOT_TOKEN" }, { status: 500 });
 
@@ -138,32 +139,30 @@ export async function processSalesQueue(req) {
         OUTPUT JSON ESTRITO APENAS.
         `;
 
-        // Seleção de Modelo com Fallback Robusto
-        let completion;
+        // Seleção de Modelo com Fallback Robusto (OpenAI -> Gemini)
+        let responseContent;
         let usedProvider = "none";
 
-        const tryOpenRouter = async () => {
-             if (!OPENROUTER_API_KEY) throw new Error("OpenRouter Key missing");
-             const openrouter = new OpenAI({
-                apiKey: OPENROUTER_API_KEY,
-                baseURL: "https://openrouter.ai/api/v1"
-            });
-            usedProvider = "openrouter";
-            return await openrouter.chat.completions.create({
-                model: "google/gemini-2.0-flash-001", 
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
-                ],
-                response_format: { type: "json_object" }
-            });
+        const tryGemini = async () => {
+             if (!GEMINI_API_KEY) throw new Error("Gemini API Key missing");
+             
+             const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+             const model = genAI.getGenerativeModel({ 
+                model: "gemini-1.5-flash",
+                systemInstruction: systemPrompt,
+                generationConfig: { responseMimeType: "application/json" }
+             });
+             
+             usedProvider = "gemini";
+             const result = await model.generateContent(`Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}`);
+             return result.response.text();
         };
 
         if (OPENAI_API_KEY) {
             try {
                 // Tenta OpenAI Primeiro
                 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-                completion = await openai.chat.completions.create({
+                const completion = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
                     messages: [
                         { role: "system", content: systemPrompt },
@@ -172,17 +171,16 @@ export async function processSalesQueue(req) {
                     response_format: { type: "json_object" }
                 });
                 usedProvider = "openai";
+                responseContent = completion.choices[0].message.content;
             } catch (err) {
-                console.warn("OpenAI Failed (Quota/Error), falling back to OpenRouter:", err.message);
-                // Fallback para OpenRouter se falhar
-                completion = await tryOpenRouter();
+                console.warn("OpenAI Failed (Quota/Error), falling back to Gemini:", err.message);
+                // Fallback para Gemini se falhar
+                responseContent = await tryGemini();
             }
         } else {
-            // Se não tem OpenAI, vai direto pro OpenRouter
-            completion = await tryOpenRouter();
+            // Se não tem OpenAI, vai direto pro Gemini
+            responseContent = await tryGemini();
         }
-
-        const responseContent = completion.choices[0].message.content;
         let responseJson;
         try {
             responseJson = JSON.parse(responseContent);
