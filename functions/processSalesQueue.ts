@@ -181,17 +181,29 @@ export async function processSalesQueue(req) {
             // Se não tem OpenAI, vai direto pro Gemini
             responseContent = await tryGemini();
         }
+        // Sanitize response content (remove markdown code blocks if present)
+        const cleanContent = responseContent.replace(/```json\n?|```/g, '').trim();
+
         let responseJson;
         try {
-            responseJson = JSON.parse(responseContent);
+            responseJson = JSON.parse(cleanContent);
         } catch (e) {
             // Fallback se não vier JSON puro
-            console.error("JSON Parse Error", e);
-            responseJson = { action: "reply", reply_text: responseContent };
+            console.error("JSON Parse Error", e, "Content:", responseContent);
+            responseJson = { action: "reply", reply_text: cleanContent };
         }
 
         // 4. Executar Ação
-        let replyText = responseJson.reply_text || "Comando processado.";
+        let replyText = responseJson.reply_text;
+        
+        // Se não houver texto de resposta, usar um padrão melhor ou o próprio conteúdo se não for JSON
+        if (!replyText) {
+             if (responseJson.action === "reply" && !responseJson.reply_text) {
+                 replyText = "Desculpe, não entendi. Poderia repetir?";
+             } else {
+                 replyText = "Comando processado.";
+             }
+        }
         const action = responseJson.action;
         let cid = currentCompanyId;
 
