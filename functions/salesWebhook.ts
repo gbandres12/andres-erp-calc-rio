@@ -39,9 +39,8 @@ export async function salesWebhook(req) {
                     voice_file_id: voiceFileId
                 });
 
-                // Disparar processamento assíncrono (Fire & Forget via função)
-                // Nota: Idealmente seria via Trigger/Automation, mas aqui chamamos direto para agilizar
-                base44.asServiceRole.functions.invoke("processSalesQueue", { 
+                // Disparar processamento assíncrono (AWAIT é necessário em Serverless para não matar o processo)
+                await base44.asServiceRole.functions.invoke("processSalesQueue", { 
                     data: { chat_id: chatId, message_id: messageId } 
                 });
             }

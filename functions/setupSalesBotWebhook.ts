@@ -22,7 +22,7 @@ export async function setupSalesBotWebhook(req) {
         const res = await fetch(`https://api.telegram.org/bot${SALES_BOT_TOKEN}/setWebhook?url=${webhookUrl}`);
         const data = await res.json();
 
-        return Response.json(data);
+        return Response.json({ ...data, webhook_url_used: webhookUrl });
     } catch (e) {
         console.error("Setup Error:", e);
         return Response.json({ error: e.message }, { status: 500 });
