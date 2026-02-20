@@ -257,6 +257,14 @@ export default function Settings() {
                   Configure o Webhook para conectar o bot de vendas do Telegram ao sistema.
                   Certifique-se de que o token SALES_BOT_TOKEN está configurado nos segredos.
                 </p>
+                
+                <div className="mb-4 p-3 bg-slate-100 rounded-md border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-700 mb-1">URL do Webhook (Manual):</p>
+                  <code className="text-xs text-slate-600 break-all select-all">
+                    {window.location.origin}/functions/salesWebhook
+                  </code>
+                </div>
+
                 <Button 
                   onClick={async () => {
                     try {
