@@ -446,6 +446,9 @@ export default function Transactions() {
         setFormData({
             description: data.description || "Despesa importada",
             amount: data.amount || 0,
+            original_amount: data.amount || 0,
+            discount_type: "valor",
+            discount_value: 0,
             type: "despesa",
             category: data.category_suggestion || "",
             status: "pago", // Usually receipts are already paid
@@ -524,6 +527,9 @@ export default function Transactions() {
           await base44.entities.Transaction.create({
             description,
             amount: validAmount,
+            original_amount: validAmount,
+            discount_type: "valor",
+            discount_value: 0,
             type,
             category,
             status: 'pago', 
@@ -607,6 +613,9 @@ export default function Transactions() {
       const transaction = await base44.entities.Transaction.create({
         description: data.description,
         amount: data.amount,
+        original_amount: data.amount,
+        discount_type: "valor",
+        discount_value: 0,
         type: data.type,
         category: data.category,
         status: 'pago',
