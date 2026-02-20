@@ -5,9 +5,9 @@ export async function processSalesQueue(req) {
     const base44 = createClientFromRequest(req);
     const SALES_BOT_TOKEN = Deno.env.get("SALES_BOT_TOKEN");
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY"); // Opcional, mas preferido para velocidade
 
     if (!SALES_BOT_TOKEN) return Response.json({ error: "Missing SALES_BOT_TOKEN" }, { status: 500 });
-    if (!OPENROUTER_API_KEY) return Response.json({ error: "Missing OPENROUTER_API_KEY" }, { status: 500 });
 
     const sendTelegram = async (chatId, text) => {
         try {
@@ -81,13 +81,16 @@ export async function processSalesQueue(req) {
         }
         // --------------------------------------------------------------------------------
 
-        // 2. Contexto e Sessão
-        let session = (await base44.asServiceRole.entities.SalesTelegramSession.filter({ chat_id: chat_id }))[0];
+        // 2. Contexto e Sessão (Busca Paralela para Velocidade)
+        const [sessions, companies] = await Promise.all([
+            base44.asServiceRole.entities.SalesTelegramSession.filter({ chat_id: chat_id }),
+            base44.asServiceRole.entities.Company.filter({ is_active: true })
+        ]);
+
+        let session = sessions[0];
         if (!session) {
             session = await base44.asServiceRole.entities.SalesTelegramSession.create({ chat_id: chat_id, history: [] });
         }
-
-        const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
         
         // Resolver Filial
         let currentCompanyId = session.selected_company_id;
@@ -97,7 +100,7 @@ export async function processSalesQueue(req) {
         let history = session.history || [];
         const historyText = history.slice(-10).map(msg => `${msg.role === 'user' ? 'User' : 'Bot'}: ${msg.content}`).join("\n");
 
-        // 3. Prompt para OpenRouter (DeepSeek)
+        // 3. Prompt Otimizado
         const systemPrompt = `Você é o "Vendedor Virtual" da Andres Tech.
         Seu público são pessoas mais velhas e tradicionais. Fale de forma simples e paciente.
         Filial Atual: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
@@ -124,10 +127,10 @@ export async function processSalesQueue(req) {
         5. Fechamento: Só então gere a venda.
 
         AÇÕES (JSON):
-        - "reply": Responder texto (pergunta ou conversa).
+        - "reply": Responder texto.
         - "set_company": Definir filial (target_id).
-        - "search_products": Buscar produtos (query) - Use quando ele citar o produto para ver preço/estoque.
-        - "create_client": Cadastrar (client_data: name, phone, city) - Só quando tiver todos os dados confirmados.
+        - "search_products": Buscar produtos (query).
+        - "create_client": Cadastrar (client_data: name, phone, city).
         - "create_sale": Criar venda (sale_data: client_name, items[{product_name, qty}], payment_method).
         
         MÉTODOS DE PAGAMENTO: "dinheiro", "pix", "transferencia", "cartao_debito", "cartao_credito", "cheque".
@@ -135,19 +138,36 @@ export async function processSalesQueue(req) {
         OUTPUT JSON ESTRITO APENAS.
         `;
 
-        const openrouter = new OpenAI({
-            apiKey: OPENROUTER_API_KEY,
-            baseURL: "https://openrouter.ai/api/v1"
-        });
-
-        const completion = await openrouter.chat.completions.create({
-            model: "deepseek/deepseek-chat",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
-            ],
-            response_format: { type: "json_object" }
-        });
+        // Seleção de Modelo para Velocidade (Prioridade: OpenAI Direto > OpenRouter Flash > DeepSeek)
+        let completion;
+        
+        if (OPENAI_API_KEY) {
+            // Rota mais rápida: GPT-4o-mini direto
+            const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+            completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
+                ],
+                response_format: { type: "json_object" }
+            });
+        } else {
+            // Rota alternativa: OpenRouter (Gemini Flash ou Llama para velocidade, fallback DeepSeek)
+            const openrouter = new OpenAI({
+                apiKey: OPENROUTER_API_KEY,
+                baseURL: "https://openrouter.ai/api/v1"
+            });
+            
+            completion = await openrouter.chat.completions.create({
+                model: "google/gemini-2.0-flash-001", // Modelo ultra-rápido e barato
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
+                ],
+                response_format: { type: "json_object" }
+            });
+        }
 
         const responseContent = completion.choices[0].message.content;
         let responseJson;
