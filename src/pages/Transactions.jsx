@@ -330,9 +330,28 @@ export default function Transactions() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    // Calcular valores finais
+    const original = parseFloat(formData.original_amount || 0);
+    const discVal = parseFloat(formData.discount_value || 0);
+    let finalAmount = original;
+    let totalDiscount = 0;
+
+    if (formData.discount_type === 'porcentagem') {
+      totalDiscount = (original * discVal) / 100;
+      finalAmount = original - totalDiscount;
+    } else {
+      totalDiscount = discVal;
+      finalAmount = original - totalDiscount;
+    }
+
     const dataToSubmit = {
        ...formData,
-       amount: formData.amount === '' ? 0 : parseFloat(formData.amount)
+       amount: finalAmount, // Valor Líquido
+       discount: totalDiscount, // Valor total do desconto em R$
+       original_amount: original,
+       discount_type: formData.discount_type,
+       discount_value: discVal,
+       paid_amount: formData.status === 'pago' ? finalAmount : (formData.paid_amount || 0)
     };
 
     if (editingTransaction) {
