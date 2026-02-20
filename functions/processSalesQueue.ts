@@ -118,6 +118,8 @@ export async function processSalesQueue(req) {
         - "create_client": Cadastrar (client_data: name, phone, city).
         - "create_sale": Criar venda (sale_data: client_name, items[{product_name, qty}], payment_method).
         
+        MÉTODOS DE PAGAMENTO VÁLIDOS: "dinheiro", "pix", "transferencia", "cartao_debito", "cartao_credito", "cheque".
+
         OUTPUT JSON ESTRITO APENAS.
         `;
 
