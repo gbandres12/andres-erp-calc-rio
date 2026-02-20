@@ -1791,6 +1791,18 @@ export default function Transactions() {
                     </div>
                   </div>
                   <div className="text-right">
+                    {(transaction.original_amount > transaction.amount) && (
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs text-slate-400 line-through">
+                                {formatBRL(transaction.original_amount)}
+                            </span>
+                            {transaction.discount_type === 'porcentagem' && (
+                                <span className="text-[10px] text-red-400 bg-red-50 px-1 rounded">
+                                    -{transaction.discount_value}%
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <p className={`text-xl font-bold ${
                       transaction.type === 'receita' ? 'text-green-600' : 'text-red-600'
                     }`}>
