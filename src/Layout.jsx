@@ -161,7 +161,7 @@ export default function Layout({ children, currentPageName }) {
       const savedCompanyId = localStorage.getItem('selectedCompanyId');
       
       // Se não tiver filial selecionada E não estiver na página de seleção, redirecionar
-      if (!savedCompanyId && currentPageName !== 'CompanySelector') {
+      if (!savedCompanyId && currentPageName !== 'CompanySelector' && currentPageName !== 'Settings') {
         navigate(createPageUrl('CompanySelector'));
         return;
       }
@@ -208,7 +208,7 @@ export default function Layout({ children, currentPageName }) {
   }
 
   // Se não tiver filial selecionada, não renderizar nada (vai redirecionar)
-  if (!selectedCompanyId) {
+  if (!selectedCompanyId && currentPageName !== 'Settings') {
     return null;
   }
 

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Plus, Edit, Check, LogOut, User, Sparkles } from "lucide-react";
+import { Building2, Plus, Edit, Check, LogOut, User, Sparkles, Settings } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { createPageUrl } from "@/utils";
@@ -225,6 +225,17 @@ export default function CompanySelector() {
                 >
                   <LogOut className="w-4 h-4" />
                 </Button>
+                {user?.role === 'admin' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.location.href = createPageUrl('Settings')}
+                    className="ml-2 text-white hover:bg-white/10"
+                    title="Configurações do Sistema"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </Button>
+                )}
               </motion.div>
             )}
           </motion.div>
