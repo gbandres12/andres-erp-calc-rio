@@ -39,6 +39,7 @@ export async function processTelegramQueue(req) {
         }
 
         let { chat_id, user_text, id: queueId, media_type, voice_file_id } = queueItem;
+        chat_id = String(chat_id); // Garantir que é string para buscar sessão corretamente
 
         // --- Processamento de Voz (Whisper) ---
         if (media_type === "voice" && voice_file_id) {
@@ -137,24 +138,29 @@ export async function processTelegramQueue(req) {
         const todayStr = new Date().toLocaleDateString('pt-BR');
         const historyText = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join("\n");
         
-        // 3. Prompt Refinado (SALES BOT - OpenRouter)
-        let prompt = `Você é o "SalesBot" 🤖, assistente de VENDAS das filiais: ${companies.map(c => c.name).join(", ")}.
+        // 3. Prompt Refinado (FINANCEIRO - OpenRouter)
+        let prompt = `Você é o "Assistente Financeiro e Comercial" da Calcário Amazônia 🚜.
+        Você atende as filiais: ${companies.map(c => c.name).join(", ")}.
         
         Data: ${todayStr}
         Filial Ativa: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
         
-        CONTEXTO:
+        CONTEXTO ANTERIOR (Mantenha o fluxo):
         ${historyText}
+        
+        MENSAGEM ATUAL:
         User: "${user_text}"
 
         SUA MISSÃO:
-        - Atender clientes, consultar preços/estoque, cadastrar clientes e fechar vendas.
-        - **NÃO** acesse dados financeiros (contas, saldo, extrato). Se pedirem, diga que não tem permissão.
+        - Auxiliar na gestão financeira e vendas.
+        - Você PODE consultar preços e estoque.
+        - Você PODE registrar vendas e clientes.
+        - Mantenha o contexto da conversa anterior. Não inicie uma nova conversa a cada mensagem.
         
         REGRAS CRÍTICAS:
-        1. **FILIAL**: Identifique a filial para qualquer operação de consulta ou venda. Se não souber, PERGUNTE.
-        2. **CLIENTES**: Para vender, precisa do nome do cliente. Se não existir, use a ação 'create_client'.
-        3. **VENDAS**: Confirme os itens e o total antes de fechar.
+        1. **IDENTIDADE**: Você é da Calcário Amazônia. Nunca mencione Andres Tech.
+        2. **FILIAL**: Identifique a filial para qualquer operação.
+        3. **FLUXO**: Se o usuário estiver respondendo a uma pergunta sua anterior, use o contexto.
 
         DADOS:
         Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name})))}

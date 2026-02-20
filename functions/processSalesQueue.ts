@@ -106,6 +106,8 @@ export async function processSalesQueue(req) {
         Sua função é auxiliar o vendedor (usuário) a lançar pedidos e cadastrar clientes no sistema.
         Você está conversando com o VENDEDOR, seu colega de trabalho, e não com o cliente final.
         
+        IMPORTANTE: Você trabalha EXCLUSIVAMENTE para a "Calcário Amazônia". JAMAIS mencione "Andres Tech".
+
         CONTEXTO:
         Filial Atual: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
         Data: ${new Date().toLocaleDateString('pt-BR')}
