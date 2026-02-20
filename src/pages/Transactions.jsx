@@ -97,17 +97,20 @@ export default function Transactions() {
   ];
 
   const [formData, setFormData] = useState({
-    description: "",
-    amount: 0,
-    type: "receita",
-    category: "",
-    status: "pendente",
-    due_date: getTodayDate(),
-    payment_date: "",
-    account_id: "",
-    contact_id: "",
-    cost_center: "",
-    notes: ""
+  description: "",
+  amount: 0,
+  original_amount: 0,
+  discount_type: "valor",
+  discount_value: 0,
+  type: "receita",
+  category: "",
+  status: "pendente",
+  due_date: getTodayDate(),
+  payment_date: "",
+  account_id: "",
+  contact_id: "",
+  cost_center: "",
+  notes: ""
   });
 
   const { data: transactions = [] } = useQuery({
@@ -308,6 +311,9 @@ export default function Transactions() {
     setFormData({
       description: "",
       amount: 0,
+      original_amount: 0,
+      discount_type: "valor",
+      discount_value: 0,
       type: "receita",
       category: "",
       status: "pendente",
