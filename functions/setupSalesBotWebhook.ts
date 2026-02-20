@@ -7,22 +7,32 @@ export async function setupSalesBotWebhook(req) {
     const user = await base44.auth.me();
     if (!user || user.role !== 'admin') return Response.json({ error: "Unauthorized" }, { status: 403 });
 
-    const SALES_BOT_TOKEN = Deno.env.get("SALES_BOT_TOKEN");
-    if (!SALES_BOT_TOKEN) return Response.json({ error: "Token não configurado (SALES_BOT_TOKEN)" }, { status: 400 });
+    const { baseUrl, token } = await req.json();
+    
+    // Prioriza o token enviado, senão usa o do ambiente
+    const BOT_TOKEN = token || Deno.env.get("SALES_BOT_TOKEN");
+
+    if (!BOT_TOKEN) return Response.json({ error: "Token não configurado (SALES_BOT_TOKEN)" }, { status: 400 });
 
     try {
-        const { baseUrl } = await req.json();
-        
         // Remove trailing slash if exists
         const cleanBaseUrl = baseUrl.replace(/\/$/, "");
         const webhookUrl = `${cleanBaseUrl}/functions/salesWebhook`;
 
-        console.log(`Setting webhook to: ${webhookUrl}`);
+        console.log(`Setting webhook to: ${webhookUrl} using token ending in ...${BOT_TOKEN.slice(-5)}`);
 
-        const res = await fetch(`https://api.telegram.org/bot${SALES_BOT_TOKEN}/setWebhook?url=${webhookUrl}`);
+        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${webhookUrl}`);
         const data = await res.json();
 
-        return Response.json({ ...data, webhook_url_used: webhookUrl });
+        // Get Webhook Info para confirmar
+        const infoRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo`);
+        const infoData = await infoRes.json();
+
+        return Response.json({ 
+            setup_result: data, 
+            webhook_info: infoData,
+            webhook_url_used: webhookUrl 
+        });
     } catch (e) {
         console.error("Setup Error:", e);
         return Response.json({ error: e.message }, { status: 500 });
