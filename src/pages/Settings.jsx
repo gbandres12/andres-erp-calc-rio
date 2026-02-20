@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette, RefreshCw } from "lucide-react";
+import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette, RefreshCw, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -56,6 +56,7 @@ export default function Settings() {
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
+          <TabsTrigger value="integrations">Integrações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -237,6 +238,74 @@ export default function Settings() {
                 <Save className="w-4 h-4 mr-2" />
                 Salvar Preferências
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-blue-600" />
+                <CardTitle>Integrações (Telegram)</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="p-4 bg-slate-50 border rounded-lg">
+                <h3 className="font-semibold text-slate-900 mb-2">SalesBot (Vendas)</h3>
+                <p className="text-sm text-slate-500 mb-4">
+                  Configure o Webhook para conectar o bot de vendas do Telegram ao sistema.
+                  Certifique-se de que o token SALES_BOT_TOKEN está configurado nos segredos.
+                </p>
+                <Button 
+                  onClick={async () => {
+                    try {
+                      const toastId = toast.loading("Configurando Webhook...");
+                      const { data } = await base44.functions.invoke("setupSalesBotWebhook", { 
+                        baseUrl: window.location.origin 
+                      });
+                      
+                      if (data.ok) {
+                        toast.success("Webhook configurado com sucesso!", { id: toastId });
+                      } else {
+                        toast.error("Erro ao configurar: " + (data.description || data.error), { id: toastId });
+                      }
+                    } catch (e) {
+                      toast.error("Erro na requisição: " + e.message);
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Bot className="w-4 h-4 mr-2" />
+                  Configurar Webhook SalesBot
+                </Button>
+              </div>
+
+              <div className="p-4 bg-slate-50 border rounded-lg">
+                <h3 className="font-semibold text-slate-900 mb-2">FinanceiroBot (Geral)</h3>
+                <p className="text-sm text-slate-500 mb-4">
+                  Bot principal para gestão financeira e administrativa.
+                  Usa o token TELEGRAM_BOT_TOKEN.
+                </p>
+                 <Button 
+                  onClick={async () => {
+                     try {
+                      const toastId = toast.loading("Configurando Webhook Financeiro...");
+                      // Reutilizando a lógica, assumindo que existe uma função similar ou adaptando
+                      // Como não criamos uma func especifica pra setup do financeiro agora, 
+                      // vamos deixar apenas informativo ou criar a func se necessário depois.
+                      toast.info("Configuração manual necessária ou função pendente.");
+                    } catch (e) {
+                      toast.error("Erro: " + e.message);
+                    }
+                  }}
+                  variant="outline"
+                  disabled
+                >
+                  <Bot className="w-4 h-4 mr-2" />
+                  Configurar Webhook Financeiro (Em breve)
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
