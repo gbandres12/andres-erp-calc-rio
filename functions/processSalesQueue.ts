@@ -349,7 +349,7 @@ export async function processSalesQueue(req) {
                                 total: total,
                                 subtotal: total,
                                 payment_method: sData.payment_method || "dinheiro",
-                                status: "rascunho", // Define como Rascunho para o Financeiro aprovar/faturar
+                                status: "rascunho",
                                 payment_status: "pendente",
                                 notes: "Venda criada via Assistente Virtual (SalesBot)"
                             });
