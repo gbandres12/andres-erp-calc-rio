@@ -247,27 +247,29 @@ export async function processSalesQueue(req) {
             responseJson = { action: "reply", reply_text: cleanContent };
         }
 
-        // 4. Executar Ação
-        let replyText = responseJson.reply_text;
+        // 4. Normalização robusta da Ação e Parâmetros
+        let action = responseJson.action;
         
-        // Se ainda não tiver texto, tenta usar o conteúdo bruto ou mensagem padrão
-        if (!replyText) {
-             if (responseJson.action === "reply") {
-                 replyText = "Desculpe, não entendi. Poderia repetir?";
-             } else if (responseJson.action) {
-                 // Se tem ação mas não tem texto (ex: create_sale), define um texto padrão se não foi setado pela ação depois
-                 replyText = "Processando comando..."; 
-             } else {
-                 // Se não tem nada
-                 replyText = cleanContent || "Desculpe, tive um erro interno.";
-             }
+        // Correção para alucinações de estrutura conhecidas
+        if (!action) {
+            if (responseJson.setcompany) action = "set_company";
+            else if (responseJson.create_sale) action = "create_sale";
+            else if (responseJson.create_client) action = "create_client";
         }
-        const action = responseJson.action;
+
+        let replyText = responseJson.reply_text || responseJson.reply || "Comando processado.";
         let cid = currentCompanyId;
 
         // Lógica de Troca de Filial
-        if (responseJson.target_company_id || action === "set_company") {
-            const targetId = responseJson.target_company_id || responseJson.filter_data?.company_id;
+        if (action === "set_company" || responseJson.target_company_id) {
+            let targetId = responseJson.target_company_id;
+            
+            // Suporte a estrutura alucinada: { "setcompany": { "targetid": "..." } }
+            if (!targetId && responseJson.setcompany?.targetid) {
+                targetId = responseJson.setcompany.targetid;
+            }
+            
+            if (!targetId) targetId = responseJson.filter_data?.company_id;
             const newComp = companies.find(c => c.id === targetId);
             if (newComp) {
                 cid = newComp.id;
