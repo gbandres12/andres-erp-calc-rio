@@ -138,35 +138,48 @@ export async function processSalesQueue(req) {
         OUTPUT JSON ESTRITO APENAS.
         `;
 
-        // Seleção de Modelo para Velocidade (Prioridade: OpenAI Direto > OpenRouter Flash > DeepSeek)
+        // Seleção de Modelo com Fallback Robusto
         let completion;
-        
-        if (OPENAI_API_KEY) {
-            // Rota mais rápida: GPT-4o-mini direto
-            const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-            completion = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
-                ],
-                response_format: { type: "json_object" }
-            });
-        } else {
-            // Rota alternativa: OpenRouter (Gemini Flash ou Llama para velocidade, fallback DeepSeek)
-            const openrouter = new OpenAI({
+        let usedProvider = "none";
+
+        const tryOpenRouter = async () => {
+             if (!OPENROUTER_API_KEY) throw new Error("OpenRouter Key missing");
+             const openrouter = new OpenAI({
                 apiKey: OPENROUTER_API_KEY,
                 baseURL: "https://openrouter.ai/api/v1"
             });
-            
-            completion = await openrouter.chat.completions.create({
-                model: "google/gemini-2.0-flash-001", // Modelo ultra-rápido e barato
+            usedProvider = "openrouter";
+            return await openrouter.chat.completions.create({
+                model: "google/gemini-2.0-flash-001", 
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
                 ],
                 response_format: { type: "json_object" }
             });
+        };
+
+        if (OPENAI_API_KEY) {
+            try {
+                // Tenta OpenAI Primeiro
+                const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+                completion = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
+                    ],
+                    response_format: { type: "json_object" }
+                });
+                usedProvider = "openai";
+            } catch (err) {
+                console.warn("OpenAI Failed (Quota/Error), falling back to OpenRouter:", err.message);
+                // Fallback para OpenRouter se falhar
+                completion = await tryOpenRouter();
+            }
+        } else {
+            // Se não tem OpenAI, vai direto pro OpenRouter
+            completion = await tryOpenRouter();
         }
 
         const responseContent = completion.choices[0].message.content;
