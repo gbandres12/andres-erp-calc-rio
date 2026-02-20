@@ -1036,16 +1036,77 @@ export default function Transactions() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
                     <div className="space-y-2">
-                      <Label>Valor *</Label>
+                      <Label>Valor Original (R$) *</Label>
                       <Input
                         type="number"
                         step="0.01"
                         required
-                        value={formData.amount}
-                        onChange={(e) => setFormData({ ...formData, amount: e.target.value === '' ? '' : e.target.value })}
+                        value={formData.original_amount}
+                        onChange={(e) => {
+                            const val = parseFloat(e.target.value || 0);
+                            setFormData(prev => {
+                                const discVal = parseFloat(prev.discount_value || 0);
+                                const disc = prev.discount_type === 'porcentagem' 
+                                    ? (val * discVal / 100) 
+                                    : discVal;
+                                return { ...prev, original_amount: e.target.value, amount: val - disc };
+                            });
+                        }}
                       />
                     </div>
+                    <div className="space-y-2">
+                        <Label>Desconto</Label>
+                        <div className="flex gap-2">
+                            <Select 
+                                value={formData.discount_type} 
+                                onValueChange={(val) => {
+                                    setFormData(prev => {
+                                        const orig = parseFloat(prev.original_amount || 0);
+                                        const discVal = parseFloat(prev.discount_value || 0);
+                                        const disc = val === 'porcentagem' 
+                                            ? (orig * discVal / 100) 
+                                            : discVal;
+                                        return { ...prev, discount_type: val, amount: orig - disc };
+                                    });
+                                }}
+                            >
+                                <SelectTrigger className="w-[80px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="valor">R$</SelectItem>
+                                    <SelectItem value="porcentagem">%</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                value={formData.discount_value}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value || 0);
+                                    setFormData(prev => {
+                                        const orig = parseFloat(prev.original_amount || 0);
+                                        const disc = prev.discount_type === 'porcentagem' 
+                                            ? (orig * val / 100) 
+                                            : val;
+                                        return { ...prev, discount_value: e.target.value, amount: orig - disc };
+                                    });
+                                }}
+                                placeholder={formData.discount_type === 'porcentagem' ? "%" : "R$"}
+                            />
+                        </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-lg border flex justify-between items-center mb-4">
+                      <span className="text-sm font-medium text-slate-500">Valor Líquido (Final):</span>
+                      <span className={`text-lg font-bold ${formData.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatBRL(formData.amount)}
+                      </span>
                   </div>
 
                   <div className="space-y-2">
