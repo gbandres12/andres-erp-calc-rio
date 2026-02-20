@@ -181,27 +181,41 @@ export async function processSalesQueue(req) {
             // Se não tem OpenAI, vai direto pro Gemini
             responseContent = await tryGemini();
         }
-        // Sanitize response content (remove markdown code blocks if present)
-        const cleanContent = responseContent.replace(/```json\n?|```/g, '').trim();
+        // Debug Log
+        console.log("AI Response:", responseContent);
+
+        let cleanContent = responseContent || "";
+        // Tentar extrair JSON se estiver misturado com texto
+        const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            cleanContent = jsonMatch[0];
+        } else {
+            // Remove markdown code blocks apenas se não achou JSON direto
+            cleanContent = cleanContent.replace(/```json\n?|```/g, '').trim();
+        }
 
         let responseJson;
         try {
             responseJson = JSON.parse(cleanContent);
         } catch (e) {
-            // Fallback se não vier JSON puro
-            console.error("JSON Parse Error", e, "Content:", responseContent);
+            // Fallback se não vier JSON puro: assume que é texto direto
+            console.warn("JSON Parse Failed, using raw text.", e);
             responseJson = { action: "reply", reply_text: cleanContent };
         }
 
         // 4. Executar Ação
         let replyText = responseJson.reply_text;
         
-        // Se não houver texto de resposta, usar um padrão melhor ou o próprio conteúdo se não for JSON
+        // Se ainda não tiver texto, tenta usar o conteúdo bruto ou mensagem padrão
         if (!replyText) {
-             if (responseJson.action === "reply" && !responseJson.reply_text) {
+             if (responseJson.action === "reply") {
                  replyText = "Desculpe, não entendi. Poderia repetir?";
+             } else if (responseJson.action) {
+                 // Se tem ação mas não tem texto (ex: create_sale), define um texto padrão se não foi setado pela ação depois
+                 replyText = "Processando comando..."; 
              } else {
-                 replyText = "Comando processado.";
+                 // Se não tem nada
+                 replyText = cleanContent || "Desculpe, tive um erro interno.";
              }
         }
         const action = responseJson.action;
