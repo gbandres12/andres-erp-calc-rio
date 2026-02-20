@@ -358,6 +358,9 @@ export default function Transactions() {
       setFormData({
         description: transaction.description || "",
         amount: transaction.amount || 0,
+        original_amount: transaction.original_amount || transaction.amount || 0, // Fallback para amount se original não existir
+        discount_type: transaction.discount_type || "valor",
+        discount_value: transaction.discount_value || 0,
         type: transaction.type || "receita",
         category: transaction.category || "",
         status: transaction.status || "pendente",
