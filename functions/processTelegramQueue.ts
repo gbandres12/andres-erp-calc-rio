@@ -4,7 +4,7 @@ import OpenAI from 'npm:openai';
 export async function processTelegramQueue(req) {
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || Deno.env.get("OPENAI_API_KEY");
 
     if (!BOT_Token) {
         console.error("[Queue] Missing TELEGRAM_BOT_TOKEN");
@@ -62,15 +62,29 @@ export async function processTelegramQueue(req) {
                 const audioRes = await fetch(audioUrl);
                 const audioBlob = await audioRes.blob();
 
-                // 3. Transcrever com OpenAI Whisper
-                const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-                const file = new File([audioBlob], "voice.ogg", { type: "audio/ogg" });
+                // 3. Transcrever com OpenAI Whisper (usando endpoint original da OpenAI se disponível, ou falhar graciosamente)
+                // Nota: OpenRouter não tem endpoint de audio/transcriptions compatível diretamente com a lib da OpenAI as vezes
+                // Vamos tentar usar a chave original se existir, ou pular se for só OpenRouter
+                let transcriptionText = "";
+                
+                if (Deno.env.get("OPENAI_API_KEY")) {
+                    const openaiAudio = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") });
+                    const file = new File([audioBlob], "voice.ogg", { type: "audio/ogg" });
+                    const transcription = await openaiAudio.audio.transcriptions.create({
+                        file: file,
+                        model: "whisper-1",
+                        language: "pt"
+                    });
+                    transcriptionText = transcription.text;
+                } else {
+                   // Fallback ou aviso se não tiver OpenAI Key para Audio
+                   throw new Error("Transscrição de áudio requer OPENAI_API_KEY (OpenRouter não suporta Whisper via SDK padrão ainda).");
+                }
 
-                const transcription = await openai.audio.transcriptions.create({
-                    file: file,
-                    model: "whisper-1",
-                    language: "pt"
-                });
+                if (!transcriptionText) throw new Error("Transcription empty");
+
+                // Atualizar texto do usuário com a transcrição
+                user_text = transcriptionText;
 
                 if (!transcription.text) throw new Error("Transcription empty");
 
@@ -123,92 +137,77 @@ export async function processTelegramQueue(req) {
         const todayStr = new Date().toLocaleDateString('pt-BR');
         const historyText = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join("\n");
         
-        // 3. Prompt Refinado
-        let prompt = `Você é o "FinanceiroBot" 🤖, assistente das filiais: ${companies.map(c => c.name).join(", ")}.
+        // 3. Prompt Refinado (SALES BOT - OpenRouter)
+        let prompt = `Você é o "SalesBot" 🤖, assistente de VENDAS das filiais: ${companies.map(c => c.name).join(", ")}.
         
         Data: ${todayStr}
-        Filial Ativa na Sessão: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
+        Filial Ativa: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
         
         CONTEXTO:
         ${historyText}
         User: "${user_text}"
 
+        SUA MISSÃO:
+        - Atender clientes, consultar preços/estoque, cadastrar clientes e fechar vendas.
+        - **NÃO** acesse dados financeiros (contas, saldo, extrato). Se pedirem, diga que não tem permissão.
+        
         REGRAS CRÍTICAS:
-        1. **FILIAL OBRIGATÓRIA**: Para gravar ou ler dados (transações, produtos, etc), você PRECISA de uma 'company_id'. 
-           - Se o usuário NÃO disse a filial e NÃO tem "Filial Ativa", PERGUNTE.
-           - Se o usuário mencionou uma filial, use o ID dela no JSON.
-           - Se o usuário pediu para "mudar para filial X", atualize a filial.
-        2. **DADOS COMPLETOS**: Não invente IDs. Use os fornecidos abaixo.
+        1. **FILIAL**: Identifique a filial para qualquer operação de consulta ou venda. Se não souber, PERGUNTE.
+        2. **CLIENTES**: Para vender, precisa do nome do cliente. Se não existir, use a ação 'create_client'.
+        3. **VENDAS**: Confirme os itens e o total antes de fechar.
 
         DADOS:
-        Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name, code: c.code})))}
-        Contas: ${JSON.stringify(accounts.map(a => ({id: a.id, name: a.name, company_id: a.company_id})))}
+        Filiais: ${JSON.stringify(companies.map(c => ({id: c.id, name: c.name})))}
 
-        AÇÕES: "reply", "set_company", "create_transaction", "read_transactions", "read_balance", "search_products", "create_sale".
+        AÇÕES PERMITIDAS: 
+        - "reply" (apenas responder/conversar)
+        - "set_company" (mudar filial)
+        - "search_products" (buscar preços/estoque)
+        - "create_client" (cadastrar novo cliente)
+        - "create_sale" (fechar venda)
 
         RETORNO JSON (Estrito):
         {
-            "action": "...",
-            "reply_text": "...",
-            "target_company_id": "ID da filial se identificada/alterada nesta mensagem (ou null)",
-            "transaction_data": { "description": "...", "amount": 0.00, "type": "receita|despesa", "category": "...", "status": "...", "company_id": "..." },
-            "filter_data": { "company_id": "..." },
-            "search_query": "...",
-            "sale_data": { ... }
+            "action": "uma das ações acima",
+            "reply_text": "texto para o usuário (use markdown bonito)",
+            "target_company_id": "ID da filial se mudou/identificou",
+            "search_query": "termo para busca de produto",
+            "client_data": { "name": "...", "phone": "...", "document": "...", "address": "..." },
+            "sale_data": { 
+                "client_name": "...", 
+                "items": [{ "product_name": "...", "quantity": 1 }], 
+                "payment_method": "..." 
+            }
         }
         `;
 
-        // 4. Chamar LLM
+        // 4. Chamar LLM (OpenRouter)
         let response;
         try {
-            response = await base44.integrations.Core.InvokeLLM({
-                prompt: prompt,
-                response_json_schema: {
-                    type: "object",
-                    properties: {
-                        action: { type: "string" },
-                        reply_text: { type: "string" },
-                        target_company_id: { type: "string" },
-                        transaction_data: { 
-                            type: "object", 
-                            properties: {
-                                description: { type: "string" },
-                                amount: { type: "number" },
-                                type: { type: "string", enum: ["receita", "despesa"] },
-                                category: { type: "string" },
-                                company_id: { type: "string" },
-                                status: { type: "string", enum: ["pago", "pendente", "parcial"] },
-                                paid_amount: { type: "number" },
-                                due_date: { type: "string" },
-                                payment_date: { type: "string" }
-                            },
-                            required: ["description", "amount", "type", "category"] 
-                        },
-                        filter_data: { type: "object", additionalProperties: true },
-                        search_query: { type: "string" },
-                        sale_data: { 
-                            type: "object", 
-                            properties: {
-                                client_name: { type: "string" },
-                                items: { 
-                                    type: "array", 
-                                    items: { 
-                                        type: "object", 
-                                        properties: {
-                                            product_name: { type: "string" },
-                                            quantity: { type: "number" }
-                                        },
-                                        required: ["product_name", "quantity"]
-                                    } 
-                                },
-                                payment_method: { type: "string" }
-                            },
-                            required: ["client_name", "items"]
-                        }
-                    },
-                    required: ["action", "reply_text"]
-                }
+            const openai = new OpenAI({
+                apiKey: OPENAI_API_KEY,
+                baseURL: "https://openrouter.ai/api/v1"
             });
+
+            const completion = await openai.chat.completions.create({
+                model: "deepseek/deepseek-chat",
+                messages: [
+                    { role: "system", content: prompt },
+                    { role: "user", content: user_text }
+                ],
+                response_format: { type: "json_object" }
+            });
+            
+            const content = completion.choices[0].message.content;
+            if (!content) throw new Error("Empty response from LLM");
+            response = JSON.parse(content);
+
+        } catch (llmError) {
+            console.error("LLM Error:", llmError);
+            await sendTelegram(chat_id, "😵‍💫 Erro na minha conexão neural (OpenRouter/LLM). Tente novamente.");
+            try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
+            return Response.json({ status: "llm_error_handled" });
+        }
         } catch (llmError) {
             console.error("LLM Error:", llmError);
             await sendTelegram(chat_id, "😵‍💫 Minha mente deu um nó (Erro na IA). Pode repetir por favor?");
@@ -232,50 +231,32 @@ export async function processTelegramQueue(req) {
              }
         }
 
-        const needsCompany = ["create_transaction", "read_transactions", "read_balance", "search_products", "create_sale"].includes(action);
+        const needsCompany = ["search_products", "create_sale", "create_client"].includes(action);
 
         if (needsCompany && !cid) {
-            finalReply = `🏢 *Qual filial?* Não sei em qual filial devo executar isso.\nOpções: ${companies.map(c => c.name).join(", ")}`;
+            finalReply = `🏢 *Qual filial?* Selecione a filial para prosseguir.\nOpções: ${companies.map(c => c.name).join(", ")}`;
         } 
         else {
             try {
-                if (action === "create_transaction") {
-                    const data = response.transaction_data;
-                    data.company_id = cid; // Forçar ID resolvido/validado
+                if (action === "create_client") {
+                    const cData = response.client_data;
+                    cData.company_id = cid;
+                    cData.type = "cliente"; // Forçar tipo
                     
-                    const today = new Date().toISOString().split('T')[0];
-                    if (!data.due_date) data.due_date = today;
-                    if (data.status === 'pago') {
-                        data.paid_amount = data.amount;
-                        if (!data.payment_date) data.payment_date = today;
-                    }
+                    // Verificar duplicidade simples
+                    const existing = (await base44.asServiceRole.entities.Contact.filter({ 
+                        name: { $regex: cData.name, $options: 'i' }, 
+                        company_id: cid 
+                    }))[0];
 
-                    const tx = await base44.asServiceRole.entities.Transaction.create(data);
-                    base44.functions.invoke('recalculateBalance', { company_id: cid });
-                    
-                    finalReply = `✅ *Lançamento Criado na ${companies.find(c=>c.id===cid)?.name}*\n📝 ${tx.description}\n💰 R$ ${tx.amount} (${tx.type})`;
+                    if (existing) {
+                        finalReply = `⚠️ *Cliente já existe!*\nEncontrei: ${existing.name} (Tel: ${existing.phone || 'N/A'})`;
+                    } else {
+                        const newClient = await base44.asServiceRole.entities.Contact.create(cData);
+                        finalReply = `✅ *Cliente Cadastrado!* \n👤 ${newClient.name}\n📞 ${newClient.phone || 'Sem telefone'}\n📍 ${newClient.city || 'Sem cidade'}`;
+                    }
                 }
                 
-                else if (action === "read_transactions") {
-                    const query = { company_id: cid };
-                    if (response.filter_data?.status) query.status = response.filter_data.status;
-                    const list = await base44.asServiceRole.entities.Transaction.filter(query, '-due_date', 8);
-                    
-                    if (list.length > 0) {
-                        finalReply = `📊 *Extrato ${companies.find(c=>c.id===cid)?.name}*\n` + 
-                            list.map(t => `▪️ ${t.description} | R$ ${t.amount} (${t.status})`).join("\n");
-                    } else {
-                        finalReply = `Nada recente encontrado na filial ${companies.find(c=>c.id===cid)?.name}. 🦗`;
-                    }
-                }
-
-                else if (action === "read_balance") {
-                    const companyAccounts = accounts.filter(a => a.company_id === cid);
-                    const total = companyAccounts.reduce((sum, a) => sum + (a.current_balance || 0), 0);
-                    finalReply = `🏦 *Saldo ${companies.find(c=>c.id===cid)?.name}*\nTotal: *R$ ${total.toFixed(2)}*\n\n` + 
-                        companyAccounts.map(a => `▫️ ${a.name}: R$ ${a.current_balance?.toFixed(2)}`).join("\n");
-                }
-
                 else if (action === "search_products") {
                     const query = response.search_query || "";
                     const products = await base44.asServiceRole.entities.Product.filter({ 
