@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 import OpenAI from 'npm:openai';
-import { GoogleGenerativeAI } from "npm:@google/generative-ai";
+import { GoogleGenerativeAI } from "npm:@google/generative-ai@^0.12.0";
 
 export async function processSalesQueue(req) {
     const base44 = createClientFromRequest(req);
@@ -148,7 +148,7 @@ export async function processSalesQueue(req) {
              
              const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
              const model = genAI.getGenerativeModel({ 
-                model: "gemini-1.5-flash",
+                model: "gemini-1.5-flash-latest",
                 systemInstruction: systemPrompt,
                 generationConfig: { responseMimeType: "application/json" }
              });
