@@ -31,6 +31,16 @@ export async function processTelegramQueue(req) {
         } catch (e) { console.error("Action Error:", e); }
     };
 
+    const sendPhoto = async (chatId, photoUrl, caption) => {
+        try {
+            await fetch(`https://api.telegram.org/bot${BOT_Token}/sendPhoto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, photo: photoUrl, caption: caption })
+            });
+        } catch (e) { console.error("Photo Error:", e); }
+    };
+
     try {
         const payload = await req.json();
         const queueItem = payload.data;
@@ -206,6 +216,7 @@ export async function processTelegramQueue(req) {
         6. "add_expense": Lançar NOVA despesa ou receita avulsa.
         7. "pay_bill": Dar baixa/pagar uma conta existente ou recém mencionada.
         8. "search_finance": Buscar transações para análise (ex: "quanto gastei de luz?", "vendas de ontem").
+        9. "generate_chart": Criar GRÁFICO visual quando o usuário pedir ou for útil para análise comparativa (ex: "gráfico de vendas", "evolução saldo").
 
         ESTRUTURA JSON (Estrito):
         {
@@ -238,6 +249,16 @@ export async function processTelegramQueue(req) {
                 "category_contains": "termo ou null",
                 "start_date": "YYYY-MM-DD",
                 "end_date": "YYYY-MM-DD"
+            },
+
+            // Para generate_chart
+            "chart_data": {
+                "type": "bar" | "line" | "pie" | "doughnut",
+                "title": "Título do Gráfico",
+                "labels": ["Label1", "Label2"],
+                "datasets": [
+                    { "label": "Série 1", "data": [10, 20] }
+                ]
             },
 
             // Para create_client / create_sale (mantenha estrutura anterior)
@@ -303,7 +324,7 @@ export async function processTelegramQueue(req) {
              }
         }
 
-        const needsCompany = ["search_products", "create_sale", "create_client", "add_expense", "pay_bill", "search_finance"].includes(action);
+        const needsCompany = ["search_products", "create_sale", "create_client", "add_expense", "pay_bill", "search_finance", "generate_chart"].includes(action);
 
         if (needsCompany && !cid) {
             finalReply = `🏢 *Qual filial?* Selecione a filial para prosseguir.\nOpções: ${companies.map(c => c.name).join(", ")}`;
@@ -482,6 +503,40 @@ export async function processTelegramQueue(req) {
                      } else {
                          finalReply = `⚠️ Não encontrei conta pendente parecida com "${pData.search_term}"${pData.amount_approx ? ` de aprox R$ ${pData.amount_approx.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : ''}.`;
                      }
+                }
+
+                else if (action === "generate_chart") {
+                    const cData = response.chart_data;
+                    
+                    // Configuração do QuickChart
+                    const chartConfig = {
+                        type: cData.type,
+                        data: {
+                            labels: cData.labels,
+                            datasets: cData.datasets.map((ds, idx) => ({
+                                label: ds.label,
+                                data: ds.data,
+                                backgroundColor: idx === 0 ? 'rgba(54, 162, 235, 0.5)' : 'rgba(255, 99, 132, 0.5)',
+                                borderColor: idx === 0 ? 'rgba(54, 162, 235, 1)' : 'rgba(255, 99, 132, 1)',
+                                borderWidth: 1
+                            }))
+                        },
+                        options: {
+                            title: { display: true, text: cData.title },
+                            legend: { display: true },
+                            plugins: {
+                                datalabels: { display: true, anchor: 'end', align: 'top' }
+                            }
+                        }
+                    };
+
+                    const quickChartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&width=500&height=300&backgroundColor=white`;
+                    
+                    // Envia a foto primeiro
+                    await sendPhoto(chat_id, quickChartUrl, response.reply_text || "📊 Gráfico gerado com sucesso.");
+                    
+                    // Se o bot também mandou texto, usa ele, senão confirmação simples
+                    if (!response.reply_text) finalReply = "Gráfico enviado acima 👆";
                 }
 
             } catch (logicError) {
