@@ -253,12 +253,19 @@ export async function processTelegramQueue(req) {
                 baseURL: "https://openrouter.ai/api/v1"
             });
 
+            // Estruturar mensagens corretamente para manter o histórico (thread)
+            const messages = [
+                { role: "system", content: systemPrompt },
+                ...history.map(msg => ({ 
+                    role: msg.role === 'user' ? 'user' : 'assistant', 
+                    content: msg.content 
+                })),
+                { role: "user", content: user_text }
+            ];
+
             const completion = await openai.chat.completions.create({
                 model: "deepseek/deepseek-chat",
-                messages: [
-                    { role: "system", content: prompt },
-                    { role: "user", content: user_text }
-                ],
+                messages: messages,
                 response_format: { type: "json_object" }
             });
             
