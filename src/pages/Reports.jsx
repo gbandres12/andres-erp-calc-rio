@@ -83,8 +83,8 @@ export default function Reports() {
   });
 
   const { data: refuelings = [] } = useQuery({
-    queryKey: ['refuelings', selectedCompanyId],
-    queryFn: () => base44.entities.Refueling.filter({ company_id: selectedCompanyId }),
+    queryKey: ['refuelings', filterCompanyId],
+    queryFn: () => base44.entities.Refueling.filter(companyFilter),
     initialData: []
   });
 
