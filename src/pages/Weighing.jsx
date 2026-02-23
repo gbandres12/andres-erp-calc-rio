@@ -81,8 +81,6 @@ export default function Weighing() {
     mutationFn: async (data) => {
       const lastWeighing = await base44.entities.Weighing.list('-reference', 1);
       const lastRef = lastWeighing[0]?.reference || 'VG000000';
-      const lastWeighing = await base44.entities.Weighing.list('-reference', 1);
-      const lastRef = lastWeighing[0]?.reference || 'VG000000';
       const nextNumber = parseInt(lastRef.replace('VG', '')) + 1;
       const newRef = `VG${String(nextNumber).padStart(6, '0')}`;
       
