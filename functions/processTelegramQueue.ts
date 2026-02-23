@@ -135,6 +135,40 @@ export async function processTelegramQueue(req) {
             return null;
         };
 
+        // 2.1 Dados Financeiros (Se tiver filial definida)
+        let financialContext = "Selecione uma filial para ver os dados financeiros.";
+        if (currentCompanyId) {
+            // Buscar pendências e atrasados
+            const [pendingExpenses, pendingRevenues, lateExpenses, lateRevenues] = await Promise.all([
+                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'pendente' }, 'due_date', 5),
+                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'pendente' }, 'due_date', 5),
+                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'atrasado' }, 'due_date', 5),
+                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'atrasado' }, 'due_date', 5)
+            ]);
+
+            const companyAccounts = accounts.filter(a => a.company_id === currentCompanyId);
+            const totalBalance = companyAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
+            
+            const formatTx = (t) => `- ${t.description} (R$ ${t.amount}) Venc: ${t.due_date.split('-').reverse().join('/')}`;
+            
+            financialContext = `
+            📊 DADOS FINANCEIROS ATUAIS (${currentCompanyName}):
+            💰 Saldo Total em Contas: R$ ${totalBalance.toFixed(2)}
+            
+            🔴 A PAGAR (ATRASADOS):
+            ${lateExpenses.length ? lateExpenses.map(formatTx).join("\n") : "(Nenhum atraso)"}
+            
+            🔴 A PAGAR (PRÓXIMOS):
+            ${pendingExpenses.length ? pendingExpenses.map(formatTx).join("\n") : "(Nenhuma pendência próxima)"}
+            
+            🟢 A RECEBER (ATRASADOS):
+            ${lateRevenues.length ? lateRevenues.map(formatTx).join("\n") : "(Nenhum atraso)"}
+            
+            🟢 A RECEBER (PRÓXIMOS):
+            ${pendingRevenues.length ? pendingRevenues.map(formatTx).join("\n") : "(Nenhuma pendência próxima)"}
+            `;
+        }
+
         const todayStr = new Date().toLocaleDateString('pt-BR');
         const historyText = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join("\n");
         
@@ -145,6 +179,9 @@ export async function processTelegramQueue(req) {
         Data: ${todayStr}
         Filial Ativa: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
         
+        CONTEXTO FINANCEIRO (Use para responder perguntas sobre contas/saldo):
+        ${financialContext}
+        
         CONTEXTO ANTERIOR (Mantenha o fluxo):
         ${historyText}
         
@@ -153,6 +190,7 @@ export async function processTelegramQueue(req) {
 
         SUA MISSÃO:
         - Auxiliar na gestão financeira e vendas.
+        - Você PODE consultar saldos, contas a pagar e receber (dados acima).
         - Você PODE consultar preços e estoque.
         - Você PODE registrar vendas e clientes.
         - Mantenha o contexto da conversa anterior. Não inicie uma nova conversa a cada mensagem.
