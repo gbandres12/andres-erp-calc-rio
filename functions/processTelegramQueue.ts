@@ -149,11 +149,11 @@ export async function processTelegramQueue(req) {
             const companyAccounts = accounts.filter(a => a.company_id === currentCompanyId);
             const totalBalance = companyAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
             
-            const formatTx = (t) => `- ${t.description} (R$ ${t.amount}) Venc: ${t.due_date.split('-').reverse().join('/')}`;
+            const formatTx = (t) => `- ${t.description} (R$ ${t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}) Venc: ${t.due_date.split('-').reverse().join('/')}`;
             
             financialContext = `
             📊 DADOS FINANCEIROS ATUAIS (${currentCompanyName}):
-            💰 Saldo Total em Contas: R$ ${totalBalance.toFixed(2)}
+            💰 Saldo Total em Contas: R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
             
             🔴 A PAGAR (ATRASADOS):
             ${lateExpenses.length ? lateExpenses.map(formatTx).join("\n") : "(Nenhum atraso)"}
@@ -184,6 +184,7 @@ export async function processTelegramQueue(req) {
 
         SUA MISSÃO:
         - Auxiliar na gestão financeira completa (contas a pagar, receber, fluxo de caixa) e vendas.
+        - SEMPRE formate valores monetários no padrão brasileiro (ex: R$ 1.250,00). Nunca use ponto para milhares ou formato US.
         - Você PODE buscar transações detalhadas (filtro por data, tipo, categoria).
         - Você PODE lançar despesas e receitas.
         - Você PODE dar baixa em contas (marcar como pago).
@@ -338,7 +339,7 @@ export async function processTelegramQueue(req) {
                     
                     if (products.length > 0) {
                         finalReply = `📦 *Produtos (${companies.find(c=>c.id===cid)?.name})*:\n` + 
-                            products.map(p => `▫️ ${p.name} | R$ ${p.sale_price} | Est: ${p.current_stock}`).join("\n");
+                            products.map(p => `▫️ ${p.name} | R$ ${p.sale_price.toLocaleString('pt-BR', {minimumFractionDigits: 2})} | Est: ${p.current_stock}`).join("\n");
                     } else {
                         finalReply = `Nenhum produto "${query}" encontrado nesta filial.`;
                     }
@@ -400,7 +401,7 @@ export async function processTelegramQueue(req) {
                         withdrawal_status: "aguardando"
                     });
 
-                    finalReply = `✅ *Venda Realizada!* (Ref: ${sale.reference})\n👤 Cliente: ${client.name}\n💰 Total: R$ ${total.toFixed(2)}\n📦 Itens: ${saleItems.length}`;
+                    finalReply = `✅ *Venda Realizada!* (Ref: ${sale.reference})\n👤 Cliente: ${client.name}\n💰 Total: R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n📦 Itens: ${saleItems.length}`;
                 }
 
                 else if (action === "add_expense") {
@@ -422,7 +423,7 @@ export async function processTelegramQueue(req) {
                         notes: "Lançado via TelegramBot"
                     });
                     
-                    finalReply = `💸 *${eData.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!* \n📝 ${transaction.description}\n💲 R$ ${eData.amount.toFixed(2)}\n📅 ${eData.is_paid ? 'Pago' : 'Pendente'}`;
+                    finalReply = `💸 *${eData.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!* \n📝 ${transaction.description}\n💲 R$ ${eData.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n📅 ${eData.is_paid ? 'Pago' : 'Pendente'}`;
                 }
 
                 else if (action === "search_finance") {
@@ -447,8 +448,8 @@ export async function processTelegramQueue(req) {
                     const total = txs.reduce((sum, t) => sum + t.amount, 0);
                     
                     if (txs.length > 0) {
-                        finalReply = `📊 *Resultado Financeiro:*\nTotal Encontrado (max 10): R$ ${total.toFixed(2)}\n\n` + 
-                                     txs.map(t => `▪️ ${t.description} (${t.type === 'receita' ? '+' : '-'} R$ ${t.amount}) - ${t.status}`).join("\n");
+                        finalReply = `📊 *Resultado Financeiro:*\nTotal Encontrado (max 10): R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` + 
+                                     txs.map(t => `▪️ ${t.description} (${t.type === 'receita' ? '+' : '-'} R$ ${t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}) - ${t.status}`).join("\n");
                     } else {
                         finalReply = `🔍 Nenhuma transação encontrada com esses critérios.`;
                     }
@@ -477,9 +478,9 @@ export async function processTelegramQueue(req) {
                              payment_date: new Date().toISOString().split('T')[0],
                              notes: (match.notes || "") + "\nBaixa via TelegramBot"
                          });
-                         finalReply = `✅ *Conta Paga!* \nDei baixa em: ${match.description} (R$ ${match.amount.toFixed(2)})`;
+                         finalReply = `✅ *Conta Paga!* \nDei baixa em: ${match.description} (R$ ${match.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})})`;
                      } else {
-                         finalReply = `⚠️ Não encontrei conta pendente parecida com "${pData.search_term}"${pData.amount_approx ? ` de aprox R$ ${pData.amount_approx}` : ''}.`;
+                         finalReply = `⚠️ Não encontrei conta pendente parecida com "${pData.search_term}"${pData.amount_approx ? ` de aprox R$ ${pData.amount_approx.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : ''}.`;
                      }
                 }
 
