@@ -15,10 +15,11 @@ import { toast } from "sonner";
 
 export default function Reports() {
   const [selectedCompanyId] = React.useState(localStorage.getItem('selectedCompanyId'));
+  const [filterCompanyId, setFilterCompanyId] = useState(localStorage.getItem('selectedCompanyId') || 'all');
   const [period, setPeriod] = useState("30");
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setDate(d.getDate() - 90); // Default to 90 days for better trend analysis
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
