@@ -170,10 +170,9 @@ export async function processTelegramQueue(req) {
         }
 
         const todayStr = new Date().toLocaleDateString('pt-BR');
-        const historyText = history.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join("\n");
         
         // 3. Prompt Refinado (FINANCEIRO - OpenRouter)
-        let prompt = `Você é o "Assistente Financeiro e Comercial" da Calcário Amazônia 🚜.
+        let systemPrompt = `Você é o "Assistente Financeiro e Comercial" da Calcário Amazônia 🚜.
         Você atende as filiais: ${companies.map(c => c.name).join(", ")}.
         
         Data: ${todayStr}
@@ -182,12 +181,6 @@ export async function processTelegramQueue(req) {
         
         CONTEXTO FINANCEIRO (Resumo Rápido):
         ${financialContext}
-        
-        CONTEXTO ANTERIOR (Mantenha o fluxo):
-        ${historyText}
-        
-        MENSAGEM ATUAL:
-        User: "${user_text}"
 
         SUA MISSÃO:
         - Auxiliar na gestão financeira completa (contas a pagar, receber, fluxo de caixa) e vendas.
@@ -195,12 +188,12 @@ export async function processTelegramQueue(req) {
         - Você PODE lançar despesas e receitas.
         - Você PODE dar baixa em contas (marcar como pago).
         - Você PODE registrar vendas e clientes.
-        - Mantenha o contexto da conversa anterior.
         
         REGRAS CRÍTICAS:
         1. **IDENTIDADE**: Você é da Calcário Amazônia.
         2. **INTELIGÊNCIA**: Se o usuário perguntar algo que não está no "Resumo Rápido" (ex: "gastos com combustível mês passado"), USE a action "search_finance". Não invente dados.
         3. **FILIAL**: Identifique a filial para qualquer operação.
+        4. **FLUXO**: Você está em uma conversa contínua (thread). Não se apresente novamente se já houver histórico.
         
         AÇÕES PERMITIDAS (Retorne JSON):
         
