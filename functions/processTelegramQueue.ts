@@ -354,7 +354,6 @@ export async function processTelegramQueue(req) {
                     }))[0];
 
                     if (!client) {
-                        // Tentar criar se não achar? Por enquanto, avisar.
                         throw new Error(`Cliente "${client_name}" não encontrado. Cadastre-o primeiro.`);
                     }
 
@@ -382,11 +381,6 @@ export async function processTelegramQueue(req) {
                             total: itemTotal,
                             quantity_withdrawn: 0 // Pendente de retirada
                         });
-
-                        // Atualizar estoque (opcional, pode ser feito via trigger ou aqui mesmo)
-                        // await base44.asServiceRole.entities.Product.update(product.id, { 
-                        //     current_stock: (product.current_stock || 0) - item.quantity 
-                        // });
                     }
 
                     // 3. Criar Venda
@@ -409,9 +403,89 @@ export async function processTelegramQueue(req) {
                     finalReply = `✅ *Venda Realizada!* (Ref: ${sale.reference})\n👤 Cliente: ${client.name}\n💰 Total: R$ ${total.toFixed(2)}\n📦 Itens: ${saleItems.length}`;
                 }
 
+                else if (action === "add_expense") {
+                    const eData = response.expense_data;
+                    const account = accounts.find(a => a.id === eData.account_id) || accounts.find(a => a.company_id === cid && a.type === 'caixa');
+                    
+                    const transaction = await base44.asServiceRole.entities.Transaction.create({
+                        description: eData.description || "Despesa Avulsa",
+                        amount: eData.amount,
+                        original_amount: eData.amount,
+                        type: eData.type || "despesa",
+                        category: eData.category || "Geral",
+                        status: eData.is_paid ? "pago" : "pendente",
+                        paid_amount: eData.is_paid ? eData.amount : 0,
+                        due_date: new Date().toISOString().split('T')[0], // Assume hoje
+                        payment_date: eData.is_paid ? new Date().toISOString().split('T')[0] : null,
+                        account_id: account?.id || null,
+                        company_id: cid,
+                        notes: "Lançado via TelegramBot"
+                    });
+                    
+                    finalReply = `💸 *${eData.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!* \n📝 ${transaction.description}\n💲 R$ ${eData.amount.toFixed(2)}\n📅 ${eData.is_paid ? 'Pago' : 'Pendente'}`;
+                }
+
+                else if (action === "search_finance") {
+                    const fQuery = response.finance_query;
+                    const filter = {
+                         company_id: cid,
+                         type: fQuery.type !== 'all' ? fQuery.type : undefined,
+                         category: fQuery.category_contains ? { $regex: fQuery.category_contains, $options: 'i' } : undefined,
+                         due_date: (fQuery.start_date || fQuery.end_date) ? {} : undefined
+                    };
+                    
+                    // Limpar undefineds
+                    Object.keys(filter).forEach(key => filter[key] === undefined && delete filter[key]);
+                    
+                    // Adicionar range se existir
+                    if (filter.due_date) {
+                         if (fQuery.start_date) filter.due_date.$gte = fQuery.start_date;
+                         if (fQuery.end_date) filter.due_date.$lte = fQuery.end_date;
+                    }
+
+                    const txs = await base44.asServiceRole.entities.Transaction.filter(filter, '-due_date', 10);
+                    const total = txs.reduce((sum, t) => sum + t.amount, 0);
+                    
+                    if (txs.length > 0) {
+                        finalReply = `📊 *Resultado Financeiro:*\nTotal Encontrado (max 10): R$ ${total.toFixed(2)}\n\n` + 
+                                     txs.map(t => `▪️ ${t.description} (${t.type === 'receita' ? '+' : '-'} R$ ${t.amount}) - ${t.status}`).join("\n");
+                    } else {
+                        finalReply = `🔍 Nenhuma transação encontrada com esses critérios.`;
+                    }
+                }
+
+                else if (action === "pay_bill") {
+                     const pData = response.payment_data;
+                     // Tentar achar conta pendente parecida
+                     const pending = await base44.asServiceRole.entities.Transaction.filter({
+                         company_id: cid,
+                         status: { $in: ['pendente', 'atrasado', 'parcial'] },
+                         description: { $regex: pData.search_term || "", $options: 'i' }
+                     });
+                     
+                     // Filtrar por valor aproximado se fornecido (margem 10%)
+                     const match = pending.find(t => {
+                         if (!pData.amount_approx) return true;
+                         const diff = Math.abs(t.amount - pData.amount_approx);
+                         return diff < (t.amount * 0.1);
+                     });
+
+                     if (match) {
+                         await base44.asServiceRole.entities.Transaction.update(match.id, {
+                             status: 'pago',
+                             paid_amount: match.amount,
+                             payment_date: new Date().toISOString().split('T')[0],
+                             notes: (match.notes || "") + "\nBaixa via TelegramBot"
+                         });
+                         finalReply = `✅ *Conta Paga!* \nDei baixa em: ${match.description} (R$ ${match.amount.toFixed(2)})`;
+                     } else {
+                         finalReply = `⚠️ Não encontrei conta pendente parecida com "${pData.search_term}"${pData.amount_approx ? ` de aprox R$ ${pData.amount_approx}` : ''}.`;
+                     }
+                }
+
             } catch (logicError) {
                 console.error("Logic/DB Error:", logicError);
-                finalReply = `⚠️ *Erro ao processar*\nNão consegui concluir a ação no banco de dados. Verifique se os dados (valor, nome) estão corretos.`;
+                finalReply = `⚠️ *Erro ao processar*\n${logicError.message || "Erro desconhecido no banco de dados."}`;
             }
         }
 
