@@ -326,6 +326,22 @@ export default function Reports() {
                         className="bg-white w-[160px]"
                     />
                 </div>
+                
+                <div className="space-y-1">
+                    <Label>Filial / Empresa</Label>
+                    <Select value={filterCompanyId} onValueChange={setFilterCompanyId}>
+                        <SelectTrigger className="w-[200px] bg-white">
+                            <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">🏢 Todas as Filiais</SelectItem>
+                            {companies.map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 <div className="pb-1">
                     <Button variant="outline" onClick={() => {
                         setEndDate(getTodayDate());
