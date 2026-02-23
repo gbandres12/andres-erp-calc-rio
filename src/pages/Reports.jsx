@@ -101,8 +101,8 @@ export default function Reports() {
   });
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts', selectedCompanyId],
-    queryFn: () => base44.entities.FinancialAccount.filter({ company_id: selectedCompanyId }),
+    queryKey: ['accounts', filterCompanyId],
+    queryFn: () => base44.entities.FinancialAccount.filter(companyFilter),
     initialData: []
   });
 
