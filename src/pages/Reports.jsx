@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatBRL, formatDate, getTodayDate } from "@/components/utils/formatters";
 import { toast } from "sonner";
+import CostsDashboard from "@/components/reports/CostsDashboard";
 
 export default function Reports() {
   const [selectedCompanyId] = React.useState(localStorage.getItem('selectedCompanyId'));
