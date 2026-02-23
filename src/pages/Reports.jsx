@@ -30,6 +30,8 @@ export default function Reports() {
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
+  const companyFilter = useMemo(() => filterCompanyId === 'all' ? {} : { company_id: filterCompanyId }, [filterCompanyId]);
+
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: () => base44.entities.Product.filter({ is_active: true }),
