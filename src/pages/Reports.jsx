@@ -57,8 +57,8 @@ export default function Reports() {
   });
 
   const { data: sales = [] } = useQuery({
-    queryKey: ['sales', selectedCompanyId],
-    queryFn: () => base44.entities.Sale.filter({ company_id: selectedCompanyId }),
+    queryKey: ['sales', filterCompanyId],
+    queryFn: () => base44.entities.Sale.filter(companyFilter),
     initialData: []
   });
 
