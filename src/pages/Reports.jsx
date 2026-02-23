@@ -60,8 +60,22 @@ export default function Reports() {
   });
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ['transactions', selectedCompanyId],
-    queryFn: () => base44.entities.Transaction.filter({ company_id: selectedCompanyId }),
+    queryKey: ['transactions', filterCompanyId],
+    queryFn: async () => {
+      const filter = {};
+      if (filterCompanyId !== 'all') {
+        filter.company_id = filterCompanyId;
+      }
+      // Fetch more data for better historical analysis (e.g. 1 year back or based on date filter if possible)
+      // Since filter API doesn't support complex date filtering easily here, we filter client-side
+      return base44.entities.Transaction.filter(filter);
+    },
+    initialData: []
+  });
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ['companies'],
+    queryFn: () => base44.entities.Company.filter({ is_active: true }),
     initialData: []
   });
 
