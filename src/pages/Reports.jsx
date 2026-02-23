@@ -89,8 +89,8 @@ export default function Reports() {
   });
 
   const { data: weighings = [] } = useQuery({
-    queryKey: ['weighings', selectedCompanyId],
-    queryFn: () => base44.entities.Weighing.filter({ company_id: selectedCompanyId }),
+    queryKey: ['weighings', filterCompanyId],
+    queryFn: () => base44.entities.Weighing.filter(companyFilter),
     initialData: []
   });
 
