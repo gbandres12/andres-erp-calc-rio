@@ -302,7 +302,7 @@ export async function processTelegramQueue(req) {
              }
         }
 
-        const needsCompany = ["search_products", "create_sale", "create_client"].includes(action);
+        const needsCompany = ["search_products", "create_sale", "create_client", "add_expense", "pay_bill", "search_finance"].includes(action);
 
         if (needsCompany && !cid) {
             finalReply = `🏢 *Qual filial?* Selecione a filial para prosseguir.\nOpções: ${companies.map(c => c.name).join(", ")}`;
