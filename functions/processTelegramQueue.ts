@@ -246,6 +246,7 @@ export async function processTelegramQueue(req) {
             // Para search_finance
             "finance_query": {
                 "type": "receita" | "despesa" | "all",
+                "status": "pago" | "pendente" | "atrasado" | "aberto" | "all", 
                 "category_contains": "termo ou null",
                 "start_date": "YYYY-MM-DD",
                 "end_date": "YYYY-MM-DD"
@@ -455,6 +456,15 @@ export async function processTelegramQueue(req) {
                          category: fQuery.category_contains ? { $regex: fQuery.category_contains, $options: 'i' } : undefined,
                          due_date: (fQuery.start_date || fQuery.end_date) ? {} : undefined
                     };
+
+                    // Filtro de Status
+                    if (fQuery.status && fQuery.status !== 'all') {
+                        if (fQuery.status === 'aberto') {
+                            filter.status = { $in: ['pendente', 'atrasado', 'parcial'] };
+                        } else {
+                            filter.status = fQuery.status;
+                        }
+                    }
                     
                     // Limpar undefineds
                     Object.keys(filter).forEach(key => filter[key] === undefined && delete filter[key]);
@@ -465,7 +475,7 @@ export async function processTelegramQueue(req) {
                          if (fQuery.end_date) filter.due_date.$lte = fQuery.end_date;
                     }
 
-                    const txs = await base44.asServiceRole.entities.Transaction.filter(filter, '-due_date', 10);
+                    const txs = await base44.asServiceRole.entities.Transaction.filter(filter, '-due_date', 15);
                     const total = txs.reduce((sum, t) => sum + t.amount, 0);
                     
                     if (txs.length > 0) {
