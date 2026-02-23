@@ -51,8 +51,8 @@ export default function Reports() {
   });
 
   const { data: vehicles = [] } = useQuery({
-    queryKey: ['vehicles', selectedCompanyId],
-    queryFn: () => base44.entities.Vehicle.filter({ company_id: selectedCompanyId }),
+    queryKey: ['vehicles', filterCompanyId],
+    queryFn: () => base44.entities.Vehicle.filter(companyFilter),
     initialData: []
   });
 
