@@ -369,6 +369,15 @@ export default function Reports() {
           <TabsTrigger value="operational">Operacional</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="costs">
+          <CostsDashboard 
+            transactions={filterByDate(transactions, 'due_date')} 
+            companies={companies}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        </TabsContent>
+
         <TabsContent value="overview" className="space-y-6">
           {/* KPIs Principais */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
