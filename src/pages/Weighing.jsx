@@ -19,8 +19,9 @@ export default function Weighing() {
   const [currentWeight, setCurrentWeight] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [formData, setFormData] = useState({
-    vehicle_id: "",
+    vehicle_id: "avulso",
     vehicle_plate: "",
+    driver_name: "",
     product: "",
     origin: "",
     destination: "",
@@ -29,8 +30,11 @@ export default function Weighing() {
     operator: "",
     client_id: "",
     notes: "",
-    purpose: "saida_venda"
+    purpose: "saida_venda",
+    ticket_number: ""
   });
+
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: scaleState } = useQuery({
     queryKey: ['scaleState', selectedCompanyId],
@@ -77,16 +81,32 @@ export default function Weighing() {
     mutationFn: async (data) => {
       const lastWeighing = await base44.entities.Weighing.list('-reference', 1);
       const lastRef = lastWeighing[0]?.reference || 'VG000000';
+      const lastWeighing = await base44.entities.Weighing.list('-reference', 1);
+      const lastRef = lastWeighing[0]?.reference || 'VG000000';
       const nextNumber = parseInt(lastRef.replace('VG', '')) + 1;
       const newRef = `VG${String(nextNumber).padStart(6, '0')}`;
       
+      // Gera número de ticket único para cada pesagem
+      const ticket = `TCK-${Date.now().toString().slice(-6)}`;
+      
       const net = data.gross - data.tare;
+      const netTon = net / 1000; // Converte para toneladas
+
+      // Se for veículo cadastrado, pega a placa dele, senão usa a digitada
+      let plateToUse = data.vehicle_plate;
+      if (data.vehicle_id && data.vehicle_id !== 'avulso') {
+          const v = vehicles.find(v => v.id === data.vehicle_id);
+          if (v) plateToUse = v.plate;
+      }
       
       return base44.entities.Weighing.create({
         ...data,
         reference: newRef,
+        ticket_number: ticket,
+        vehicle_plate: plateToUse.toUpperCase(),
         company_id: selectedCompanyId,
         net: net,
+        net_ton: netTon,
         status: data.gross > 0 ? 'concluida' : 'aguardando_bruto'
       });
     },
@@ -115,8 +135,9 @@ export default function Weighing() {
 
   const resetForm = () => {
     setFormData({
-      vehicle_id: "",
+      vehicle_id: "avulso",
       vehicle_plate: "",
+      driver_name: "",
       product: "",
       origin: "",
       destination: "",
@@ -124,8 +145,11 @@ export default function Weighing() {
       gross: 0,
       operator: "",
       client_id: "",
-      notes: ""
+      notes: "",
+      purpose: "saida_venda",
+      ticket_number: ""
     });
+    setSearchTerm("");
   };
 
   const handleSubmit = (e) => {
@@ -228,31 +252,56 @@ export default function Weighing() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Veículo *</Label>
+                  <Label>Veículo / Motorista</Label>
                   <Select
-                    required
                     value={formData.vehicle_id}
                     onValueChange={(value) => {
                       const vehicle = vehicles.find(v => v.id === value);
                       setFormData({ 
                         ...formData, 
                         vehicle_id: value,
-                        vehicle_plate: vehicle?.plate || ""
+                        vehicle_plate: vehicle?.plate || "",
+                        driver_name: vehicle?.driver_name || ""
                       });
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o veículo" />
+                      <SelectValue placeholder="Selecione ou Avulso" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="avulso">🚛 Veículo Avulso / Terceiro</SelectItem>
                       {vehicles.map((vehicle) => (
                         <SelectItem key={vehicle.id} value={vehicle.id}>
-                          {vehicle.plate} - {vehicle.brand} {vehicle.model}
+                          {vehicle.plate} - {vehicle.brand}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {formData.vehicle_id === 'avulso' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Placa do Veículo *</Label>
+                            <Input
+                                required
+                                value={formData.vehicle_plate}
+                                onChange={(e) => setFormData({ ...formData, vehicle_plate: e.target.value.toUpperCase() })}
+                                placeholder="ABC-1234"
+                                maxLength={8}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nome do Motorista *</Label>
+                            <Input
+                                required
+                                value={formData.driver_name}
+                                onChange={(e) => setFormData({ ...formData, driver_name: e.target.value })}
+                                placeholder="Nome completo"
+                            />
+                        </div>
+                    </>
+                )}
                 <div className="space-y-2">
                   <Label>Produto *</Label>
                   <Input
@@ -303,22 +352,37 @@ export default function Weighing() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Cliente</Label>
-                  <Select
-                    value={formData.client_id}
-                    onValueChange={(value) => setFormData({ ...formData, client_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contacts.map((contact) => (
-                        <SelectItem key={contact.id} value={contact.id}>
-                          {contact.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Cliente (Pesquisar)</Label>
+                  <div className="relative">
+                      <Input 
+                          placeholder="Digite para buscar..." 
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="mb-2"
+                      />
+                      <Select
+                        value={formData.client_id}
+                        onValueChange={(value) => {
+                            const c = contacts.find(contact => contact.id === value);
+                            setFormData({ ...formData, client_id: value });
+                            if(c) setSearchTerm(c.name);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={formData.client_id ? contacts.find(c=>c.id===formData.client_id)?.name : "Selecione o cliente"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contacts
+                            .filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                            .slice(0, 50) // Limita resultados para performance
+                            .map((contact) => (
+                            <SelectItem key={contact.id} value={contact.id}>
+                              {contact.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                  </div>
                 </div>
                 <div className="col-span-2 space-y-2">
                   <Label>Observações</Label>
@@ -334,11 +398,19 @@ export default function Weighing() {
               {formData.tare > 0 && formData.gross > 0 && (
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="pt-6">
-                    <div className="text-center">
-                      <p className="text-sm text-slate-600 mb-2">Peso Líquido Calculado:</p>
-                      <p className="text-4xl font-bold text-blue-600">
-                        {(formData.gross - formData.tare).toLocaleString()} kg
-                      </p>
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <p className="text-sm text-slate-600 mb-1">Peso Líquido (KG)</p>
+                            <p className="text-3xl font-bold text-blue-600">
+                                {(formData.gross - formData.tare).toLocaleString()} kg
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-slate-600 mb-1">Peso em Toneladas</p>
+                            <p className="text-3xl font-bold text-green-600">
+                                {((formData.gross - formData.tare) / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
+                            </p>
+                        </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -430,9 +502,14 @@ export default function Weighing() {
                         <Badge variant="outline" className="ml-2">
                           {weighing.purpose === 'entrada_estoque' ? 'Entrada' : 'Saída'}
                         </Badge>
+                        {weighing.ticket_number && (
+                            <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600">
+                                🎫 {weighing.ticket_number}
+                            </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-slate-600">
-                        {weighing.vehicle_plate} • {weighing.product}
+                        {weighing.vehicle_plate} • {weighing.driver_name ? `${weighing.driver_name} • ` : ''} {weighing.product}
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
                         {weighing.origin} → {weighing.destination} • Operador: {weighing.operator}
@@ -451,7 +528,9 @@ export default function Weighing() {
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Líquido</p>
-                        <p className="text-lg font-bold text-blue-600">{weighing.net?.toLocaleString()} kg</p>
+                        <p className="text-lg font-bold text-blue-600">
+                            {weighing.net_ton ? `${weighing.net_ton.toFixed(3)} ton` : `${weighing.net?.toLocaleString()} kg`}
+                        </p>
                       </div>
                     </div>
                     <Button
