@@ -362,6 +362,7 @@ export default function Reports() {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="costs">Análise de Custos</TabsTrigger>
           <TabsTrigger value="financial">DRE & Fluxo</TabsTrigger>
           <TabsTrigger value="statement">Extrato Bancário</TabsTrigger>
           <TabsTrigger value="payables">A Pagar/Receber</TabsTrigger>
