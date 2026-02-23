@@ -231,6 +231,60 @@ export default function Reports() {
     };
   }, [transactions, startDate, endDate]);
 
+  // Análise de Dívidas (Curto, Médio, Longo Prazo)
+  const debtAnalysis = useMemo(() => {
+    const today = new Date();
+    const shortTermLimit = new Date(); shortTermLimit.setDate(today.getDate() + 30);
+    const mediumTermLimit = new Date(); mediumTermLimit.setDate(today.getDate() + 90);
+
+    let shortTerm = 0;
+    let mediumTerm = 0;
+    let longTerm = 0;
+
+    // Filtra todas as despesas pendentes (não pagas), independente do filtro de data da tela (queremos ver a dívida total futura)
+    const allPendingExpenses = transactions.filter(t => t.type === 'despesa' && t.status !== 'pago' && t.due_date);
+
+    allPendingExpenses.forEach(t => {
+        const dueDate = new Date(t.due_date);
+        const amount = t.amount - (t.paid_amount || 0);
+        
+        if (dueDate <= shortTermLimit) {
+            shortTerm += amount;
+        } else if (dueDate <= mediumTermLimit) {
+            mediumTerm += amount;
+        } else {
+            longTerm += amount;
+        }
+    });
+
+    return [
+        { name: 'Curto Prazo (30d)', value: shortTerm, fill: '#EF4444' },
+        { name: 'Médio Prazo (90d)', value: mediumTerm, fill: '#F59E0B' },
+        { name: 'Longo Prazo (>90d)', value: longTerm, fill: '#3B82F6' }
+    ];
+  }, [transactions]);
+
+  // Fluxo de Caixa Diário Médio
+  const dailyAverageData = useMemo(() => {
+    if (!startDate || !endDate) return { revenue: 0, expense: 0, balance: 0 };
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; // Evitar divisão por zero
+
+    // Usar totais do DRE que já estão filtrados pelo período e pagos
+    const avgRevenue = dreData.totalReceita / diffDays;
+    const avgExpense = dreData.totalDespesa / diffDays;
+
+    return {
+        revenue: avgRevenue,
+        expense: avgExpense,
+        balance: avgRevenue - avgExpense,
+        days: diffDays
+    };
+  }, [dreData, startDate, endDate]);
+
   // Dados para Extrato Bancário
   const statementData = useMemo(() => {
     let filtered = filterByDate(transactions, 'payment_date').filter(t => t.status === 'pago');
@@ -575,10 +629,98 @@ export default function Reports() {
             </CardContent>
           </Card>
           
+          {/* Análise de Dívidas e Médias Diárias */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Perfil de Dívida (A Pagar)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={debtAnalysis} layout="vertical" margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" tickFormatter={(value) => `R$${(value/1000).toFixed(0)}k`} fontSize={12} />
+                                <YAxis dataKey="name" type="category" width={120} fontSize={12} />
+                                <Tooltip formatter={(value) => formatBRL(value)} cursor={{fill: 'transparent'}} />
+                                <Bar dataKey="value" name="Valor" radius={[0, 4, 4, 0]} barSize={40}>
+                                    {debtAnalysis.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-slate-500">
+                        <div>
+                            <span className="block font-bold text-red-600 text-sm">{formatBRL(debtAnalysis[0].value)}</span>
+                            Até 30 dias
+                        </div>
+                        <div>
+                            <span className="block font-bold text-yellow-600 text-sm">{formatBRL(debtAnalysis[1].value)}</span>
+                            30 a 90 dias
+                        </div>
+                        <div>
+                            <span className="block font-bold text-blue-600 text-sm">{formatBRL(debtAnalysis[2].value)}</span>
+                            +90 dias
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Médias Diárias (Período Selecionado)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-green-100 rounded-full">
+                                <ArrowUpCircle className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-green-900">Entrada Média Diária</p>
+                                <p className="text-xs text-green-600">Baseado em {dailyAverageData.days} dias</p>
+                            </div>
+                        </div>
+                        <span className="text-xl font-bold text-green-700">{formatBRL(dailyAverageData.revenue)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-red-100 rounded-full">
+                                <ArrowDownCircle className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-red-900">Saída Média Diária</p>
+                                <p className="text-xs text-red-600">Baseado em {dailyAverageData.days} dias</p>
+                            </div>
+                        </div>
+                        <span className="text-xl font-bold text-red-700">{formatBRL(dailyAverageData.expense)}</span>
+                    </div>
+
+                    <div className={`flex items-center justify-between p-4 rounded-lg border ${dailyAverageData.balance >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'}`}>
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${dailyAverageData.balance >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
+                                <TrendingUp className={`w-5 h-5 ${dailyAverageData.balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+                            </div>
+                            <div>
+                                <p className={`text-sm font-medium ${dailyAverageData.balance >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>Saldo Médio Diário</p>
+                                <p className={`text-xs ${dailyAverageData.balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>Resultado operacional médio</p>
+                            </div>
+                        </div>
+                        <span className={`text-xl font-bold ${dailyAverageData.balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+                            {formatBRL(dailyAverageData.balance)}
+                        </span>
+                    </div>
+                </CardContent>
+            </Card>
+          </div>
+
           {/* Fluxo de Caixa */}
           <Card>
             <CardHeader>
-              <CardTitle>Fluxo de Caixa Diário</CardTitle>
+              <CardTitle>Evolução do Fluxo de Caixa Diário</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
