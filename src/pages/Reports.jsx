@@ -39,8 +39,8 @@ export default function Reports() {
   });
 
   const { data: stockEntries = [] } = useQuery({
-    queryKey: ['stockEntries', selectedCompanyId],
-    queryFn: () => base44.entities.StockEntry.filter({ company_id: selectedCompanyId }),
+    queryKey: ['stockEntries', filterCompanyId],
+    queryFn: () => base44.entities.StockEntry.filter(companyFilter),
     initialData: []
   });
 
