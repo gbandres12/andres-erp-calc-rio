@@ -28,6 +28,8 @@ export default function Reports() {
   });
   const [endDate, setEndDate] = useState(getTodayDate());
   const [selectedAccount, setSelectedAccount] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
   const companyFilter = useMemo(() => filterCompanyId === 'all' ? {} : { company_id: filterCompanyId }, [filterCompanyId]);
@@ -153,13 +155,38 @@ export default function Reports() {
     }
   };
 
-  // Filtros de Data
-  const filterByDate = (items, dateField) => {
+  // Filtros Avançados (Data, Texto, Categoria)
+  const filterData = (items, dateField) => {
     return items.filter(item => {
+        // Filtro de Data
         if (!item[dateField]) return false;
-        return item[dateField] >= startDate && item[dateField] <= endDate;
+        const dateMatch = item[dateField] >= startDate && item[dateField] <= endDate;
+        if (!dateMatch) return false;
+
+        // Filtro de Texto (Busca)
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            const matchesSearch = 
+                (item.description && item.description.toLowerCase().includes(term)) ||
+                (item.name && item.name.toLowerCase().includes(term)) || // Para produtos/outros
+                (item.notes && item.notes.toLowerCase().includes(term));
+            if (!matchesSearch) return false;
+        }
+
+        // Filtro de Categoria (apenas para transações que têm categoria)
+        if (selectedCategory !== 'all' && item.category) {
+            if (item.category !== selectedCategory) return false;
+        }
+
+        return true;
     });
   };
+
+  // Extrair categorias únicas para o filtro
+  const categories = useMemo(() => {
+    const cats = new Set(transactions.map(t => t.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [transactions]);
 
   // Cálculos Gerais
   const totalStockValue = stockEntries.reduce((sum, e) => sum + (e.quantity_available * e.unit_cost || 0), 0);
@@ -204,13 +231,13 @@ export default function Reports() {
 
   // Dados para DRE (Demonstração do Resultado do Exercício)
   const dreData = useMemo(() => {
-    const incomeByCategory = {};
-    const expenseByCategory = {};
-    
-    // Filtrar transações PAGAS no período selecionado
-    const filteredTransactions = filterByDate(transactions, 'payment_date').filter(t => t.status === 'pago');
+  const incomeByCategory = {};
+  const expenseByCategory = {};
 
-    filteredTransactions.forEach(t => {
+  // Filtrar transações PAGAS no período selecionado (usando novos filtros)
+  const filteredTransactions = filterData(transactions, 'payment_date').filter(t => t.status === 'pago');
+
+  filteredTransactions.forEach(t => {
       const cat = t.category || 'Sem Categoria';
       if (t.type === 'receita') {
         incomeByCategory[cat] = (incomeByCategory[cat] || 0) + t.paid_amount;
@@ -287,7 +314,7 @@ export default function Reports() {
 
   // Dados para Extrato Bancário
   const statementData = useMemo(() => {
-    let filtered = filterByDate(transactions, 'payment_date').filter(t => t.status === 'pago');
+    let filtered = filterData(transactions, 'payment_date').filter(t => t.status === 'pago');
     
     if (selectedAccount !== 'all') {
         filtered = filtered.filter(t => t.account_id === selectedAccount);
@@ -306,7 +333,7 @@ export default function Reports() {
   // Dados para Contas a Pagar/Receber
   const pendingData = useMemo(() => {
     // Filtra por data de VENCIMENTO
-    const filtered = filterByDate(transactions, 'due_date').filter(t => t.status !== 'pago');
+    const filtered = filterData(transactions, 'due_date').filter(t => t.status !== 'pago');
     
     const receivables = filtered.filter(t => t.type === 'receita');
     const payables = filtered.filter(t => t.type === 'despesa');
@@ -411,6 +438,33 @@ export default function Reports() {
                         Últimos 30 dias
                     </Button>
                 </div>
+
+                {/* Novos Filtros: Busca e Categoria */}
+                <div className="w-full flex gap-4 mt-2 border-t pt-4">
+                    <div className="flex-1 space-y-1">
+                        <Label>Buscar (Descrição, Obs)</Label>
+                        <Input 
+                            placeholder="Ex: Combustível, Manutenção..." 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-white"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <Label>Categoria</Label>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                            <SelectTrigger className="w-[200px] bg-white">
+                                <SelectValue placeholder="Todas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas as Categorias</SelectItem>
+                                {categories.map(cat => (
+                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
             </CardContent>
         </Card>
       </div>
@@ -427,7 +481,7 @@ export default function Reports() {
 
         <TabsContent value="costs">
           <CostsDashboard 
-            transactions={filterByDate(transactions, 'due_date')} 
+            transactions={filterData(transactions, 'due_date')} 
             companies={companies}
             startDate={startDate}
             endDate={endDate}
@@ -633,6 +687,43 @@ export default function Reports() {
           <div className="grid md:grid-cols-2 gap-6">
             <Card>
                 <CardHeader>
+                    <CardTitle>Média Diária (Entradas vs Saídas)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={[
+                                { 
+                                    name: 'Média Diária', 
+                                    Entrada: dailyAverageData.revenue, 
+                                    Saida: dailyAverageData.expense 
+                                }
+                            ]} barSize={60}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" />
+                                <YAxis tickFormatter={(val) => `R$${(val/1000).toFixed(0)}k`} />
+                                <Tooltip formatter={(value) => formatBRL(value)} cursor={{fill: 'transparent'}} />
+                                <Legend />
+                                <Bar dataKey="Entrada" fill="#10B981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Saida" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="mt-4 flex justify-around text-center">
+                         <div>
+                            <p className="text-sm text-slate-500">Média Receita</p>
+                            <p className="font-bold text-green-600">{formatBRL(dailyAverageData.revenue)}</p>
+                         </div>
+                         <div>
+                            <p className="text-sm text-slate-500">Média Despesa</p>
+                            <p className="font-bold text-red-600">{formatBRL(dailyAverageData.expense)}</p>
+                         </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
                     <CardTitle>Perfil de Dívida (A Pagar)</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -668,53 +759,6 @@ export default function Reports() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Médias Diárias (Período Selecionado)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-100">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-100 rounded-full">
-                                <ArrowUpCircle className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-green-900">Entrada Média Diária</p>
-                                <p className="text-xs text-green-600">Baseado em {dailyAverageData.days} dias</p>
-                            </div>
-                        </div>
-                        <span className="text-xl font-bold text-green-700">{formatBRL(dailyAverageData.revenue)}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-red-100 rounded-full">
-                                <ArrowDownCircle className="w-5 h-5 text-red-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-red-900">Saída Média Diária</p>
-                                <p className="text-xs text-red-600">Baseado em {dailyAverageData.days} dias</p>
-                            </div>
-                        </div>
-                        <span className="text-xl font-bold text-red-700">{formatBRL(dailyAverageData.expense)}</span>
-                    </div>
-
-                    <div className={`flex items-center justify-between p-4 rounded-lg border ${dailyAverageData.balance >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'}`}>
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${dailyAverageData.balance >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
-                                <TrendingUp className={`w-5 h-5 ${dailyAverageData.balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
-                            </div>
-                            <div>
-                                <p className={`text-sm font-medium ${dailyAverageData.balance >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>Saldo Médio Diário</p>
-                                <p className={`text-xs ${dailyAverageData.balance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>Resultado operacional médio</p>
-                            </div>
-                        </div>
-                        <span className={`text-xl font-bold ${dailyAverageData.balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
-                            {formatBRL(dailyAverageData.balance)}
-                        </span>
-                    </div>
-                </CardContent>
-            </Card>
           </div>
 
           {/* Fluxo de Caixa */}
