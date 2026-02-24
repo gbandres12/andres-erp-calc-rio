@@ -168,7 +168,7 @@ export default function Weighing() {
   const readScale = () => {
     if (isScaleActive) {
       setCurrentWeight(liveWeight);
-      toast.success(`Peso atualizado: ${liveWeight.toLocaleString()} kg`);
+      toast.success(`Peso atualizado: ${(liveWeight / 1000).toLocaleString()} ton`);
     } else {
       toast.error("Balança desconectada ou sem dados recentes.");
     }
@@ -224,7 +224,7 @@ export default function Weighing() {
                       <span className="text-sm">{isConnected ? 'Balança Online (Ao Vivo)' : 'Balança Offline'}</span>
                     </div>
                     <div className="text-6xl font-bold font-mono">
-                      {currentWeight.toLocaleString()} kg
+                      {(currentWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
                     </div>
                   </div>
                   <div className="flex gap-3 justify-center">
@@ -333,21 +333,25 @@ export default function Weighing() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Tara (KG) *</Label>
+                  <Label>Tara (Ton) *</Label>
                   <Input
                     type="number"
+                    step="0.001"
                     required
-                    value={formData.tare}
-                    onChange={(e) => setFormData({ ...formData, tare: parseFloat(e.target.value) || 0 })}
+                    value={formData.tare > 0 ? formData.tare / 1000 : ''}
+                    onChange={(e) => setFormData({ ...formData, tare: (parseFloat(e.target.value) || 0) * 1000 })}
+                    placeholder="0.000"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Peso Bruto (KG) *</Label>
+                  <Label>Peso Bruto (Ton) *</Label>
                   <Input
                     type="number"
+                    step="0.001"
                     required
-                    value={formData.gross}
-                    onChange={(e) => setFormData({ ...formData, gross: parseFloat(e.target.value) || 0 })}
+                    value={formData.gross > 0 ? formData.gross / 1000 : ''}
+                    onChange={(e) => setFormData({ ...formData, gross: (parseFloat(e.target.value) || 0) * 1000 })}
+                    placeholder="0.000"
                   />
                 </div>
                 <div className="space-y-2">
@@ -468,15 +472,15 @@ export default function Weighing() {
                   <CardContent className="pt-6">
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
-                            <p className="text-sm text-slate-600 mb-1">Peso Líquido (KG)</p>
-                            <p className="text-3xl font-bold text-blue-600">
-                                {(formData.gross - formData.tare).toLocaleString()} kg
+                            <p className="text-sm text-slate-600 mb-1">Peso Líquido</p>
+                            <p className="text-3xl font-bold text-green-600">
+                                {((formData.gross - formData.tare) / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
                             </p>
                         </div>
                         <div>
-                            <p className="text-sm text-slate-600 mb-1">Peso em Toneladas</p>
-                            <p className="text-3xl font-bold text-green-600">
-                                {((formData.gross - formData.tare) / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
+                            <p className="text-sm text-slate-600 mb-1">Em KG</p>
+                            <p className="text-3xl font-bold text-slate-400">
+                                {(formData.gross - formData.tare).toLocaleString()} kg
                             </p>
                         </div>
                     </div>
@@ -598,16 +602,16 @@ export default function Weighing() {
                     <div className="flex items-center gap-4 mb-2">
                       <div>
                         <p className="text-xs text-slate-500">Tara</p>
-                        <p className="font-semibold">{weighing.tare?.toLocaleString()} kg</p>
+                        <p className="font-semibold">{(weighing.tare / 1000).toFixed(3)} ton</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Bruto</p>
-                        <p className="font-semibold">{weighing.gross?.toLocaleString()} kg</p>
+                        <p className="font-semibold">{(weighing.gross / 1000).toFixed(3)} ton</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Líquido</p>
                         <p className="text-lg font-bold text-blue-600">
-                            {weighing.net_ton ? `${weighing.net_ton.toFixed(3)} ton` : `${weighing.net?.toLocaleString()} kg`}
+                            {weighing.net_ton ? `${weighing.net_ton.toFixed(3)} ton` : `${(weighing.net / 1000).toFixed(3)} ton`}
                         </p>
                       </div>
                     </div>
