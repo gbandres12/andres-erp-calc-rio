@@ -77,6 +77,12 @@ export default function Weighing() {
     initialData: []
   });
 
+  const { data: sales = [] } = useQuery({
+    queryKey: ['sales', selectedCompanyId],
+    queryFn: () => base44.entities.Sale.filter({ company_id: selectedCompanyId, status: { $in: ['concluida', 'faturada'] } }, '-created_date', 50),
+    initialData: []
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const lastWeighing = await base44.entities.Weighing.list('-reference', 1);
@@ -84,8 +90,8 @@ export default function Weighing() {
       const nextNumber = parseInt(lastRef.replace('VG', '')) + 1;
       const newRef = `VG${String(nextNumber).padStart(6, '0')}`;
       
-      // Gera número de ticket único para cada pesagem
-      const ticket = `TCK-${Date.now().toString().slice(-6)}`;
+      // Gera número de ticket único se não informado
+      const ticket = data.ticket_number || `TCK-${Date.now().toString().slice(-6)}`;
       
       const net = data.gross - data.tare;
       const netTon = net / 1000; // Converte para toneladas
@@ -133,19 +139,21 @@ export default function Weighing() {
 
   const resetForm = () => {
     setFormData({
-      vehicle_id: "avulso",
-      vehicle_plate: "",
-      driver_name: "",
-      product: "",
-      origin: "",
-      destination: "",
-      tare: 0,
-      gross: 0,
-      operator: "",
-      client_id: "",
-      notes: "",
-      purpose: "saida_venda",
-      ticket_number: ""
+    vehicle_id: "avulso",
+    vehicle_plate: "",
+    driver_name: "",
+    product: "",
+    origin: "",
+    destination: "",
+    tare: 0,
+    gross: 0,
+    operator: "",
+    client_id: "",
+    sale_id: "", // Novo campo
+    barge_name: "", // Novo campo
+    notes: "",
+    purpose: "saida_venda",
+    ticket_number: ""
     });
     setSearchTerm("");
   };
@@ -382,6 +390,50 @@ export default function Weighing() {
                       </Select>
                   </div>
                 </div>
+
+                {formData.purpose === 'saida_venda' && (
+                    <div className="space-y-2">
+                        <Label>Vincular Venda (Opcional)</Label>
+                        <Select
+                            value={formData.sale_id}
+                            onValueChange={(value) => setFormData({ ...formData, sale_id: value })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione a venda..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {sales
+                                    .filter(s => !formData.client_id || s.client_id === formData.client_id)
+                                    .map((sale) => (
+                                    <SelectItem key={sale.id} value={sale.id}>
+                                        {sale.reference} - {sale.client_name} ({new Date(sale.sale_date).toLocaleDateString()})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
+                {formData.purpose === 'entrada_estoque' && (
+                    <div className="space-y-2">
+                        <Label>Nome da Balsa</Label>
+                        <Input 
+                            value={formData.barge_name}
+                            onChange={(e) => setFormData({ ...formData, barge_name: e.target.value })}
+                            placeholder="Ex: Balsa Rio Negro"
+                        />
+                    </div>
+                )}
+
+                <div className="space-y-2">
+                    <Label>Nº Ticket (Físico/Controle)</Label>
+                    <Input 
+                        value={formData.ticket_number}
+                        onChange={(e) => setFormData({ ...formData, ticket_number: e.target.value })}
+                        placeholder="Gerado automaticamente se vazio"
+                    />
+                </div>
+
                 <div className="col-span-2 space-y-2">
                   <Label>Observações</Label>
                   <Textarea
@@ -444,10 +496,10 @@ export default function Weighing() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {weighings.reduce((sum, w) => sum + (w.net || 0), 0).toLocaleString()} kg
+            {(weighings.reduce((sum, w) => sum + (w.net || 0), 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
             </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+            </Card>
 
         <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
           <CardHeader className="pb-2">
@@ -503,6 +555,16 @@ export default function Weighing() {
                         {weighing.ticket_number && (
                             <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600">
                                 🎫 {weighing.ticket_number}
+                            </Badge>
+                        )}
+                        {weighing.sale_id && (
+                            <Badge variant="outline" className="ml-2 border-blue-200 text-blue-700">
+                                🛒 Venda Vinculada
+                            </Badge>
+                        )}
+                        {weighing.barge_name && (
+                            <Badge variant="outline" className="ml-2 border-cyan-200 text-cyan-700">
+                                🚢 {weighing.barge_name}
                             </Badge>
                         )}
                       </div>
