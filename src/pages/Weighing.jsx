@@ -35,6 +35,7 @@ export default function Weighing() {
   });
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [saleSearchTerm, setSaleSearchTerm] = useState("");
 
   const { data: scaleState } = useQuery({
     queryKey: ['scaleState', selectedCompanyId],
@@ -393,24 +394,41 @@ export default function Weighing() {
 
                 {formData.purpose === 'saida_venda' && (
                     <div className="space-y-2">
-                        <Label>Vincular Venda (Opcional)</Label>
-                        <Select
-                            value={formData.sale_id}
-                            onValueChange={(value) => setFormData({ ...formData, sale_id: value })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione a venda..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {sales
-                                    .filter(s => !formData.client_id || s.client_id === formData.client_id)
-                                    .map((sale) => (
-                                    <SelectItem key={sale.id} value={sale.id}>
-                                        {sale.reference} - {sale.client_name} ({new Date(sale.sale_date).toLocaleDateString()})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Label>Vincular Venda (Pesquisar)</Label>
+                        <div className="relative">
+                            <Input 
+                                placeholder="Buscar nº venda ou cliente..." 
+                                value={saleSearchTerm}
+                                onChange={(e) => setSaleSearchTerm(e.target.value)}
+                                className="mb-2"
+                            />
+                            <Select
+                                value={formData.sale_id}
+                                onValueChange={(value) => {
+                                    const s = sales.find(sale => sale.id === value);
+                                    setFormData({ ...formData, sale_id: value });
+                                    if(s) setSaleSearchTerm(`${s.reference} - ${s.client_name}`);
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione a venda..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {sales
+                                        .filter(s => !formData.client_id || s.client_id === formData.client_id)
+                                        .filter(s => 
+                                            s.reference.toLowerCase().includes(saleSearchTerm.toLowerCase()) || 
+                                            s.client_name?.toLowerCase().includes(saleSearchTerm.toLowerCase())
+                                        )
+                                        .slice(0, 50)
+                                        .map((sale) => (
+                                        <SelectItem key={sale.id} value={sale.id}>
+                                            {sale.reference} - {sale.client_name} ({new Date(sale.sale_date).toLocaleDateString()})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 )}
 
