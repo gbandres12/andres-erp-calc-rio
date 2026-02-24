@@ -696,13 +696,14 @@ export default function Transactions() {
         }
     }
     
-    // Pesquisa por descrição ou contato
+    // Pesquisa por descrição, contato, categoria ou observação
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       const matchDescription = t.description?.toLowerCase().includes(search);
       const matchContact = t.contact_name?.toLowerCase().includes(search);
       const matchCategory = t.category?.toLowerCase().includes(search);
-      if (!matchDescription && !matchContact && !matchCategory) return false;
+      const matchNotes = t.notes?.toLowerCase().includes(search);
+      if (!matchDescription && !matchContact && !matchCategory && !matchNotes) return false;
     }
     
     return true;
@@ -746,6 +747,36 @@ export default function Transactions() {
   const pendingPayables = transactions
     .filter(t => t.type === 'despesa' && t.status !== 'pago')
     .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
+
+  // Calcular Saldo Líquido (Receitas Pagas - Despesas Pagas)
+  const saldoLiquido = totalReceita - totalDespesa;
+
+  // Calcular Médias Diárias (baseado nos filtrados)
+  const dailyAverages = React.useMemo(() => {
+    if (filteredTransactions.length === 0) return { receita: 0, despesa: 0, days: 0 };
+    
+    // Encontrar range de datas dos filtrados
+    const dates = filteredTransactions
+        .map(t => t.payment_date || t.due_date)
+        .filter(Boolean)
+        .map(d => new Date(d).getTime());
+    
+    if (dates.length === 0) return { receita: 0, despesa: 0, days: 0 };
+
+    const minDate = Math.min(...dates);
+    const maxDate = Math.max(...dates);
+    const diffTime = Math.abs(maxDate - minDate);
+    const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    const totalRev = filteredTransactions.filter(t => t.type === 'receita').reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+    const totalExp = filteredTransactions.filter(t => t.type === 'despesa').reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+
+    return {
+        receita: totalRev / diffDays,
+        despesa: totalExp / diffDays,
+        days: diffDays
+    };
+  }, [filteredTransactions]);
 
   const statusColors = {
     pendente: "bg-yellow-100 text-yellow-800",
@@ -1627,6 +1658,19 @@ export default function Transactions() {
           </CardContent>
         </Card>
 
+        <Card className="bg-white border-slate-200 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Saldo Líquido</CardTitle>
+            <DollarSign className={`h-5 w-5 ${saldoLiquido >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatBRL(saldoLiquido)}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Receitas - Despesas</p>
+          </CardContent>
+        </Card>
+
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-blue-100">A Receber</CardTitle>
@@ -1648,30 +1692,62 @@ export default function Transactions() {
         </Card>
       </div>
 
-      {/* Gráfico de Movimentação Diária */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Movimentação de Caixa Diária</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyCashFlow}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="formattedDate" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value) => formatBRL(value)}
-                  contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                />
-                <Legend />
-                <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Gráfico e Médias */}
+      <div className="grid lg:grid-cols-3 gap-6 mb-8">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Movimentação de Caixa Diária</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyCashFlow}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="formattedDate" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => formatBRL(value)}
+                      contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+                <CardTitle>Médias Diárias (Filtrado)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-100">
+                    <div>
+                        <p className="text-sm text-green-900 font-medium">Entrada Média</p>
+                        <p className="text-xs text-green-600">Base: {dailyAverages.days} dias</p>
+                    </div>
+                    <span className="text-lg font-bold text-green-700">{formatBRL(dailyAverages.receita)}</span>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
+                    <div>
+                        <p className="text-sm text-red-900 font-medium">Saída Média</p>
+                        <p className="text-xs text-red-600">Base: {dailyAverages.days} dias</p>
+                    </div>
+                    <span className="text-lg font-bold text-red-700">{formatBRL(dailyAverages.despesa)}</span>
+                </div>
+
+                <div className="pt-4 border-t">
+                    <p className="text-sm text-slate-500 mb-2 text-center">Saldo Diário Médio</p>
+                    <div className={`text-2xl font-bold text-center ${dailyAverages.receita - dailyAverages.despesa >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                        {formatBRL(dailyAverages.receita - dailyAverages.despesa)}
+                    </div>
+                </div>
+            </CardContent>
+          </Card>
+      </div>
 
       {/* Filtros */}
       <Card className="mb-6">
@@ -1739,6 +1815,21 @@ export default function Transactions() {
                   className="w-auto"
                 />
               </div>
+            )}
+
+            {(searchTerm || filterType !== 'all' || filterStatus !== 'all' || dateFilter !== 'all') && (
+                <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                        setSearchTerm('');
+                        setFilterType('all');
+                        setFilterStatus('all');
+                        setDateFilter('all');
+                    }}
+                    className="ml-auto text-slate-500 hover:text-red-600"
+                >
+                    Limpar Filtros
+                </Button>
             )}
           </div>
         </CardContent>
