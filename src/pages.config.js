@@ -74,6 +74,7 @@ import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
+import SalesForecast from './pages/SalesForecast';
 import __Layout from './Layout.jsx';
 
 
@@ -105,6 +106,7 @@ export const PAGES = {
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
+    "SalesForecast": SalesForecast,
 }
 
 export const pagesConfig = {
