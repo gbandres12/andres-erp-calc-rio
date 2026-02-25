@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
 
             console.error(`[GEMINI] Sending ${mimeType} to Gemini 1.5 Flash...`);
             const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
 
             const result = await geminiModel.generateContent([
                 { inlineData: { mimeType, data: base64Data } },
@@ -245,7 +245,7 @@ ESTRUTURA JSON (retorne APENAS o JSON, sem markdown):
     let response;
     try {
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
 
         const chatHistory = [
             { role: "user", parts: [{ text: systemPrompt }] },
