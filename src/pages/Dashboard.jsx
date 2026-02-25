@@ -249,7 +249,9 @@ export default function Dashboard() {
       pendingReceivables,
       pendingPayables,
       clientsCount,
-      suppliersCount
+      suppliersCount,
+      britaStock,
+      poTons,
     };
   }, [stockEntries, products, allPaidTransactions, contacts, pendingTransactions]);
 
