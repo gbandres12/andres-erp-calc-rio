@@ -490,6 +490,8 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
+          <FinancialOverview transactions={transactions} />
+
           {/* KPIs Principais */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
