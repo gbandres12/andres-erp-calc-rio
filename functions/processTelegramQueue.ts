@@ -103,8 +103,25 @@ Deno.serve(async (req) => {
                 else mimeType = "image/jpeg";
             }
             const prompt = isVoice
-                ? "Transcreva este áudio para texto em português. Responda APENAS com o texto transcrito, sem prefixos. Se inaudível, responda '[Áudio inaudível]'."
-                : "Descreva esta imagem em português. Se for comprovante/nota fiscal, extraia: valor, data, fornecedor e descrição. Se for outra coisa, descreva o que vê em contexto financeiro empresarial.";
+                ? `Você é um assistente financeiro especializado. Transcreva este áudio de voz em português brasileiro com precisão máxima.
+REGRAS:
+- Responda SOMENTE com o texto transcrito, sem introduções, sem prefixos como "O usuário disse:" ou "Transcrição:".
+- Mantenha números, valores monetários (R$), datas e nomes exatamente como falados.
+- Se houver ruído mas for possível entender parcialmente, transcreva o que entendeu.
+- Se completamente inaudível, responda exatamente: [Áudio inaudível]`
+                : `Você é um especialista em análise de documentos financeiros. Analise esta imagem com atenção.
+
+Se for COMPROVANTE, NOTA FISCAL, BOLETO, PIX ou RECIBO, extraia estruturadamente:
+- 💰 Valor: R$ [valor exato]
+- 📅 Data: [data no formato DD/MM/AAAA]
+- 🏢 Emitente/Fornecedor: [nome]
+- 📋 Descrição: [o que é cobrado]
+- 🔢 Número do documento: [se visível]
+- 💳 Forma de pagamento: [se identificável]
+
+Se for outro tipo de imagem (produto, local, pessoa, etc.), descreva o que vê em no máximo 2 linhas com foco em relevância financeira ou operacional.
+
+Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem.`;
 
             console.error(`[MEDIA] Enviando mimeType=${mimeType} size=${bytes.byteLength} para Gemini ${MODEL_NAME}...`);
             const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
