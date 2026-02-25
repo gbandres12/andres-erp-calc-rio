@@ -344,7 +344,7 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
                     payment_date: ed.is_paid ? today : null,
                     account_id: acct?.id || null, company_id: cid, notes: "Via TelegramBot"
                 });
-                finalReply = `💸 *${ed.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!*\n📝 ${ed.description}\n💲 R$ ${Number(ed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n📅 ${ed.is_paid ? '✅ Pago' : '🟡 Pendente'}`;
+                finalReply = `✅ *${ed.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!*\n📝 ${ed.description}\n💲 *R$ ${Number(ed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n📁 Categoria: ${ed.category || 'Geral'}\n📅 Venc: ${dueDate.split('-').reverse().join('/')}\n${ed.is_paid ? '✅ *Pago*' : '🟡 Pendente'}`;
             }
             else if (action === "pay_bill") {
                 const pd = response.payment_data;
