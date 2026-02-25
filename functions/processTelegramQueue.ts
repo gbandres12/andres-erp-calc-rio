@@ -209,19 +209,22 @@ JSON OBRIGATÓRIO:
     // Chamar Gemini LLM
     let response;
     try {
-        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const llmModel = genAI.getGenerativeModel({ model: MODEL_NAME });
-        console.error(`[LLM] Iniciando chat Gemini ${MODEL_NAME}. history=${history.length}`);
+        const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+        console.error(`[LLM] Chamando Gemini ${MODEL_NAME}. history=${history.length}`);
 
-        const chatHistory = [
+        const historyMessages = [
             { role: "user", parts: [{ text: systemPrompt }] },
             { role: "model", parts: [{ text: '{"action":"reply","reply_text":"Pronto. Sou o Agente Financeiro Executivo.","target_company_id":null}' }] },
-            ...history.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }))
+            ...history.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
+            { role: "user", parts: [{ text: user_text }] }
         ];
 
-        const chat = llmModel.startChat({ history: chatHistory, generationConfig: { responseMimeType: "application/json" } });
-        const result = await chat.sendMessage(user_text);
-        const content = result.response.text();
+        const result = await genAI.models.generateContent({
+            model: MODEL_NAME,
+            contents: historyMessages,
+            config: { responseMimeType: "application/json" }
+        });
+        const content = result.text;
         console.error(`[LLM] Resposta raw: "${content?.slice(0, 300)}"`);
         if (!content) throw new Error("Gemini resposta vazia");
         response = JSON.parse(content);
