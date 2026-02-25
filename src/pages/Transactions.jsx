@@ -74,28 +74,7 @@ export default function Transactions() {
     notes: ""
   });
 
-  const defaultCategories = [
-    "Combustível",
-    "Manutenção Veículos",
-    "Peças",
-    "Salários",
-    "Alimentação",
-    "Serviços Terceiros",
-    "Impostos",
-    "Aluguel",
-    "Energia Elétrica",
-    "Água/Esgoto",
-    "Internet/Telefone",
-    "Material de Escritório",
-    "Material de Construção",
-    "EPIs",
-    "Marketing",
-    "Vendas",
-    "Distribuição entre Filiais",
-    "Empréstimo entre Filiais",
-    "Pró-labore",
-    "Outros"
-  ];
+  const defaultCategories = formData.type === 'receita' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   const [formData, setFormData] = useState({
   description: "",
