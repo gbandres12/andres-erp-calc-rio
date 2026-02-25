@@ -66,6 +66,7 @@ import Reports from './pages/Reports';
 import Requisitions from './pages/Requisitions';
 import SaleWithdrawals from './pages/SaleWithdrawals';
 import Sales from './pages/Sales';
+import SalesForecast from './pages/SalesForecast';
 import Settings from './pages/Settings';
 import SupplierQuotes from './pages/SupplierQuotes';
 import Transactions from './pages/Transactions';
@@ -74,7 +75,6 @@ import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
-import SalesForecast from './pages/SalesForecast';
 import __Layout from './Layout.jsx';
 
 
@@ -98,6 +98,7 @@ export const PAGES = {
     "Requisitions": Requisitions,
     "SaleWithdrawals": SaleWithdrawals,
     "Sales": Sales,
+    "SalesForecast": SalesForecast,
     "Settings": Settings,
     "SupplierQuotes": SupplierQuotes,
     "Transactions": Transactions,
@@ -106,7 +107,6 @@ export const PAGES = {
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
-    "SalesForecast": SalesForecast,
 }
 
 export const pagesConfig = {
