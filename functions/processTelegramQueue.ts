@@ -96,13 +96,12 @@ Deno.serve(async (req) => {
                 : "Descreva esta imagem em português. Se for comprovante/nota fiscal, extraia: valor, data, fornecedor e descrição. Se for outra coisa, descreva o que vê em contexto financeiro empresarial.";
 
             console.error(`[MEDIA] Enviando ${mimeType} para Gemini ${MODEL_NAME}...`);
-            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const mediaModel = genAI.getGenerativeModel({ model: MODEL_NAME });
-            const result = await mediaModel.generateContent([
-                { inlineData: { mimeType, data: base64Data } },
-                prompt
-            ]);
-            const processedText = result.response.text();
+            const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+            const result = await genAI.models.generateContent({
+                model: MODEL_NAME,
+                contents: [{ parts: [{ inlineData: { mimeType, data: base64Data } }, { text: prompt }] }]
+            });
+            const processedText = result.text;
             console.error(`[MEDIA] Resposta Gemini: "${processedText?.slice(0, 200)}"`);
             if (!processedText) throw new Error("Gemini retornou resposta vazia");
 
