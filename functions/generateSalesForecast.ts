@@ -103,25 +103,17 @@ export async function generateSalesForecast(req) {
         }
         `;
 
-        // 5. Call LLM
-        const apiKey = Deno.env.get("OPENROUTER_API_KEY") || Deno.env.get("OPENAI_API_KEY");
-        const baseURL = Deno.env.get("OPENROUTER_API_KEY") ? "https://openrouter.ai/api/v1" : undefined;
+        // 5. Call LLM (Gemini - sem custo de OpenRouter)
+        const geminiKey = Deno.env.get("GEMINI_API_KEY");
+        const genAI = new GoogleGenAI({ apiKey: geminiKey });
 
-        const openai = new OpenAI({
-            apiKey: apiKey,
-            baseURL: baseURL
+        const result = await genAI.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ parts: [{ text: systemPrompt + "\n\nDADOS:\n" + JSON.stringify(contextData) }] }],
+            config: { responseMimeType: "application/json" }
         });
 
-        const completion = await openai.chat.completions.create({
-            model: "deepseek/deepseek-chat", // or gpt-4o
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: JSON.stringify(contextData) }
-            ],
-            response_format: { type: "json_object" }
-        });
-
-        const forecast = JSON.parse(completion.choices[0].message.content);
+        const forecast = JSON.parse(result.text);
 
         return Response.json({
             ...forecast,
