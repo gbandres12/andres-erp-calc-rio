@@ -1,10 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
-import OpenAI from 'npm:openai';
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.1.0';
 
 export async function processTelegramQueue(req) {
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
-    const OPENAI_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || Deno.env.get("OPENAI_API_KEY");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     if (!BOT_Token) {
         console.error("[Queue] Missing TELEGRAM_BOT_TOKEN");

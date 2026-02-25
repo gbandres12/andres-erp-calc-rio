@@ -19,6 +19,7 @@ export async function telegramWebhook(req) {
         const msg = body.message;
         let userText = msg.text;
         let voiceFileId = null;
+        let photoFileId = null;
         let mediaType = "text";
 
         // Detectar tipo de mensagem
@@ -26,8 +27,14 @@ export async function telegramWebhook(req) {
             userText = "[Audio Message]";
             voiceFileId = msg.voice.file_id;
             mediaType = "voice";
+        } else if (msg.photo && msg.photo.length > 0) {
+            userText = msg.caption || "[Photo Message]";
+            // Pegar a maior foto (última do array)
+            const photo = msg.photo[msg.photo.length - 1];
+            photoFileId = photo.file_id;
+            mediaType = "photo";
         } else if (!msg.text) {
-             // Ignorar se não for texto nem voz
+             // Ignorar se não for texto, voz ou foto
              return Response.json({ status: "ignored" });
         }
         
@@ -41,6 +48,7 @@ export async function telegramWebhook(req) {
             chat_id: String(msg.chat.id),
             user_text: userText,
             voice_file_id: voiceFileId,
+            photo_file_id: photoFileId,
             media_type: mediaType,
             username: msg.from.first_name || "User",
             message_id: String(msg.message_id),
