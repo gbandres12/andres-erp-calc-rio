@@ -150,36 +150,56 @@ export async function processTelegramQueue(req) {
         let hasLateItems = false;
         
         if (currentCompanyId) {
-            // Buscar pendências e atrasados
-            const [pendingExpenses, pendingRevenues, lateExpenses, lateRevenues] = await Promise.all([
-                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'pendente' }, 'due_date', 5),
-                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'pendente' }, 'due_date', 5),
-                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'atrasado' }, 'due_date', 5),
-                 base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'atrasado' }, 'due_date', 5)
+            // BUSCA ABRANGENTE PARA O CONTEXTO DO AGENTE
+            // Buscar totais macro para dar contexto real do módulo
+            const [
+                totalPayablePending, 
+                totalPayableLate,
+                totalReceivablePending,
+                totalReceivableLate
+            ] = await Promise.all([
+                base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'pendente' }),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'atrasado' }),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'pendente' }),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'atrasado' })
             ]);
 
-            if (lateExpenses.length > 0 || lateRevenues.length > 0) hasLateItems = true;
+            const sumPayablePending = totalPayablePending.reduce((sum, t) => sum + t.amount, 0);
+            const sumPayableLate = totalPayableLate.reduce((sum, t) => sum + t.amount, 0);
+            const sumReceivablePending = totalReceivablePending.reduce((sum, t) => sum + t.amount, 0);
+            const sumReceivableLate = totalReceivableLate.reduce((sum, t) => sum + t.amount, 0);
+
+            // Amostra de itens (limitado para não estourar contexto, mas focado nos maiores valores)
+            // Ordenar por valor decrescente para mostrar os mais importantes
+            const topLateExpenses = totalPayableLate.sort((a,b) => b.amount - a.amount).slice(0, 5);
+            const topPendingExpenses = totalPayablePending.sort((a,b) => a.due_date.localeCompare(b.due_date)).slice(0, 5); // Próximos a vencer
+            
+            if (totalPayableLate.length > 0 || totalReceivableLate.length > 0) hasLateItems = true;
 
             const companyAccounts = accounts.filter(a => a.company_id === currentCompanyId);
             const totalBalance = companyAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
             
-            const formatTx = (t) => `- ${t.description} (R$ ${t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}) Venc: ${t.due_date.split('-').reverse().join('/')}`;
+            const formatTx = (t) => `- ${t.description} | ${t.contact_name || 'Fornecedor ñ ident.'} | R$ ${t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})} | Venc: ${t.due_date.split('-').reverse().join('/')}`;
             
             financialContext = `
-            📊 DADOS FINANCEIROS ATUAIS (${currentCompanyName}):
-            💰 Saldo Total em Contas: R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+            📊 RESUMO GERAL DA FILIAL (${currentCompanyName}):
             
-            🔴 A PAGAR (ATRASADOS - URGENTE):
-            ${lateExpenses.length ? lateExpenses.map(formatTx).join("\n") : "(Nenhum atraso)"}
+            💰 SALDO EM CAIXA/BANCOS: R$ ${totalBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+
+            🔴 CONTAS A PAGAR (VISÃO MACRO):
+               - TOTAL ATRASADO: R$ ${sumPayableLate.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${totalPayableLate.length} contas)
+               - TOTAL A VENCER: R$ ${sumPayablePending.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${totalPayablePending.length} contas)
+               = TOTAL GERAL DÍVIDA: R$ ${(sumPayableLate + sumPayablePending).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+
+            🟢 CONTAS A RECEBER (VISÃO MACRO):
+               - TOTAL ATRASADO: R$ ${sumReceivableLate.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+               - TOTAL A VENCER: R$ ${sumReceivablePending.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
             
-            🔴 A PAGAR (PRÓXIMOS):
-            ${pendingExpenses.length ? pendingExpenses.map(formatTx).join("\n") : "(Nenhuma pendência próxima)"}
+            ⚠️ PRINCIPAIS CONTAS ATRASADAS (TOP 5 VALORES):
+            ${topLateExpenses.length ? topLateExpenses.map(formatTx).join("\n") : "(Nenhum atraso)"}
             
-            🟢 A RECEBER (ATRASADOS - COBRAR):
-            ${lateRevenues.length ? lateRevenues.map(formatTx).join("\n") : "(Nenhum atraso)"}
-            
-            🟢 A RECEBER (PRÓXIMOS):
-            ${pendingRevenues.length ? pendingRevenues.map(formatTx).join("\n") : "(Nenhuma pendência próxima)"}
+            📅 PRÓXIMAS CONTAS A VENCER (TOP 5):
+            ${topPendingExpenses.length ? topPendingExpenses.map(formatTx).join("\n") : "(Nenhuma pendência próxima)"}
             `;
         }
 
