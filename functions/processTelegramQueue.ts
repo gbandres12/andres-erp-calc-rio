@@ -171,7 +171,7 @@ Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem
     if (!session) {
         session = await base44.asServiceRole.entities.TelegramChatSession.create({ chat_id, history: [] });
     }
-    let history = (session.history || []).slice(-10);
+    let history = (session.history || []).slice(-20);
 
     const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
     const accounts = await base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true });
