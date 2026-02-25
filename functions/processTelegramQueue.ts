@@ -425,9 +425,10 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
         }
     }
 
-    // Salvar histórico e cleanup
+    // Salvar histórico (manter até 20 mensagens = 10 trocas)
     history.push({ role: "user", content: user_text });
     history.push({ role: "assistant", content: finalReply });
+    if (history.length > 20) history = history.slice(-20);
 
     await Promise.all([
         base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history }),
