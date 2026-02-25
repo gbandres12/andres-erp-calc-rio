@@ -124,27 +124,38 @@ Se for outro tipo de imagem (produto, local, pessoa, etc.), descreva o que vê e
 
 Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem.`;
 
-            console.error(`[MEDIA] Enviando mimeType=${mimeType} size=${bytes.byteLength} para Gemini ${MODEL_NAME}...`);
+            console.error(`[MEDIA] Enviando para Gemini: model=${MODEL_NAME} mimeType=${mimeType} size=${bytes.byteLength} base64len=${base64Data.length}`);
             const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-            const result = await genAI.models.generateContent({
-                model: MODEL_NAME,
-                contents: [{ parts: [{ inlineData: { mimeType, data: base64Data } }, { text: prompt }] }]
-            });
-            console.error(`[MEDIA] Gemini raw result keys: ${Object.keys(result || {}).join(',')}`);
-            let processedText = result.text;
-            console.error(`[MEDIA] Resposta Gemini (1ª tentativa): "${processedText?.slice(0, 200)}"`);
 
-            // Se vazio/erro em voz, tentar com audio/webm (Opus embutido em WebM)
-            if (!processedText && isVoice) {
-                console.error(`[MEDIA] Tentando com audio/webm...`);
-                const result2 = await genAI.models.generateContent({
-                    model: MODEL_NAME,
-                    contents: [{ parts: [{ inlineData: { mimeType: "audio/webm", data: base64Data } }, { text: prompt }] }]
-                });
-                processedText = result2.text;
-                console.error(`[MEDIA] Resposta Gemini (2ª tentativa audio/webm): "${processedText?.slice(0, 200)}"`);
+            let processedText = null;
+            const mimesToTry = isVoice
+                ? ["audio/ogg", "audio/ogg; codecs=opus", "audio/webm", "audio/webm; codecs=opus", "audio/mpeg"]
+                : [mimeType];
+
+            for (const tryMime of mimesToTry) {
+                console.error(`[MEDIA] Tentando mimeType="${tryMime}"...`);
+                try {
+                    const result = await genAI.models.generateContent({
+                        model: MODEL_NAME,
+                        contents: [{ parts: [{ inlineData: { mimeType: tryMime, data: base64Data } }, { text: prompt }] }]
+                    });
+                    console.error(`[MEDIA] Gemini result keys: ${Object.keys(result || {}).join(',')}`);
+                    const txt = result?.text;
+                    console.error(`[MEDIA] Resposta com "${tryMime}": "${txt?.slice(0, 300)}"`);
+                    if (txt && txt.trim() && !txt.includes("[Áudio inaudível]")) {
+                        processedText = txt;
+                        console.error(`[MEDIA] Sucesso com mimeType="${tryMime}"`);
+                        break;
+                    } else if (txt) {
+                        // guardamos como fallback mas continuamos tentando
+                        processedText = processedText || txt;
+                    }
+                } catch (mimeErr) {
+                    console.error(`[MEDIA] Erro com "${tryMime}": ${mimeErr.message}`);
+                }
             }
-            if (!processedText) throw new Error("Gemini retornou resposta vazia para o áudio. O arquivo pode estar corrompido ou o formato não é suportado.");
+
+            if (!processedText) throw new Error(`Gemini não conseguiu transcrever o áudio. file_path=${fileData.result.file_path} size=${bytes.byteLength} mimesTried=${mimesToTry.join(',')}`);
 
             // 5. Atualizar user_text para o LLM principal
             if (isVoice) {
