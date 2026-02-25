@@ -80,15 +80,17 @@ export async function processTelegramQueue(req) {
                 // 2. Processar com Gemini
                 const mimeType = media_type === "voice" ? "audio/ogg" : "image/jpeg";
                 const prompt = media_type === "voice" 
-                    ? "Transcreva este áudio para texto em português. Responda APENAS com o texto transcrito."
+                    ? "Transcreva este áudio para texto em português. Responda APENAS com o texto transcrito. Se não houver fala clara, responda ' [Áudio inaudível] '."
                     : "Descreva esta imagem para um contexto financeiro. Se for um comprovante ou nota fiscal, extraia valor, data e descrição. Se for outra coisa, descreva o que vê.";
 
+                console.log(`[Gemini Media] Enviando ${mimeType} para Gemini...`);
                 const result = await model.generateContent([
                     { inlineData: { mimeType: mimeType, data: base64Data } },
                     { text: prompt }
                 ]);
 
                 const processedText = result.response.text();
+                console.log(`[Gemini Media] Resultado: ${processedText}`);
                 if (!processedText) throw new Error("Empty response from Gemini");
 
                 // Atualizar texto do usuário
@@ -103,7 +105,7 @@ export async function processTelegramQueue(req) {
 
             } catch (mediaError) {
                 console.error("Media Error:", mediaError);
-                await sendTelegram(chat_id, `😓 Não consegui processar o ${media_type === "voice" ? "áudio" : "imagem"}. Tente novamente.`);
+                await sendTelegram(chat_id, `😓 Não consegui processar o ${media_type === "voice" ? "áudio" : "imagem"}. Erro técnico: ${mediaError.message}`);
                 try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
                 return Response.json({ status: "media_error" });
             }
