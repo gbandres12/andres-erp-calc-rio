@@ -1,8 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.12.0';
-import { Buffer } from "node:buffer";
 
 export async function processTelegramQueue(req) {
+    console.log("[Queue] Processing started - Version Gemini 2.0");
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -75,7 +75,15 @@ export async function processTelegramQueue(req) {
                 const fileUrl = `https://api.telegram.org/file/bot${BOT_Token}/${fileData.result.file_path}`;
                 const fileDownloadRes = await fetch(fileUrl);
                 const arrayBuffer = await fileDownloadRes.arrayBuffer();
-                const base64Data = Buffer.from(arrayBuffer).toString('base64');
+                
+                // Convert ArrayBuffer to Base64 (Deno friendly)
+                let binary = '';
+                const bytes = new Uint8Array(arrayBuffer);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64Data = btoa(binary);
 
                 // 2. Processar com Gemini
                 const mimeType = media_type === "voice" ? "audio/ogg" : "image/jpeg";
@@ -104,7 +112,7 @@ export async function processTelegramQueue(req) {
                 }
 
             } catch (mediaError) {
-                console.error("Media Error:", mediaError);
+                console.error("Media Processing Error (Gemini):", mediaError);
                 await sendTelegram(chat_id, `😓 Não consegui processar o ${media_type === "voice" ? "áudio" : "imagem"}. Erro técnico: ${mediaError.message}`);
                 try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
                 return Response.json({ status: "media_error" });
