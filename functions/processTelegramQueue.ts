@@ -1,8 +1,8 @@
-// processTelegramQueue v5 - gemini-2.0-flash-exp
+// processTelegramQueue v6 - gemini-2.5-flash via new SDK
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai@0.21.0';
+import { GoogleGenAI } from 'npm:@google/genai@1.0.1';
 
-const MODEL_NAME = "gemini-2.0-flash-exp";
+const MODEL_NAME = "gemini-2.5-flash";
 
 Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
