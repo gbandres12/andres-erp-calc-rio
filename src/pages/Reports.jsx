@@ -173,9 +173,9 @@ export default function Reports() {
             if (!matchesSearch) return false;
         }
 
-        // Filtro de Categoria (apenas para transações que têm categoria)
-        if (selectedCategory !== 'all' && item.category) {
-            if (item.category !== selectedCategory) return false;
+        // Filtro de Categoria
+        if (selectedCategory !== 'all') {
+            if ((item.category || '') !== selectedCategory) return false;
         }
 
         return true;
