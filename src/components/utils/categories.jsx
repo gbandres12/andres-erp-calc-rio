@@ -1,0 +1,80 @@
+// Lista centralizada de categorias financeiras
+export const EXPENSE_CATEGORIES = [
+  // Pessoal
+  "Salários",
+  "Encargos Salariais",
+  "Benefícios Salariais",
+  "Pro labore",
+  // Operacional - Mineração/Agroindustrial
+  "Combustível e Pedágios",
+  "Manutenção de Frota",
+  "Manutenção de Equipamentos",
+  "Aluguel de Equipamentos",
+  "Ativos e Equipamentos Próprios",
+  "Matéria-Prima",
+  "Mercadoria para Revenda",
+  "Embalagem",
+  "Análises Laboratoriais",
+  "EPI e Segurança do Trabalho",
+  "Serviços Portuários",
+  "Armazenagem / Estocagem",
+  "Pesagem / Balança",
+  "Royalties / Concessão Mineral",
+  "Licenças e Alvarás",
+  // Infraestrutura
+  "Aluguel",
+  "Condomínio",
+  "Água",
+  "Luz",
+  "Internet",
+  "Telefone Celular",
+  "Telefone Fixo",
+  "TV a Cabo",
+  // Administrativo
+  "Material de Escritório",
+  "Contabilidade",
+  "Honorários Advocatícios",
+  "Impostos",
+  "IPTU",
+  "Tarifas Bancárias",
+  "Juros de Empréstimos",
+  "Amortização de Empréstimos",
+  // Comercial / Marketing
+  "Comissão de Vendas",
+  "Propaganda",
+  "Brindes",
+  "Eventos",
+  // Logística
+  "Frete",
+  "Serviços de Entrega",
+  // Outros
+  "Seguros em Geral",
+  "Segurança",
+  "Limpeza",
+  "Viagem e Hospedagem",
+  "Manutenção Predial",
+  "Abatimentos",
+  "Devoluções / Abatimentos",
+  "Saídas",
+  "Distribuição entre Filiais",
+  "Empréstimo entre Filiais",
+  "Outras Despesas",
+];
+
+export const INCOME_CATEGORIES = [
+  "Receita de Vendas",
+  "Vendas - Calcário",
+  "Vendas - Gesso",
+  "Vendas - Outros Produtos",
+  "Serviços Prestados",
+  "Frete a Receber",
+  "Comissões Recebidas",
+  "Juros Recebidos",
+  "Aluguéis Recebidos",
+  "Distribuição entre Filiais",
+  "Empréstimo entre Filiais",
+  "Devoluções Recebidas",
+  "Outras Receitas",
+];
+
+export const ALL_CATEGORIES = [...new Set([...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES])].sort();
