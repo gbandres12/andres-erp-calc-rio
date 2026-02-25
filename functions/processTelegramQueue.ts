@@ -113,9 +113,20 @@ Deno.serve(async (req) => {
                 contents: [{ parts: [{ inlineData: { mimeType, data: base64Data } }, { text: prompt }] }]
             });
             console.error(`[MEDIA] Gemini raw result keys: ${Object.keys(result || {}).join(',')}`);
-            const processedText = result.text;
-            console.error(`[MEDIA] Resposta Gemini: "${processedText?.slice(0, 200)}"`);
-            if (!processedText) throw new Error("Gemini retornou resposta vazia");
+            let processedText = result.text;
+            console.error(`[MEDIA] Resposta Gemini (1ª tentativa): "${processedText?.slice(0, 200)}"`);
+
+            // Se vazio/erro em voz, tentar com audio/webm (Opus embutido em WebM)
+            if (!processedText && isVoice) {
+                console.error(`[MEDIA] Tentando com audio/webm...`);
+                const result2 = await genAI.models.generateContent({
+                    model: MODEL_NAME,
+                    contents: [{ parts: [{ inlineData: { mimeType: "audio/webm", data: base64Data } }, { text: prompt }] }]
+                });
+                processedText = result2.text;
+                console.error(`[MEDIA] Resposta Gemini (2ª tentativa audio/webm): "${processedText?.slice(0, 200)}"`);
+            }
+            if (!processedText) throw new Error("Gemini retornou resposta vazia para o áudio. O arquivo pode estar corrompido ou o formato não é suportado.");
 
             // 5. Atualizar user_text para o LLM principal
             if (isVoice) {
