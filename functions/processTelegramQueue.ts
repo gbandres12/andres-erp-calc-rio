@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.1.0';
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.12.0';
+import { Buffer } from "node:buffer";
 
 export async function processTelegramQueue(req) {
     const base44 = createClientFromRequest(req);
@@ -74,7 +75,7 @@ export async function processTelegramQueue(req) {
                 const fileUrl = `https://api.telegram.org/file/bot${BOT_Token}/${fileData.result.file_path}`;
                 const fileDownloadRes = await fetch(fileUrl);
                 const arrayBuffer = await fileDownloadRes.arrayBuffer();
-                const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
                 // 2. Processar com Gemini
                 const mimeType = media_type === "voice" ? "audio/ogg" : "image/jpeg";
