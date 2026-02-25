@@ -3,6 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 import { GoogleGenAI } from 'npm:@google/genai@1.0.1';
 
 const MODEL_NAME = "gemini-2.5-flash";
+const AUDIO_MODEL = "gemini-2.5-flash"; // mesmo modelo, mas prompts específicos para áudio
 
 Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
