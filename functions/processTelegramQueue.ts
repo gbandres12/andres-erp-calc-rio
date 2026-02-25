@@ -90,17 +90,29 @@ Deno.serve(async (req) => {
             console.error(`[MEDIA] base64 length=${base64Data.length}`);
 
             // 4. Chamar Gemini com multimodal
-            const mimeType = isVoice ? "audio/ogg" : "image/jpeg";
+            // Telegram voice = OGG+OPUS, Gemini aceita "audio/ogg" ou "audio/webm"
+            // Para imagens: detectar pelo file_path
+            let mimeType;
+            if (isVoice) {
+                mimeType = "audio/ogg";
+            } else {
+                const fp = fileData.result.file_path || "";
+                if (fp.endsWith(".jpg") || fp.endsWith(".jpeg")) mimeType = "image/jpeg";
+                else if (fp.endsWith(".png")) mimeType = "image/png";
+                else if (fp.endsWith(".webp")) mimeType = "image/webp";
+                else mimeType = "image/jpeg";
+            }
             const prompt = isVoice
                 ? "Transcreva este áudio para texto em português. Responda APENAS com o texto transcrito, sem prefixos. Se inaudível, responda '[Áudio inaudível]'."
                 : "Descreva esta imagem em português. Se for comprovante/nota fiscal, extraia: valor, data, fornecedor e descrição. Se for outra coisa, descreva o que vê em contexto financeiro empresarial.";
 
-            console.error(`[MEDIA] Enviando ${mimeType} para Gemini ${MODEL_NAME}...`);
+            console.error(`[MEDIA] Enviando mimeType=${mimeType} size=${bytes.byteLength} para Gemini ${MODEL_NAME}...`);
             const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const result = await genAI.models.generateContent({
                 model: MODEL_NAME,
                 contents: [{ parts: [{ inlineData: { mimeType, data: base64Data } }, { text: prompt }] }]
             });
+            console.error(`[MEDIA] Gemini raw result keys: ${Object.keys(result || {}).join(',')}`);
             const processedText = result.text;
             console.error(`[MEDIA] Resposta Gemini: "${processedText?.slice(0, 200)}"`);
             if (!processedText) throw new Error("Gemini retornou resposta vazia");
