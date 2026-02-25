@@ -219,7 +219,7 @@ export async function processTelegramQueue(req) {
         5. "create_sale": Criar venda.
         6. "add_expense": Lançar NOVA despesa/receita.
         7. "pay_bill": Dar baixa em conta existente.
-        8. "search_finance": BUSCAR transações. Essencial para responder "quais minhas contas?", "extrato", "quanto gastei".
+        8. "search_finance": LISTAR contas. Use para "quais a receber?", "extrato", "gastos". (Configure status='aberto' para pendências).
         9. "generate_chart": Criar gráfico.
 
         ESTRUTURA JSON (Estrito):
