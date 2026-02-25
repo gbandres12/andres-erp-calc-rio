@@ -50,68 +50,61 @@ export async function processTelegramQueue(req) {
             return Response.json({ status: "ignored", reason: "no_data" });
         }
 
-        let { chat_id, user_text, id: queueId, media_type, voice_file_id } = queueItem;
-        chat_id = String(chat_id); // Garantir que é string para buscar sessão corretamente
+        let { chat_id, user_text, id: queueId, media_type, voice_file_id, photo_file_id } = queueItem;
+        chat_id = String(chat_id); // Garantir que é string
 
-        // --- Processamento de Voz (Whisper) ---
-        if (media_type === "voice" && voice_file_id) {
-            if (!OPENAI_API_KEY) {
-                await sendTelegram(chat_id, "⚠️ Preciso da chave da OpenAI (OPENAI_API_KEY) configurada para transcrever áudios.");
+        // --- Processamento de Multimídia (Gemini) ---
+        if ((media_type === "voice" && voice_file_id) || (media_type === "photo" && photo_file_id)) {
+            if (!GEMINI_API_KEY) {
+                await sendTelegram(chat_id, "⚠️ Preciso da chave do Google Gemini (GEMINI_API_KEY) configurada.");
                 try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
-                return Response.json({ status: "missing_openai_key" });
+                return Response.json({ status: "missing_gemini_key" });
             }
 
-            await sendAction(chat_id, "record_voice"); // Mostra "gravando áudio..." como feedback
+            const action = media_type === "voice" ? "record_voice" : "upload_photo";
+            await sendAction(chat_id, action);
 
             try {
-                // 1. Obter caminho do arquivo no Telegram
-                const fileRes = await fetch(`https://api.telegram.org/bot${BOT_Token}/getFile?file_id=${voice_file_id}`);
+                // 1. Obter arquivo do Telegram
+                const fileId = media_type === "voice" ? voice_file_id : photo_file_id;
+                const fileRes = await fetch(`https://api.telegram.org/bot${BOT_Token}/getFile?file_id=${fileId}`);
                 const fileData = await fileRes.json();
-                if (!fileData.ok) throw new Error("Failed to get file path from Telegram");
-                const filePath = fileData.result.file_path;
-
-                // 2. Baixar o áudio
-                const audioUrl = `https://api.telegram.org/file/bot${BOT_Token}/${filePath}`;
-                const audioRes = await fetch(audioUrl);
-                const audioBlob = await audioRes.blob();
-
-                // 3. Transcrever com OpenAI Whisper (usando endpoint original da OpenAI se disponível, ou falhar graciosamente)
-                // Nota: OpenRouter não tem endpoint de audio/transcriptions compatível diretamente com a lib da OpenAI as vezes
-                // Vamos tentar usar a chave original se existir, ou pular se for só OpenRouter
-                let transcriptionText = "";
+                if (!fileData.ok) throw new Error("Failed to get file path");
                 
-                if (Deno.env.get("OPENAI_API_KEY")) {
-                    const openaiAudio = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") });
-                    const file = new File([audioBlob], "voice.ogg", { type: "audio/ogg" });
-                    const transcription = await openaiAudio.audio.transcriptions.create({
-                        file: file,
-                        model: "whisper-1",
-                        language: "pt"
-                    });
-                    transcriptionText = transcription.text;
+                const fileUrl = `https://api.telegram.org/file/bot${BOT_Token}/${fileData.result.file_path}`;
+                const fileDownloadRes = await fetch(fileUrl);
+                const arrayBuffer = await fileDownloadRes.arrayBuffer();
+                const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+                // 2. Processar com Gemini
+                const mimeType = media_type === "voice" ? "audio/ogg" : "image/jpeg";
+                const prompt = media_type === "voice" 
+                    ? "Transcreva este áudio para texto em português. Responda APENAS com o texto transcrito."
+                    : "Descreva esta imagem para um contexto financeiro. Se for um comprovante ou nota fiscal, extraia valor, data e descrição. Se for outra coisa, descreva o que vê.";
+
+                const result = await model.generateContent([
+                    { inlineData: { mimeType: mimeType, data: base64Data } },
+                    { text: prompt }
+                ]);
+
+                const processedText = result.response.text();
+                if (!processedText) throw new Error("Empty response from Gemini");
+
+                // Atualizar texto do usuário
+                if (media_type === "voice") {
+                    user_text = processedText;
+                    await sendTelegram(chat_id, `🎤 *Ouvi:* "${user_text}"`);
                 } else {
-                   // Fallback ou aviso se não tiver OpenAI Key para Audio
-                   throw new Error("Transscrição de áudio requer OPENAI_API_KEY (OpenRouter não suporta Whisper via SDK padrão ainda).");
+                    const caption = user_text && user_text !== "[Photo Message]" ? `Legenda: ${user_text}\n` : "";
+                    user_text = `${caption}[Análise da Imagem via Gemini]: ${processedText}`;
+                    await sendTelegram(chat_id, `📷 *Analisei a imagem:* \n${processedText}`);
                 }
 
-                if (!transcriptionText) throw new Error("Transcription empty");
-
-                // Atualizar texto do usuário com a transcrição
-                user_text = transcriptionText;
-
-                if (!transcription.text) throw new Error("Transcription empty");
-
-                // Atualizar texto do usuário com a transcrição
-                user_text = transcription.text;
-                
-                // Feedback visual do que foi entendido
-                await sendTelegram(chat_id, `🎤 *Ouvi:* "${user_text}"`);
-
-            } catch (voiceError) {
-                console.error("Voice Processing Error:", voiceError);
-                await sendTelegram(chat_id, "😓 Não consegui entender o áudio. Pode tentar escrever?");
+            } catch (mediaError) {
+                console.error("Media Error:", mediaError);
+                await sendTelegram(chat_id, `😓 Não consegui processar o ${media_type === "voice" ? "áudio" : "imagem"}. Tente novamente.`);
                 try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
-                return Response.json({ status: "voice_error" });
+                return Response.json({ status: "media_error" });
             }
         }
         // --------------------------------------
@@ -368,44 +361,40 @@ AÇÕES DISPONÍVEIS (Retorne JSON):
         }
         `;
 
-        // 4. Chamar LLM (OpenRouter)
+        // 4. Chamar LLM (Gemini)
         let response;
         try {
-            const openai = new OpenAI({
-                apiKey: OPENAI_API_KEY,
-                baseURL: "https://openrouter.ai/api/v1"
-            });
-
-            // Estruturar mensagens corretamente para manter o histórico (thread)
-            const messages = [
-                { role: "system", content: systemPrompt },
-                ...history.map(msg => ({ 
-                    role: msg.role === 'user' ? 'user' : 'assistant', 
-                    content: msg.content 
-                })),
-                { role: "user", content: user_text }
+            const chatHistory = [
+                {
+                    role: "user",
+                    parts: [{ text: systemPrompt }]
+                },
+                {
+                    role: "model",
+                    parts: [{ text: "Entendido. Estou configurado como Agente Financeiro Executivo. Aguardo as interações." }]
+                },
+                ...history.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'model',
+                    parts: [{ text: msg.content }]
+                }))
             ];
 
-            const completion = await openai.chat.completions.create({
-                model: "deepseek/deepseek-chat",
-                messages: messages,
-                response_format: { type: "json_object" }
+            const chat = model.startChat({
+                history: chatHistory,
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
             });
+
+            const result = await chat.sendMessage(user_text);
+            const content = result.response.text();
             
-            const content = completion.choices[0].message.content;
-            if (!content) throw new Error("Empty response from LLM");
+            if (!content) throw new Error("Empty response from Gemini");
             response = JSON.parse(content);
 
         } catch (llmError) {
-            console.error("LLM Error:", llmError);
-            await sendTelegram(chat_id, "😵‍💫 Erro na minha conexão neural (OpenRouter/LLM). Tente novamente.");
-            try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
-            return Response.json({ status: "llm_error_handled" });
-        }
-        } catch (llmError) {
-            console.error("LLM Error:", llmError);
-            await sendTelegram(chat_id, "😵‍💫 Minha mente deu um nó (Erro na IA). Pode repetir por favor?");
-            // Importante: Deletar da fila para não travar, pois é erro de IA temporário
+            console.error("Gemini Error:", llmError);
+            await sendTelegram(chat_id, "😵‍💫 Minha mente deu um nó (Erro na IA/Gemini). Pode repetir?");
             try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
             return Response.json({ status: "llm_error_handled" });
         }
