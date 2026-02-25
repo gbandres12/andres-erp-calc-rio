@@ -2,10 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai@^0.12.0';
 
 export async function processTelegramQueue(req) {
-    console.log("[Queue] Processing started - Version Gemini 2.0");
+    console.error("[DEBUG] Function Start - Version 2.1"); // Using error to ensure visibility
     const base44 = createClientFromRequest(req);
     const BOT_Token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    console.error(`[DEBUG] Keys: GEMINI=${GEMINI_API_KEY ? 'OK' : 'MISSING'}, BOT=${BOT_Token ? 'OK' : 'MISSING'}`);
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -404,7 +405,7 @@ AÇÕES DISPONÍVEIS (Retorne JSON):
             response = JSON.parse(content);
 
         } catch (llmError) {
-            console.error("Gemini Error:", llmError);
+            console.error("[DEBUG] Gemini Catch Error:", JSON.stringify(llmError, Object.getOwnPropertyNames(llmError)));
             await sendTelegram(chat_id, "😵‍💫 Minha mente deu um nó (Erro na IA/Gemini). Pode repetir?");
             try { await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId); } catch(e){}
             return Response.json({ status: "llm_error_handled" });
