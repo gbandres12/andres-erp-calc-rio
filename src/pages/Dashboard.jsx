@@ -341,16 +341,29 @@ export default function Dashboard() {
 
         {/* Cards Principais */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-violet-500 to-violet-700 text-white border-none hover:shadow-xl transition-all duration-300 hover:scale-105">
+          <Card className="bg-gradient-to-br from-stone-500 to-stone-700 text-white border-none hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-violet-100">
-                Produtos
+              <CardTitle className="text-sm font-medium text-stone-100">
+                Pedra de Calcário (Brita)
               </CardTitle>
-              <Package className="h-5 w-5 text-violet-200" />
+              <Package className="h-5 w-5 text-stone-200" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{products.length}</div>
-              <p className="text-xs text-violet-200 mt-2">Total de itens ativos</p>
+              <div className="text-3xl font-bold">{stats.britaStock.tons.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} <span className="text-lg">TON</span></div>
+              <p className="text-xs text-stone-200 mt-2">Estoque disponível em estoque</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-slate-500 to-slate-700 text-white border-none hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-slate-100">
+                Calcário em Pó
+              </CardTitle>
+              <Package className="h-5 w-5 text-slate-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.poTons.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} <span className="text-lg">TON</span></div>
+              <p className="text-xs text-slate-200 mt-2">Estoque disponível em estoque</p>
             </CardContent>
           </Card>
 
