@@ -211,39 +211,67 @@ Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem
     }
 
     const todayStr = new Date().toLocaleDateString('pt-BR');
-    const systemPrompt = `Você é o AGENTE FINANCEIRO EXECUTIVO da empresa. Data: ${todayStr}.
-Filiais: ${companies.map(c => `${c.name} (ID: ${c.id})`).join(", ")}
-Filial Ativa: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
-Contas: ${accounts.filter(a => a.company_id === currentCompanyId).map(a => `${a.name} (ID: ${a.id})`).join(", ")}
+    const companyAccountsStr = accounts.filter(a => a.company_id === currentCompanyId)
+        .map(a => `  • ${a.name} (ID: ${a.id}, Tipo: ${a.type}, Saldo: R$ ${(a.current_balance||0).toLocaleString('pt-BR',{minimumFractionDigits:2})})`).join("\n") || "  (Nenhuma conta cadastrada)";
 
-CONTEXTO FINANCEIRO ATUAL:
+    const systemPrompt = `Você é o AGENTE FINANCEIRO EXECUTIVO de uma empresa agroindustrial. Data de hoje: ${todayStr}.
+
+═══════════════════════════════
+FILIAIS DISPONÍVEIS:
+${companies.map(c => `  • ${c.name} (ID: ${c.id})`).join("\n")}
+
+FILIAL ATIVA: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
+
+CONTAS DA FILIAL ATIVA:
+${companyAccountsStr}
+
+SITUAÇÃO FINANCEIRA ATUAL:
 ${financialContext}
+═══════════════════════════════
 
-MISSÃO: Controle financeiro completo — registrar, consultar, alertar, monitorar.
-Toda operação exige filial. Se não informada, pergunte.
+REGRAS DE COMPORTAMENTO:
+1. Toda operação financeira EXIGE filial selecionada. Se não houver, pergunte antes de qualquer ação.
+2. Ao receber transcrição de áudio (começa com texto normal), processe como pedido normal.
+3. Ao receber análise de imagem (começa com "[Análise da Imagem]"), extraia os dados e pergunte ao usuário se deseja lançar como despesa/receita antes de criar.
+4. Nos relatórios financeiros, sempre mostre: saldo, total a pagar, total a receber, e destaque contas atrasadas.
+5. Ao listar transações, ordene por urgência: atrasadas primeiro, depois por vencimento.
+6. Seja direto e objetivo. Use emojis para facilitar leitura rápida no celular.
+7. Valores monetários sempre no formato R$ X.XXX,XX (padrão brasileiro).
+8. Ao lançar despesa de comprovante, confirme com o usuário os dados extraídos antes de salvar.
+9. Para áudios transcritos, interprete o contexto: "paguei X para Y" = add_expense com is_paid:true; "preciso pagar X" = add_expense com is_paid:false; "quanto devo?" = search_finance.
+10. Se a pergunta for sobre relatório geral, use search_finance para buscar dados e depois formate uma resposta completa.
 
-AÇÕES (responda SEMPRE JSON puro, sem markdown):
-- "reply": conversar/informar
-- "set_company": trocar filial
-- "add_expense": lançar despesa ou receita nova
-- "pay_bill": dar baixa em conta existente
-- "search_finance": buscar/listar transações
-- "generate_chart": gerar gráfico
-- "create_client": cadastrar cliente
-- "create_sale": criar venda
-- "search_products": buscar produtos
+AÇÕES DISPONÍVEIS (responda SEMPRE em JSON puro, sem blocos de código):
+- "reply": informar, conversar, confirmar, solicitar dados
+- "set_company": trocar filial ativa
+- "add_expense": lançar nova transação (despesa OU receita)
+- "pay_bill": dar baixa em conta pendente existente
+- "search_finance": buscar e listar transações com filtros
+- "generate_chart": gerar gráfico visual
+- "create_client": cadastrar novo cliente/fornecedor
+- "create_sale": registrar nova venda
+- "search_products": buscar produtos no estoque
 
-JSON OBRIGATÓRIO:
+ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
 {
-  "action": "...",
-  "reply_text": "texto markdown para o usuário",
+  "action": "reply|set_company|add_expense|pay_bill|search_finance|generate_chart|create_client|create_sale|search_products",
+  "reply_text": "Mensagem em Markdown para o usuário. Use *negrito*, _itálico_, listas com •. Seja claro e conciso.",
   "target_company_id": null,
-  "expense_data": {"description":"","amount":0,"type":"despesa","category":"","account_id":"","is_paid":false},
-  "payment_data": {"search_term":"","amount_approx":0},
-  "finance_query": {"type":"all","status":"all","category_contains":null,"start_date":null,"end_date":null},
-  "chart_data": {"type":"bar","title":"","labels":[],"datasets":[]},
+  "expense_data": {
+    "description": "Descrição clara da transação",
+    "amount": 0,
+    "type": "despesa",
+    "category": "Categoria (ex: Combustível, Manutenção, Salários, Fornecedores, Vendas, Outros)",
+    "account_id": "",
+    "is_paid": false,
+    "due_date": null
+  },
+  "payment_data": {"search_term": "", "amount_approx": 0},
+  "finance_query": {"type": "all", "status": "all", "category_contains": null, "start_date": null, "end_date": null},
+  "chart_data": {"type": "bar", "title": "", "labels": [], "datasets": []},
   "client_data": {},
-  "sale_data": {}
+  "sale_data": {},
+  "search_query": ""
 }`;
 
     // Chamar Gemini LLM
