@@ -916,7 +916,7 @@ export default function Transactions() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {defaultCategories.map((cat) => (
+                      {(quickFormData.type === 'receita' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
                         <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                       ))}
                     </SelectContent>
