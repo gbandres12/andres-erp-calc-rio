@@ -774,14 +774,9 @@ export default function Payables() {
               <Select value={addForm.category} onValueChange={v => setAddForm({...addForm, category: v})}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                  <SelectItem value="Aluguel">Aluguel</SelectItem>
-                  <SelectItem value="Energia">Energia</SelectItem>
-                  <SelectItem value="Internet">Internet</SelectItem>
-                  <SelectItem value="Salários">Salários</SelectItem>
-                  <SelectItem value="Impostos">Impostos</SelectItem>
-                  <SelectItem value="Manutenção">Manutenção</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
+                  {EXPENSE_CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
