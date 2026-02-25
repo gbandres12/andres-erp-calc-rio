@@ -1,4 +1,4 @@
-// processTelegramQueue v6 - gemini-2.5-flash via new SDK
+// processTelegramQueue v7 - prompts refinados
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
 import { GoogleGenAI } from 'npm:@google/genai@1.0.1';
 
