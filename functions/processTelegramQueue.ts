@@ -327,14 +327,21 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
             if (action === "add_expense") {
                 const ed = response.expense_data;
                 const acct = accounts.find(a => a.id === ed.account_id) || accounts.find(a => a.company_id === cid && a.type === 'caixa') || accounts.find(a => a.company_id === cid);
+                const today = new Date().toISOString().split('T')[0];
+                // Converter due_date do formato DD/MM/AAAA para AAAA-MM-DD se necessário
+                let dueDate = ed.due_date || today;
+                if (dueDate && dueDate.includes('/')) {
+                    const parts = dueDate.split('/');
+                    if (parts.length === 3) dueDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
                 await base44.asServiceRole.entities.Transaction.create({
                     description: ed.description || "Lançamento via Bot",
                     amount: Number(ed.amount), original_amount: Number(ed.amount),
                     type: ed.type || "despesa", category: ed.category || "Geral",
                     status: ed.is_paid ? "pago" : "pendente",
                     paid_amount: ed.is_paid ? Number(ed.amount) : 0,
-                    due_date: new Date().toISOString().split('T')[0],
-                    payment_date: ed.is_paid ? new Date().toISOString().split('T')[0] : null,
+                    due_date: dueDate,
+                    payment_date: ed.is_paid ? today : null,
                     account_id: acct?.id || null, company_id: cid, notes: "Via TelegramBot"
                 });
                 finalReply = `💸 *${ed.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!*\n📝 ${ed.description}\n💲 R$ ${Number(ed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n📅 ${ed.is_paid ? '✅ Pago' : '🟡 Pendente'}`;
