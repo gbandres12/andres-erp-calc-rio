@@ -194,6 +194,30 @@ export default function Dashboard() {
       p.current_stock <= p.min_stock && p.min_stock > 0
     );
 
+    // Estoque específico por produto principal
+    const calcStockForProduct = (keywords) => {
+      const matchedProducts = products.filter(p =>
+        keywords.some(kw => p.name?.toLowerCase().includes(kw.toLowerCase()))
+      );
+      const matchedIds = matchedProducts.map(p => p.id);
+      const totalTons = stockEntries
+        .filter(e => matchedIds.includes(e.product_id))
+        .reduce((sum, e) => sum + (e.quantity_available || 0), 0);
+      return { tons: totalTons, count: matchedProducts.length };
+    };
+
+    const britaStock = calcStockForProduct(["brita", "pedra", "calcário", "calcario"]);
+    // Filtra apenas pó (excluindo brita/pedra)
+    const poProducts = products.filter(p => {
+      const name = p.name?.toLowerCase() || "";
+      return (name.includes("pó") || name.includes("po") || name.includes("powder")) &&
+             !name.includes("brita") && !name.includes("pedra");
+    });
+    const poIds = poProducts.map(p => p.id);
+    const poTons = stockEntries
+      .filter(e => poIds.includes(e.product_id))
+      .reduce((sum, e) => sum + (e.quantity_available || 0), 0);
+
     const thisMonth = new Date().getMonth();
     const thisMonthRevenue = allPaidTransactions
       .filter(t => t.type === 'receita' && 
