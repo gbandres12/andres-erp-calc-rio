@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
-import OpenAI from 'npm:openai';
+import { GoogleGenAI } from 'npm:@google/genai@1.0.1';
 
 export async function generateSalesForecast(req) {
     if (req.method !== 'POST') {
