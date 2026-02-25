@@ -446,6 +446,8 @@ export async function processTelegramQueue(req) {
 
                 else if (action === "search_finance") {
                     const fQuery = response.finance_query;
+                    const isOpenSearch = fQuery.status === 'aberto' || fQuery.status === 'pendente' || fQuery.status === 'atrasado';
+                    
                     const filter = {
                          company_id: cid,
                          type: fQuery.type !== 'all' ? fQuery.type : undefined,
@@ -471,14 +473,46 @@ export async function processTelegramQueue(req) {
                          if (fQuery.end_date) filter.due_date.$lte = fQuery.end_date;
                     }
 
-                    const txs = await base44.asServiceRole.entities.Transaction.filter(filter, '-due_date', 15);
+                    // Ordenação inteligente: Abertos -> Vencimento Crescente (mais antigo primeiro). Extrato -> Data Decrescente (mais novo primeiro)
+                    const sortOrder = isOpenSearch ? 'due_date' : '-due_date';
+                    const txs = await base44.asServiceRole.entities.Transaction.filter(filter, sortOrder, 20);
+                    
                     const total = txs.reduce((sum, t) => sum + t.amount, 0);
                     
                     if (txs.length > 0) {
-                        finalReply = `📊 *Resultado Financeiro:*\nTotal Encontrado (max 10): R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\n` + 
-                                     txs.map(t => `▪️ ${t.description} (${t.type === 'receita' ? '+' : '-'} R$ ${t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}) - ${t.status}`).join("\n");
+                        // Agrupar visualmente
+                        const iconMap = {
+                            'receita': '💰',
+                            'despesa': '💸'
+                        };
+                        const statusMap = {
+                            'pago': '✅ Pago',
+                            'pendente': '🟡 Pendente',
+                            'atrasado': '🔴 Atrasado',
+                            'parcial': '🟠 Parcial'
+                        };
+
+                        const lines = txs.map(t => {
+                            const dateStr = t.due_date ? t.due_date.split('-').reverse().slice(0, 2).join('/') : 'S/D';
+                            const valStr = `R$ ${t.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+                            const typeIcon = iconMap[t.type] || '📄';
+                            
+                            // Destaque para atrasados
+                            let prefix = "▪️";
+                            if (t.status === 'atrasado') prefix = "🚨";
+                            
+                            return `${prefix} ${typeIcon} *${t.description}*\n   └ ${valStr} | ${statusMap[t.status] || t.status} | ${dateStr}`;
+                        });
+
+                        const title = isOpenSearch ? "📅 *Contas em Aberto / A Receber*" : "📊 *Extrato / Histórico*";
+                        finalReply = `${title}\n\n${lines.join("\n")}\n\n------------------\n*Total Listado: R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}*`;
+                        
+                        if (isOpenSearch && txs.some(t => t.status === 'atrasado')) {
+                            finalReply += "\n\n⚠️ *Atenção:* Existem contas atrasadas na lista!";
+                        }
+
                     } else {
-                        finalReply = `🔍 Nenhuma transação encontrada com esses critérios.`;
+                        finalReply = `🔍 *Nada encontrado.* \nNão encontrei nenhuma transação com os critérios:\n- Tipo: ${fQuery.type}\n- Status: ${fQuery.status}\n- Filial Atual`;
                     }
                 }
 
