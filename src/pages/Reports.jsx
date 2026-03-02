@@ -14,6 +14,7 @@ import { formatBRL, formatDate, getTodayDate } from "@/components/utils/formatte
 import { toast } from "sonner";
 import CostsDashboard from "@/components/reports/CostsDashboard";
 import FinancialOverview from "@/components/reports/FinancialOverview";
+import StockDashboard from "@/components/reports/StockDashboard";
 
 export default function Reports() {
   const [selectedCompanyId] = React.useState(localStorage.getItem('selectedCompanyId'));
