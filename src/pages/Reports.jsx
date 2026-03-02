@@ -475,15 +475,15 @@ export default function Reports() {
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue={isOperator ? "stock" : "overview"} className="space-y-6">
         <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          {!isOperator && <TabsTrigger value="overview">Visão Geral</TabsTrigger>}
           <TabsTrigger value="stock">📦 Estoque & Balsas</TabsTrigger>
-          <TabsTrigger value="costs">Análise de Custos</TabsTrigger>
-          <TabsTrigger value="financial">DRE & Fluxo</TabsTrigger>
-          <TabsTrigger value="statement">Extrato Bancário</TabsTrigger>
-          <TabsTrigger value="payables">A Pagar/Receber</TabsTrigger>
-          <TabsTrigger value="operational">Operacional</TabsTrigger>
+          {!isOperator && <TabsTrigger value="costs">Análise de Custos</TabsTrigger>}
+          {!isOperator && <TabsTrigger value="financial">DRE & Fluxo</TabsTrigger>}
+          {!isOperator && <TabsTrigger value="statement">Extrato Bancário</TabsTrigger>}
+          {!isOperator && <TabsTrigger value="payables">A Pagar/Receber</TabsTrigger>}
+          {!isOperator && <TabsTrigger value="operational">Operacional</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="stock">
