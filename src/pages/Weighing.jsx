@@ -36,6 +36,8 @@ export default function Weighing() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [saleSearchTerm, setSaleSearchTerm] = useState("");
+  const [filterStart, setFilterStart] = useState("");
+  const [filterEnd, setFilterEnd] = useState("");
 
   const { data: scaleState } = useQuery({
     queryKey: ['scaleState', selectedCompanyId],
