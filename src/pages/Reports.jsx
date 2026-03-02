@@ -17,6 +17,10 @@ import FinancialOverview from "@/components/reports/FinancialOverview";
 import StockDashboard from "@/components/reports/StockDashboard";
 
 export default function Reports() {
+  const [user, setUser] = React.useState(null);
+  React.useEffect(() => { base44.auth.me().then(setUser).catch(() => {}); }, []);
+  const isOperator = user?.custom_role === 'operator';
+
   const [selectedCompanyId] = React.useState(localStorage.getItem('selectedCompanyId'));
   const [filterCompanyId, setFilterCompanyId] = useState(localStorage.getItem('selectedCompanyId') || 'all');
   const [period, setPeriod] = useState("30");
