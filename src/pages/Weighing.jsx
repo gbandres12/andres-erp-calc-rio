@@ -197,8 +197,8 @@ export default function Weighing() {
   };
 
   const printTicket = (weighing) => {
-    window.print();
-    toast.success("Ticket enviado para impressão!");
+    setPrintWeighing(weighing);
+    setIsPrintDialogOpen(true);
   };
 
   const statusColors = {
