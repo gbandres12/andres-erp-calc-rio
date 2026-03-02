@@ -509,6 +509,51 @@ export default function Weighing() {
                     />
                 </div>
 
+                <div className="space-y-2">
+                    <Label>Transportador</Label>
+                    <Input 
+                        value={formData.transporter}
+                        onChange={(e) => setFormData({ ...formData, transporter: e.target.value })}
+                        placeholder="Nome do transportador"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Placa 1º Reboque</Label>
+                    <Input 
+                        value={formData.vehicle_plate2}
+                        onChange={(e) => setFormData({ ...formData, vehicle_plate2: e.target.value.toUpperCase() })}
+                        placeholder="ABC-1234"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Placa 2º Reboque</Label>
+                    <Input 
+                        value={formData.vehicle_plate3}
+                        onChange={(e) => setFormData({ ...formData, vehicle_plate3: e.target.value.toUpperCase() })}
+                        placeholder="ABC-1234"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Horário de Entrada</Label>
+                    <Input 
+                        type="datetime-local"
+                        value={formData.entry_time}
+                        onChange={(e) => setFormData({ ...formData, entry_time: e.target.value })}
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Horário de Saída</Label>
+                    <Input 
+                        type="datetime-local"
+                        value={formData.exit_time}
+                        onChange={(e) => setFormData({ ...formData, exit_time: e.target.value })}
+                    />
+                </div>
+
                 <div className="col-span-2 space-y-2">
                   <Label>Observações</Label>
                   <Textarea
