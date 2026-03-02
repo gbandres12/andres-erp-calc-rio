@@ -29,6 +29,8 @@ export default function Sales() {
   const [activeTab, setActiveTab] = useState("dados");
   const [openClientCombobox, setOpenClientCombobox] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterStart, setFilterStart] = useState("");
+  const [filterEnd, setFilterEnd] = useState("");
   
   // Novo Cliente State
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false);
