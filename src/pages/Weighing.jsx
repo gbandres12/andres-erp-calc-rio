@@ -579,6 +579,23 @@ export default function Weighing() {
         </Card>
       </div>
 
+      {/* Filtros de Data */}
+      <Card className="mb-6">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <Label className="text-sm font-medium">Filtrar por data:</Label>
+            <Input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)} className="w-40" />
+            <span className="text-slate-500">até</span>
+            <Input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)} className="w-40" />
+            {(filterStart || filterEnd) && (
+              <Button variant="outline" size="sm" onClick={() => { setFilterStart(""); setFilterEnd(""); }}>
+                Limpar
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Lista de Pesagens */}
       <Card>
         <CardHeader>
