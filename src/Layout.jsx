@@ -135,7 +135,7 @@ export default function Layout({ children, currentPageName }) {
         }
         
         const filteredItems = group.items.filter(item => {
-          const forbidden = ['Reports', 'ActivityLogs', 'Settings', 'Users', 'Dashboard', 'Quotes', 'SupplierQuotes', 'SalesForecast', 'CRM'];
+          const forbidden = ['ActivityLogs', 'Settings', 'Users', 'Dashboard', 'Quotes', 'SupplierQuotes', 'SalesForecast', 'CRM'];
           return !forbidden.includes(item.url);
         });
 
