@@ -482,6 +482,10 @@ export default function Reports() {
           <TabsTrigger value="operational">Operacional</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="stock">
+          <StockDashboard companies={companies} />
+        </TabsContent>
+
         <TabsContent value="costs">
           <CostsDashboard 
             transactions={filterData(transactions, 'due_date')} 
