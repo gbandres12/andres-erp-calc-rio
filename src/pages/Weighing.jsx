@@ -609,7 +609,11 @@ export default function Weighing() {
                 <p>Nenhuma pesagem registrada ainda</p>
               </div>
             ) : (
-              weighings.map((weighing) => (
+              weighings.filter(w => {
+                if (filterStart && w.created_date < filterStart) return false;
+                if (filterEnd && w.created_date > filterEnd + "T23:59:59") return false;
+                return true;
+              }).map((weighing) => (
                 <div key={weighing.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
