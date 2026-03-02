@@ -157,21 +157,26 @@ export default function Weighing() {
 
   const resetForm = () => {
     setFormData({
-    vehicle_id: "avulso",
-    vehicle_plate: "",
-    driver_name: "",
-    product: "",
-    origin: "",
-    destination: "",
-    tare: 0,
-    gross: 0,
-    operator: "",
-    client_id: "",
-    sale_id: "", // Novo campo
-    barge_name: "", // Novo campo
-    notes: "",
-    purpose: "saida_venda",
-    ticket_number: ""
+      vehicle_id: "avulso",
+      vehicle_plate: "",
+      vehicle_plate2: "",
+      vehicle_plate3: "",
+      driver_name: "",
+      transporter: "",
+      product: "",
+      origin: "",
+      destination: "",
+      tare: 0,
+      gross: 0,
+      entry_time: "",
+      exit_time: "",
+      operator: "",
+      client_id: "",
+      sale_id: "",
+      barge_name: "",
+      notes: "",
+      purpose: "saida_venda",
+      ticket_number: ""
     });
     setSearchTerm("");
   };
