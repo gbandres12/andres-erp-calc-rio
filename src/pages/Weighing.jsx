@@ -83,6 +83,13 @@ export default function Weighing() {
     initialData: []
   });
 
+  const { data: companies = [] } = useQuery({
+    queryKey: ['companies'],
+    queryFn: () => base44.entities.Company.filter({ is_active: true }),
+    initialData: []
+  });
+  const selectedCompany = companies.find(c => c.id === selectedCompanyId);
+
   const { data: sales = [] } = useQuery({
     queryKey: ['sales', selectedCompanyId],
     queryFn: () => base44.entities.Sale.filter({ company_id: selectedCompanyId, status: { $in: ['concluida', 'faturada'] } }, '-created_date', 50),
