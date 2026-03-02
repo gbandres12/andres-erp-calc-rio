@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Scale, Plus, TruckIcon, Printer, CheckCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import WeighingTicket from "@/components/weighing/WeighingTicket";
 
 export default function Weighing() {
   const queryClient = useQueryClient();
