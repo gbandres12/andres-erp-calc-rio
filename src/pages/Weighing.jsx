@@ -39,6 +39,8 @@ export default function Weighing() {
   const [saleSearchTerm, setSaleSearchTerm] = useState("");
   const [filterStart, setFilterStart] = useState("");
   const [filterEnd, setFilterEnd] = useState("");
+  const [printWeighing, setPrintWeighing] = useState(null);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
 
   const { data: scaleState } = useQuery({
     queryKey: ['scaleState', selectedCompanyId],
