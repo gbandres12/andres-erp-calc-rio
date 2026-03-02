@@ -122,7 +122,13 @@ export default function Layout({ children, currentPageName }) {
     
     if (user.custom_role === 'operator') {
       return navigationGroups.map(group => {
-        if (group.title === "Financeiro" || group.title === "Comercial") return null;
+        if (group.title === "Financeiro") return null;
+        if (group.title === "Comercial") {
+          const allowed = ['SaleWithdrawals'];
+          const filteredItems = group.items.filter(item => allowed.includes(item.url));
+          if (filteredItems.length === 0) return null;
+          return { ...group, items: filteredItems };
+        }
         
         if (group.title === "Principal") {
            return { ...group, items: group.items.filter(item => item.url === 'CompanySelector') };
