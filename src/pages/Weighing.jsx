@@ -666,6 +666,20 @@ export default function Weighing() {
         </CardContent>
       </Card>
 
+      {/* Dialog de Impressão */}
+      <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ticket de Pesagem</DialogTitle>
+          </DialogHeader>
+          <WeighingTicket
+            weighing={printWeighing}
+            company={selectedCompany}
+            onClose={() => setIsPrintDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Lista de Pesagens */}
       <Card>
         <CardHeader>
