@@ -121,14 +121,19 @@ export default function Weighing() {
           if (v) plateToUse = v.plate;
       }
       
+      const clientName = data.client_id ? contacts.find(c => c.id === data.client_id)?.name || '' : '';
+
       return base44.entities.Weighing.create({
         ...data,
         reference: newRef,
         ticket_number: ticket,
         vehicle_plate: plateToUse.toUpperCase(),
+        client_name: clientName,
         company_id: selectedCompanyId,
         net: net,
         net_ton: netTon,
+        tare_datetime: data.entry_time || new Date().toISOString(),
+        gross_datetime: data.exit_time || new Date().toISOString(),
         status: data.gross > 0 ? 'concluida' : 'aguardando_bruto'
       });
     },
