@@ -397,7 +397,7 @@ export default function Weighing() {
                 </div>
 
                 {formData.purpose === 'saida_venda' && (
-                    <div className="space-y-2">
+                    <div className="col-span-2 space-y-2">
                         <Label>Vincular Venda (Pesquisar)</Label>
                         <div className="relative">
                             <Input 
@@ -433,6 +433,37 @@ export default function Weighing() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* Detalhes dos itens da venda selecionada */}
+                        {formData.sale_id && (() => {
+                            const selectedSale = sales.find(s => s.id === formData.sale_id);
+                            if (!selectedSale?.items?.length) return null;
+                            return (
+                                <Card className="bg-amber-50 border-amber-200 mt-2">
+                                    <CardContent className="pt-4 pb-3">
+                                        <p className="text-xs font-semibold text-amber-800 mb-2 uppercase tracking-wide">
+                                            📦 Itens do Pedido — {selectedSale.reference}
+                                        </p>
+                                        <div className="space-y-1">
+                                            {selectedSale.items.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between items-center text-sm bg-white rounded px-3 py-2 border border-amber-100">
+                                                    <span className="font-medium text-slate-700">{item.product_name}</span>
+                                                    <span className="font-bold text-amber-700">
+                                                        {item.quantity?.toLocaleString('pt-BR')} {item.unit}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            <div className="flex justify-between items-center text-sm font-bold bg-amber-100 rounded px-3 py-2 mt-1">
+                                                <span className="text-amber-900">Total do Pedido</span>
+                                                <span className="text-amber-900">
+                                                    {selectedSale.items.reduce((sum, i) => sum + (i.quantity || 0), 0).toLocaleString('pt-BR')} {selectedSale.items[0]?.unit}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
                     </div>
                 )}
 
