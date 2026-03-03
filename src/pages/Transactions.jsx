@@ -1166,7 +1166,7 @@ export default function Transactions() {
                             <CommandList>
                               <CommandEmpty>Digite para criar nova.</CommandEmpty>
                               <CommandGroup heading="Sugestões">
-                                {defaultCategories.map((category) => (
+                                {(formData.type === 'receita' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((category) => (
                                   <CommandItem
                                     key={category}
                                     value={category}
