@@ -1157,7 +1157,8 @@ export default function Transactions() {
                             <CommandInput 
                               placeholder="Buscar categoria..." 
                               onValueChange={(search) => {
-                                if (search && !defaultCategories.includes(search)) {
+                                const cats = formData.type === 'receita' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+                                if (search && !cats.includes(search)) {
                                   setFormData(prev => ({ ...prev, category: search }));
                                 }
                               }}
