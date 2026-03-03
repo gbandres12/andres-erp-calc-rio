@@ -740,16 +740,16 @@ export default function Weighing() {
                     <div className="flex items-center gap-4 mb-2">
                       <div>
                         <p className="text-xs text-slate-500">Tara</p>
-                        <p className="font-semibold">{(weighing.tare / 1000).toFixed(3)} ton</p>
+                        <p className="font-semibold">{(weighing.tare / 1000).toLocaleString("pt-BR", {minimumFractionDigits:3, maximumFractionDigits:3})} t</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Bruto</p>
-                        <p className="font-semibold">{(weighing.gross / 1000).toFixed(3)} ton</p>
+                        <p className="font-semibold">{(weighing.gross / 1000).toLocaleString("pt-BR", {minimumFractionDigits:3, maximumFractionDigits:3})} t</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Líquido</p>
                         <p className="text-lg font-bold text-blue-600">
-                            {weighing.net_ton ? `${weighing.net_ton.toFixed(3)} ton` : `${(weighing.net / 1000).toFixed(3)} ton`}
+                            {(weighing.net / 1000).toLocaleString("pt-BR", {minimumFractionDigits:3, maximumFractionDigits:3})} t
                         </p>
                       </div>
                     </div>
