@@ -74,8 +74,6 @@ export default function Transactions() {
     notes: ""
   });
 
-  const defaultCategories = formData.type === 'receita' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-
   const [formData, setFormData] = useState({
   description: "",
   amount: 0,
