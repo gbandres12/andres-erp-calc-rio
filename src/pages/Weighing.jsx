@@ -577,13 +577,13 @@ export default function Weighing() {
                         <div>
                             <p className="text-sm text-slate-600 mb-1">Peso Líquido</p>
                             <p className="text-3xl font-bold text-green-600">
-                                {((formData.gross - formData.tare) / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
+                                {(formData.gross - formData.tare).toLocaleString("pt-BR")} Kg
                             </p>
                         </div>
                         <div>
-                            <p className="text-sm text-slate-600 mb-1">Em KG</p>
+                            <p className="text-sm text-slate-600 mb-1">Em Toneladas</p>
                             <p className="text-3xl font-bold text-slate-400">
-                                {(formData.gross - formData.tare).toLocaleString()} kg
+                                {((formData.gross - formData.tare) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} t
                             </p>
                         </div>
                     </div>
