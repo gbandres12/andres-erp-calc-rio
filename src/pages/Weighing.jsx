@@ -251,7 +251,7 @@ export default function Weighing() {
                       <span className="text-sm">{isConnected ? 'Balança Online (Ao Vivo)' : 'Balança Offline'}</span>
                     </div>
                     <div className="text-6xl font-bold font-mono">
-                      {(currentWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
+                      {currentWeight.toLocaleString("pt-BR")} Kg
                     </div>
                   </div>
                   <div className="flex gap-3 justify-center">
