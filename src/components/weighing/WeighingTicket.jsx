@@ -10,7 +10,12 @@ const formatDateTime = (dt) => {
 
 const formatTon = (kg) => {
   if (kg === null || kg === undefined || isNaN(kg)) return "-";
-  return (kg / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " t";
+  const tons = kg / 1000;
+  // Se for número inteiro de toneladas, sem casas decimais
+  if (Number.isInteger(tons)) return tons.toLocaleString("pt-BR") + " t";
+  // Remove zeros desnecessários no final
+  const formatted = tons.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  return formatted + " t";
 };
 
 export default function WeighingTicket({ weighing, company, onClose }) {
