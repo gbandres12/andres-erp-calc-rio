@@ -621,7 +621,7 @@ export default function Weighing() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-            {(weighings.reduce((sum, w) => sum + (w.net || 0), 0) / 1000).toLocaleString(undefined, { minimumFractionDigits: 3 })} ton
+            {weighings.reduce((sum, w) => sum + (w.net || 0), 0).toLocaleString("pt-BR")} Kg
             </div>
             </CardContent>
             </Card>
