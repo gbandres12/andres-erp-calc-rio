@@ -75,6 +75,7 @@ import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
+import DailyFinancialReport from './pages/DailyFinancialReport';
 import __Layout from './Layout.jsx';
 
 
@@ -107,6 +108,7 @@ export const PAGES = {
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
+    "DailyFinancialReport": DailyFinancialReport,
 }
 
 export const pagesConfig = {
