@@ -51,6 +51,7 @@ import ActivityLogs from './pages/ActivityLogs';
 import CRM from './pages/CRM';
 import CompanySelector from './pages/CompanySelector';
 import Contacts from './pages/Contacts';
+import DailyFinancialReport from './pages/DailyFinancialReport';
 import Dashboard from './pages/Dashboard';
 import EPIs from './pages/EPIs';
 import FinancialAccounts from './pages/FinancialAccounts';
@@ -75,7 +76,7 @@ import Users from './pages/Users';
 import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
-import DailyFinancialReport from './pages/DailyFinancialReport';
+import PurchaseOrders from './pages/PurchaseOrders';
 import __Layout from './Layout.jsx';
 
 
@@ -84,6 +85,7 @@ export const PAGES = {
     "CRM": CRM,
     "CompanySelector": CompanySelector,
     "Contacts": Contacts,
+    "DailyFinancialReport": DailyFinancialReport,
     "Dashboard": Dashboard,
     "EPIs": EPIs,
     "FinancialAccounts": FinancialAccounts,
@@ -108,7 +110,7 @@ export const PAGES = {
     "Vehicles": Vehicles,
     "Warehouse": Warehouse,
     "Weighing": Weighing,
-    "DailyFinancialReport": DailyFinancialReport,
+    "PurchaseOrders": PurchaseOrders,
 }
 
 export const pagesConfig = {
