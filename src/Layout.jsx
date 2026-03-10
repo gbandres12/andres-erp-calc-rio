@@ -6,7 +6,7 @@ import {
   Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
   BarChart3, Settings, LogOut, Menu, X, ChevronDown,
-  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine, Bot, TrendingUp
+  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine, Bot, TrendingUp, ClipboardList
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -36,7 +36,8 @@ const navigationGroups = [
       { title: "Produtos", url: "Products", icon: Package },
       { title: "Almoxarifado", url: "Warehouse", icon: Warehouse },
       { title: "Transferências", url: "Transfers", icon: TruckIcon },
-      { title: "Requisições", url: "Requisitions", icon: FileText }
+      { title: "Requisições", url: "Requisitions", icon: FileText },
+      { title: "Pedidos de Compra", url: "PurchaseOrders", icon: ClipboardList }
     ]
   },
   {
