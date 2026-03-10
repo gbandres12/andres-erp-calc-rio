@@ -46,6 +46,9 @@ export function formatBRL(input) {
   }).format(numericValue);
 }
 
+// Alias para compatibilidade
+export const formatCurrency = formatBRL;
+
 /**
  * Formata uma data para o padrão brasileiro (DD/MM/YYYY)
  * 
