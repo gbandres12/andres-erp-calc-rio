@@ -120,6 +120,7 @@ export async function processSalesQueue(req) {
            - Pergunte: "Você deseja Cadastrar um Lead ou Efetuar uma Venda?"
 
         2. SE FOR "CADASTRAR LEAD":
+           - PRIMEIRO: Confirme em qual filial será cadastrado (use as filiais disponíveis).
            - Pergunte os dados básicos (Nome, Cidade, Telefone, Fazenda).
            - Use a action "create_client".
 
@@ -166,6 +167,7 @@ export async function processSalesQueue(req) {
             "planted_area": 0,
             "notes": "Informações da fazenda"
           },
+          "target_company_id": "ID_DA_FILIAL_PARA_CADASTRO",
           "reply_text": "Texto confirmando o cadastro."
         }
 
@@ -303,15 +305,26 @@ export async function processSalesQueue(req) {
                 }
                 else if (action === "create_client") {
                     const cData = responseJson.client_data;
-                    cData.company_id = cid;
-                    cData.type = "cliente";
-                    // Checar duplicidade simples
-                    const existing = (await base44.asServiceRole.entities.Contact.filter({ name: cData.name, company_id: cid }))[0];
-                    if (existing) {
-                        replyText = `⚠️ Cliente *${existing.name}* já existe!`;
+                    
+                    // Determinar filial de cadastro
+                    let targetCompanyId = responseJson.target_company_id || cid;
+                    const targetCompany = companies.find(c => c.id === targetCompanyId);
+                    
+                    if (!targetCompany) {
+                        replyText = `🏢 Por favor, especifique em qual filial deseja cadastrar:\n${companies.map(c => `- ${c.name}`).join("\n")}`;
                     } else {
-                        const newClient = await base44.asServiceRole.entities.Contact.create(cData);
-                        replyText = `✅ *Cliente Cadastrado!* \n👤 ${newClient.name}`;
+                        cData.company_id = targetCompanyId;
+                        cData.type = "cliente";
+                        cData.status = "prospect";
+                        
+                        // Checar duplicidade simples
+                        const existing = (await base44.asServiceRole.entities.Contact.filter({ name: cData.name, company_id: targetCompanyId }))[0];
+                        if (existing) {
+                            replyText = `⚠️ Cliente *${existing.name}* já existe na filial ${targetCompany.name}!`;
+                        } else {
+                            const newClient = await base44.asServiceRole.entities.Contact.create(cData);
+                            replyText = `✅ *Cliente Cadastrado com Sucesso!*\n\n👤 *Nome:* ${newClient.name}\n🏢 *Filial:* ${targetCompany.name}\n📍 *Cidade:* ${newClient.city || 'N/A'}\n📞 *Telefone:* ${newClient.phone || 'N/A'}`;
+                        }
                     }
                 }
                 else if (action === "create_sale") {
