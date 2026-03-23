@@ -42,6 +42,7 @@ export default function Weighing() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [saleSearchTerm, setSaleSearchTerm] = useState("");
+  const [poSearchTerm, setPoSearchTerm] = useState("");
   const [filterStart, setFilterStart] = useState("");
   const [filterEnd, setFilterEnd] = useState("");
   const [printWeighing, setPrintWeighing] = useState(null);
@@ -98,6 +99,12 @@ export default function Weighing() {
   const { data: sales = [] } = useQuery({
     queryKey: ['sales', selectedCompanyId],
     queryFn: () => base44.entities.Sale.filter({ company_id: selectedCompanyId, status: { $in: ['concluida', 'faturada'] } }, '-created_date', 50),
+    initialData: []
+  });
+
+  const { data: purchaseOrders = [] } = useQuery({
+    queryKey: ['purchaseOrdersWeighing', selectedCompanyId],
+    queryFn: () => base44.entities.PurchaseOrder.filter({ company_id: selectedCompanyId, status: { $in: ['pendente', 'aprovado'] } }, '-created_date'),
     initialData: []
   });
 
