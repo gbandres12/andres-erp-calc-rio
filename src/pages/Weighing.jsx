@@ -795,6 +795,11 @@ export default function Weighing() {
                                 🚢 {weighing.barge_name}
                             </Badge>
                         )}
+                        {weighing.purchase_order_id && (
+                            <Badge variant="outline" className="ml-2 border-purple-200 text-purple-700">
+                                📋 OC Vinculada
+                            </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-slate-600">
                         {weighing.vehicle_plate} • {weighing.driver_name ? `${weighing.driver_name} • ` : ''} {weighing.product}
