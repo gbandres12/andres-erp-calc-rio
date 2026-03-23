@@ -35,6 +35,8 @@ export default function Weighing() {
     exit_time: "",
     operator: "",
     client_id: "",
+    barge_name: "",
+    purchase_order_id: "",
     notes: "",
     purpose: "saida_venda",
     ticket_number: ""
