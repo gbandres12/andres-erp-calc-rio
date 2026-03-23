@@ -404,28 +404,29 @@ export default function PurchaseOrders() {
                       <TableCell>{formatDate(order.expected_delivery_date)}</TableCell>
                       <TableCell>{getStatusBadge(order.status)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
-                          {order.status === "pendente" && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => handleEdit(order)}>
-                                Editar
-                              </Button>
-                              <Button size="sm" onClick={() => handleStatusChange(order, "aprovado")}>
-                                Aprovar
-                              </Button>
-                            </>
-                          )}
-                          {order.status === "aprovado" && (
-                            <Button size="sm" onClick={() => handleStatusChange(order, "recebido")}>
-                              Receber
-                            </Button>
-                          )}
-                          {order.status !== "cancelado" && order.status !== "recebido" && (
-                            <Button size="sm" variant="destructive" onClick={() => handleStatusChange(order, "cancelado")}>
-                              Cancelar
-                            </Button>
-                          )}
-                        </div>
+                       <div className="flex gap-2 flex-wrap">
+                         {order.status === "pendente" && (
+                           <>
+                             <Button size="sm" variant="outline" onClick={() => handleEdit(order)}>
+                               Editar
+                             </Button>
+                             <Button size="sm" onClick={() => handleStatusChange(order, "aprovado")}>
+                               Aprovar
+                             </Button>
+                           </>
+                         )}
+                         {(order.status === "aprovado" || order.status === "pendente") && (
+                           <Button size="sm" variant="outline" className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => setPaymentOrder(order)}>
+                             <CreditCard className="w-3 h-3" />
+                             Pagar
+                           </Button>
+                         )}
+                         {order.status !== "cancelado" && order.status !== "recebido" && (
+                           <Button size="sm" variant="destructive" onClick={() => handleStatusChange(order, "cancelado")}>
+                             Cancelar
+                           </Button>
+                         )}
+                       </div>
                       </TableCell>
                     </TableRow>
                   ))}
