@@ -186,11 +186,13 @@ export default function Weighing() {
       client_id: "",
       sale_id: "",
       barge_name: "",
+      purchase_order_id: "",
       notes: "",
       purpose: "saida_venda",
       ticket_number: ""
     });
     setSearchTerm("");
+    setPoSearchTerm("");
   };
 
   const handleSubmit = (e) => {
