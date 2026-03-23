@@ -62,6 +62,12 @@ export default function PurchaseOrders() {
     enabled: !!companyId,
   });
 
+  const { data: allPayments = [] } = useQuery({
+    queryKey: ["purchaseOrderPayments", companyId],
+    queryFn: () => base44.entities.PurchaseOrderPayment.filter({ company_id: companyId }),
+    enabled: !!companyId,
+  });
+
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers", companyId],
     queryFn: async () => {
