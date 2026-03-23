@@ -385,6 +385,7 @@ export default function PurchaseOrders() {
                     <TableHead>Quantidade</TableHead>
                     <TableHead>Valor Unit.</TableHead>
                     <TableHead>Total</TableHead>
+                    <TableHead>Pago</TableHead>
                     <TableHead>Data Pedido</TableHead>
                     <TableHead>Previsão</TableHead>
                     <TableHead>Status</TableHead>
@@ -400,6 +401,20 @@ export default function PurchaseOrders() {
                       <TableCell>{order.quantity} {order.unit}</TableCell>
                       <TableCell>{formatCurrency(order.price_per_unit)}</TableCell>
                       <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const paid = allPayments.filter(p => p.purchase_order_id === order.id).reduce((s, p) => s + p.amount, 0);
+                          const pct = order.total_amount > 0 ? Math.round((paid / order.total_amount) * 100) : 0;
+                          return (
+                            <div>
+                              <span className="font-medium text-green-700">{formatCurrency(paid)}</span>
+                              {paid > 0 && paid < order.total_amount && (
+                                <div className="text-xs text-slate-400">{pct}%</div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell>{formatDate(order.order_date)}</TableCell>
                       <TableCell>{formatDate(order.expected_delivery_date)}</TableCell>
                       <TableCell>{getStatusBadge(order.status)}</TableCell>
