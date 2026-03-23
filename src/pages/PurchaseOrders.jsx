@@ -451,6 +451,15 @@ export default function PurchaseOrders() {
           </CardContent>
         </Card>
 
+        {/* Payment Dialog */}
+        <PaymentDialog
+          order={paymentOrder}
+          accounts={accounts}
+          open={!!paymentOrder}
+          onClose={() => setPaymentOrder(null)}
+          payments={paymentOrder ? allPayments.filter(p => p.purchase_order_id === paymentOrder.id) : []}
+        />
+
         {/* Form Dialog */}
         <Dialog open={showForm} onOpenChange={setShowForm}>
           <DialogContent className="max-w-2xl">
