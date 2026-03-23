@@ -502,6 +502,7 @@ export default function Weighing() {
                 )}
 
                 {formData.purpose === 'entrada_estoque' && (
+                    <>
                     <div className="space-y-2">
                         <Label>Nome da Balsa</Label>
                         <Input 
@@ -510,6 +511,64 @@ export default function Weighing() {
                             placeholder="Ex: Balsa Rio Negro"
                         />
                     </div>
+
+                    <div className="col-span-2 space-y-2">
+                        <Label>Vincular Pedido de Compra (OC)</Label>
+                        <div className="relative">
+                            <Input 
+                                placeholder="Buscar OC por referência ou item..." 
+                                value={poSearchTerm}
+                                onChange={(e) => setPoSearchTerm(e.target.value)}
+                                className="mb-2"
+                            />
+                            <Select
+                                value={formData.purchase_order_id}
+                                onValueChange={(value) => {
+                                    const po = purchaseOrders.find(o => o.id === value);
+                                    setFormData({ ...formData, purchase_order_id: value });
+                                    if (po) {
+                                      setPoSearchTerm(`${po.reference} - ${po.item_name}`);
+                                      if (!formData.product) setFormData(prev => ({ ...prev, purchase_order_id: value, product: po.item_name }));
+                                    }
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o pedido de compra..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {purchaseOrders
+                                        .filter(o => 
+                                            o.reference?.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
+                                            o.item_name?.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
+                                            o.supplier_name?.toLowerCase().includes(poSearchTerm.toLowerCase())
+                                        )
+                                        .slice(0, 50)
+                                        .map((po) => (
+                                        <SelectItem key={po.id} value={po.id}>
+                                            {po.reference} — {po.item_name} ({po.quantity} {po.unit}) · {po.supplier_name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {formData.purchase_order_id && (() => {
+                            const po = purchaseOrders.find(o => o.id === formData.purchase_order_id);
+                            if (!po) return null;
+                            return (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+                                    <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">📦 Pedido de Compra Vinculado</p>
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div><span className="text-slate-500">Referência:</span> <span className="font-medium">{po.reference}</span></div>
+                                        <div><span className="text-slate-500">Fornecedor:</span> <span className="font-medium">{po.supplier_name}</span></div>
+                                        <div><span className="text-slate-500">Item:</span> <span className="font-medium">{po.item_name}</span></div>
+                                        <div><span className="text-slate-500">Qtd Pedida:</span> <span className="font-bold text-blue-700">{po.quantity} {po.unit}</span></div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                    </>
                 )}
 
                 <div className="space-y-2">
