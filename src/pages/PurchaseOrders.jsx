@@ -30,8 +30,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Search, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Plus, Search, CheckCircle, XCircle, Clock, CreditCard } from "lucide-react";
 import { formatCurrency, formatDate } from "@/components/utils/formatters";
+import PaymentDialog from "@/components/purchaseOrders/PaymentDialog";
 
 export default function PurchaseOrders() {
   const queryClient = useQueryClient();
@@ -39,6 +40,7 @@ export default function PurchaseOrders() {
   const [editingOrder, setEditingOrder] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentOrder, setPaymentOrder] = useState(null);
 
   const companyId = localStorage.getItem("selectedCompanyId");
 
