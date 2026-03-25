@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { formatBRL, formatDate, getTodayDate } from "@/components/utils/formatters";
 import { toast } from "sonner";
 import CostsDashboard from "@/components/reports/CostsDashboard";
+import CohortReport from "@/components/reports/CohortReport";
 import FinancialOverview from "@/components/reports/FinancialOverview";
 import StockDashboard from "@/components/reports/StockDashboard";
 
@@ -484,6 +485,7 @@ export default function Reports() {
           {!isOperator && <TabsTrigger value="statement">Extrato Bancário</TabsTrigger>}
           {!isOperator && <TabsTrigger value="payables">A Pagar/Receber</TabsTrigger>}
           {!isOperator && <TabsTrigger value="operational">Operacional</TabsTrigger>}
+          {!isOperator && <TabsTrigger value="cohort">📊 Cohort</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="stock">
@@ -1043,6 +1045,10 @@ export default function Reports() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="cohort" className="space-y-6">
+          <CohortReport filterCompanyId={filterCompanyId} />
         </TabsContent>
       </Tabs>
     </div>
