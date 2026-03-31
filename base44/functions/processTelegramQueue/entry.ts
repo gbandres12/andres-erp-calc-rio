@@ -1,16 +1,11 @@
-// processTelegramQueue v7 - prompts refinados
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
-import { GoogleGenAI } from 'npm:@google/genai@1.0.1';
-
-const MODEL_NAME = "gemini-2.0-flash";
-const AUDIO_MODEL = "gemini-2.0-flash";
+// processTelegramQueue v8 - usando Base44 InvokeLLM (sem Gemini direto)
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
-    console.error(`[v5] INIT model=${MODEL_NAME} | BOT=${BOT_TOKEN ? 'OK' : 'MISSING'} | GEMINI=${GEMINI_API_KEY ? 'OK' : 'MISSING'}`);
+    console.log(`[v8] INIT | BOT=${BOT_TOKEN ? 'OK' : 'MISSING'}`);
 
     if (!BOT_TOKEN) return Response.json({ error: "No BOT_TOKEN" }, { status: 500 });
 
@@ -44,6 +39,23 @@ Deno.serve(async (req) => {
         } catch (e) { console.error("[PHOTO] Exc:", e.message); }
     };
 
+    // Baixa arquivo do Telegram e faz upload para o Base44, retorna URL pública
+    const uploadTelegramFile = async (fileId) => {
+        const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+        const fileData = await fileRes.json();
+        if (!fileData.ok) throw new Error(`Telegram getFile failed: ${JSON.stringify(fileData)}`);
+
+        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+        const dlRes = await fetch(fileUrl);
+        if (!dlRes.ok) throw new Error(`Download failed HTTP ${dlRes.status}`);
+
+        const arrayBuffer = await dlRes.arrayBuffer();
+        const blob = new Blob([arrayBuffer]);
+        const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
+        console.log(`[MEDIA] Uploaded to Base44: ${file_url}`);
+        return file_url;
+    };
+
     // ── Parse payload ─────────────────────────────────────────────────────────
     let payload;
     try { payload = await req.json(); }
@@ -54,110 +66,26 @@ Deno.serve(async (req) => {
 
     let { chat_id, user_text, id: queueId, media_type, voice_file_id, photo_file_id } = queueItem;
     chat_id = String(chat_id);
-    console.error(`[v5] MSG chat=${chat_id} type=${media_type} text="${user_text?.slice(0, 60)}"`);
+    console.log(`[v8] MSG chat=${chat_id} type=${media_type} text="${user_text?.slice(0, 60)}"`);
 
-    // ── Multimedia processing ─────────────────────────────────────────────────
+    // ── Multimedia processing via Base44 InvokeLLM ────────────────────────────
     if ((media_type === "voice" && voice_file_id) || (media_type === "photo" && photo_file_id)) {
-        if (!GEMINI_API_KEY) {
-            await sendTelegram(chat_id, "⚠️ GEMINI_API_KEY não configurada.");
-            await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(() => {});
-            return Response.json({ status: "missing_gemini_key" });
-        }
-
         const isVoice = media_type === "voice";
         await sendAction(chat_id, isVoice ? "record_voice" : "upload_photo");
 
         try {
-            // 1. Pegar caminho do arquivo no Telegram
             const fileId = isVoice ? voice_file_id : photo_file_id;
-            console.error(`[MEDIA] getFile fileId=${fileId}`);
-            const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
-            const fileData = await fileRes.json();
-            if (!fileData.ok) throw new Error(`Telegram getFile failed: ${JSON.stringify(fileData)}`);
-            console.error(`[MEDIA] file_path=${fileData.result.file_path}`);
+            const uploadedUrl = await uploadTelegramFile(fileId);
 
-            // 2. Baixar arquivo
-            const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-            const dlRes = await fetch(fileUrl);
-            if (!dlRes.ok) throw new Error(`Download failed HTTP ${dlRes.status}`);
-            const arrayBuffer = await dlRes.arrayBuffer();
-            const bytes = new Uint8Array(arrayBuffer);
-            console.error(`[MEDIA] Downloaded ${bytes.byteLength} bytes`);
-
-            // 3. Base64 puro (sem Node Buffer)
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-            const base64Data = btoa(binary);
-            console.error(`[MEDIA] base64 length=${base64Data.length}`);
-
-            // 4. Chamar Gemini com multimodal
-            // Telegram voice = OGG+OPUS, Gemini aceita "audio/ogg" ou "audio/webm"
-            // Para imagens: detectar pelo file_path
-            let mimeType;
-            if (isVoice) {
-                mimeType = "audio/ogg";
-            } else {
-                const fp = fileData.result.file_path || "";
-                if (fp.endsWith(".jpg") || fp.endsWith(".jpeg")) mimeType = "image/jpeg";
-                else if (fp.endsWith(".png")) mimeType = "image/png";
-                else if (fp.endsWith(".webp")) mimeType = "image/webp";
-                else mimeType = "image/jpeg";
-            }
             const prompt = isVoice
-                ? `Você é um assistente financeiro especializado. Transcreva este áudio de voz em português brasileiro com precisão máxima.
-REGRAS:
-- Responda SOMENTE com o texto transcrito, sem introduções, sem prefixos como "O usuário disse:" ou "Transcrição:".
-- Mantenha números, valores monetários (R$), datas e nomes exatamente como falados.
-- Se houver ruído mas for possível entender parcialmente, transcreva o que entendeu.
-- Se completamente inaudível, responda exatamente: [Áudio inaudível]`
-                : `Você é um especialista em análise de documentos financeiros. Analise esta imagem com atenção.
+                ? `Transcreva este áudio de voz em português brasileiro com precisão máxima. Responda SOMENTE com o texto transcrito, sem introduções ou prefixos. Mantenha números, valores monetários (R$), datas e nomes exatamente como falados. Se completamente inaudível, responda: [Áudio inaudível]`
+                : `Analise esta imagem. Se for comprovante, nota fiscal, boleto, PIX ou recibo, extraia: Valor, Data, Emitente/Fornecedor, Descrição, Número do documento, Forma de pagamento. Se for outro tipo de imagem, descreva brevemente com foco em relevância financeira. Seja objetivo e preciso.`;
 
-Se for COMPROVANTE, NOTA FISCAL, BOLETO, PIX ou RECIBO, extraia estruturadamente:
-- 💰 Valor: R$ [valor exato]
-- 📅 Data: [data no formato DD/MM/AAAA]
-- 🏢 Emitente/Fornecedor: [nome]
-- 📋 Descrição: [o que é cobrado]
-- 🔢 Número do documento: [se visível]
-- 💳 Forma de pagamento: [se identificável]
+            const processedText = await base44.asServiceRole.integrations.Core.InvokeLLM({
+                prompt,
+                file_urls: [uploadedUrl]
+            });
 
-Se for outro tipo de imagem (produto, local, pessoa, etc.), descreva o que vê em no máximo 2 linhas com foco em relevância financeira ou operacional.
-
-Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem.`;
-
-            console.error(`[MEDIA] Enviando para Gemini: model=${MODEL_NAME} mimeType=${mimeType} size=${bytes.byteLength} base64len=${base64Data.length}`);
-            const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-
-            let processedText = null;
-            const mimesToTry = isVoice
-                ? ["audio/ogg", "audio/ogg; codecs=opus", "audio/webm", "audio/webm; codecs=opus", "audio/mpeg"]
-                : [mimeType];
-
-            for (const tryMime of mimesToTry) {
-                console.error(`[MEDIA] Tentando mimeType="${tryMime}"...`);
-                try {
-                    const result = await genAI.models.generateContent({
-                        model: MODEL_NAME,
-                        contents: [{ parts: [{ inlineData: { mimeType: tryMime, data: base64Data } }, { text: prompt }] }]
-                    });
-                    console.error(`[MEDIA] Gemini result keys: ${Object.keys(result || {}).join(',')}`);
-                    const txt = result?.text;
-                    console.error(`[MEDIA] Resposta com "${tryMime}": "${txt?.slice(0, 300)}"`);
-                    if (txt && txt.trim() && !txt.includes("[Áudio inaudível]")) {
-                        processedText = txt;
-                        console.error(`[MEDIA] Sucesso com mimeType="${tryMime}"`);
-                        break;
-                    } else if (txt) {
-                        // guardamos como fallback mas continuamos tentando
-                        processedText = processedText || txt;
-                    }
-                } catch (mimeErr) {
-                    console.error(`[MEDIA] Erro com "${tryMime}": ${mimeErr.message}`);
-                }
-            }
-
-            if (!processedText) throw new Error(`Gemini não conseguiu transcrever o áudio. file_path=${fileData.result.file_path} size=${bytes.byteLength} mimesTried=${mimesToTry.join(',')}`);
-
-            // 5. Atualizar user_text para o LLM principal
             if (isVoice) {
                 user_text = processedText;
                 await sendTelegram(chat_id, `🎤 *Ouvi:* "${user_text}"`);
@@ -168,14 +96,14 @@ Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem
             }
 
         } catch (mediaError) {
-            console.error("[MEDIA ERROR]:", mediaError.message, mediaError.stack);
+            console.error("[MEDIA ERROR]:", mediaError.message);
             await sendTelegram(chat_id, `😓 Não consegui processar o ${isVoice ? "áudio" : "imagem"}.\nErro: ${mediaError.message}`);
             await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(() => {});
             return Response.json({ status: "media_error", error: mediaError.message });
         }
     }
 
-    // ── Main LLM (agente financeiro) ─────────────────────────────────────────
+    // ── Main LLM via Base44 InvokeLLM ─────────────────────────────────────────
     sendAction(chat_id, "typing");
 
     let session = (await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id }))[0];
@@ -226,7 +154,12 @@ Seja objetivo e preciso. Não invente dados que não estejam visíveis na imagem
     const companyAccountsStr = accounts.filter(a => a.company_id === currentCompanyId)
         .map(a => `  • ${a.name} (ID: ${a.id}, Tipo: ${a.type}, Saldo: R$ ${(a.current_balance||0).toLocaleString('pt-BR',{minimumFractionDigits:2})})`).join("\n") || "  (Nenhuma conta cadastrada)";
 
-    const systemPrompt = `Você é o AGENTE FINANCEIRO EXECUTIVO de uma empresa agroindustrial. Data de hoje: ${todayStr}.
+    // Montar histórico como texto para o prompt
+    const historyText = history.length > 0
+        ? "\n\nHISTÓRICO DA CONVERSA:\n" + history.map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content}`).join("\n")
+        : "";
+
+    const fullPrompt = `Você é o AGENTE FINANCEIRO EXECUTIVO de uma empresa agroindustrial. Data de hoje: ${todayStr}.
 
 ═══════════════════════════════
 FILIAIS DISPONÍVEIS:
@@ -243,73 +176,79 @@ ${financialContext}
 
 REGRAS DE COMPORTAMENTO:
 1. Toda operação financeira EXIGE filial selecionada. Se não houver, pergunte antes de qualquer ação.
-2. Ao receber transcrição de áudio (começa com texto normal), processe como pedido normal.
+2. Ao receber transcrição de áudio (texto normal), processe como pedido normal.
 3. Ao receber análise de imagem (começa com "[Análise da Imagem]"), extraia os dados e pergunte ao usuário se deseja lançar como despesa/receita antes de criar.
 4. Nos relatórios financeiros, sempre mostre: saldo, total a pagar, total a receber, e destaque contas atrasadas.
 5. Ao listar transações, ordene por urgência: atrasadas primeiro, depois por vencimento.
 6. Seja direto e objetivo. Use emojis para facilitar leitura rápida no celular.
 7. Valores monetários sempre no formato R$ X.XXX,XX (padrão brasileiro).
 8. Ao lançar despesa de comprovante, confirme com o usuário os dados extraídos antes de salvar.
-9. Para áudios transcritos, interprete o contexto: "paguei X para Y" = add_expense com is_paid:true; "preciso pagar X" = add_expense com is_paid:false; "quanto devo?" = search_finance.
-10. Se a pergunta for sobre relatório geral, use search_finance para buscar dados e depois formate uma resposta completa.
+9. Para áudios transcritos: "paguei X para Y" = add_expense com is_paid:true; "preciso pagar X" = add_expense com is_paid:false.
+10. Se a pergunta for sobre relatório geral, use search_finance para buscar dados e formate uma resposta completa.${historyText}
 
-AÇÕES DISPONÍVEIS (responda SEMPRE em JSON puro, sem blocos de código):
-- "reply": informar, conversar, confirmar, solicitar dados
-- "set_company": trocar filial ativa
-- "add_expense": lançar nova transação (despesa OU receita)
-- "pay_bill": dar baixa em conta pendente existente
-- "search_finance": buscar e listar transações com filtros
-- "generate_chart": gerar gráfico visual
-- "create_client": cadastrar novo cliente/fornecedor
-- "create_sale": registrar nova venda
-- "search_products": buscar produtos no estoque
+MENSAGEM ATUAL DO USUÁRIO: ${user_text}
 
-ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
-{
-  "action": "reply|set_company|add_expense|pay_bill|search_finance|generate_chart|create_client|create_sale|search_products",
-  "reply_text": "Mensagem em Markdown para o usuário. Use *negrito*, _itálico_, listas com •. Seja claro e conciso.",
-  "target_company_id": null,
-  "expense_data": {
-    "description": "Descrição clara da transação",
-    "amount": 0,
-    "type": "despesa",
-    "category": "Categoria (ex: Combustível, Manutenção, Salários, Fornecedores, Vendas, Outros)",
-    "account_id": "",
-    "is_paid": false,
-    "due_date": null
-  },
-  "payment_data": {"search_term": "", "amount_approx": 0},
-  "finance_query": {"type": "all", "status": "all", "category_contains": null, "start_date": null, "end_date": null},
-  "chart_data": {"type": "bar", "title": "", "labels": [], "datasets": []},
-  "client_data": {},
-  "sale_data": {},
-  "search_query": ""
-}`;
+Responda com a ação correta no formato JSON especificado.`;
 
-    // Chamar Gemini LLM
+    const responseSchema = {
+        type: "object",
+        properties: {
+            action: { type: "string", enum: ["reply","set_company","add_expense","pay_bill","search_finance","generate_chart","create_client","create_sale","search_products"] },
+            reply_text: { type: "string" },
+            target_company_id: { type: "string" },
+            expense_data: {
+                type: "object",
+                properties: {
+                    description: { type: "string" },
+                    amount: { type: "number" },
+                    type: { type: "string" },
+                    category: { type: "string" },
+                    account_id: { type: "string" },
+                    is_paid: { type: "boolean" },
+                    due_date: { type: "string" }
+                }
+            },
+            payment_data: {
+                type: "object",
+                properties: {
+                    search_term: { type: "string" },
+                    amount_approx: { type: "number" }
+                }
+            },
+            finance_query: {
+                type: "object",
+                properties: {
+                    type: { type: "string" },
+                    status: { type: "string" },
+                    category_contains: { type: "string" },
+                    start_date: { type: "string" },
+                    end_date: { type: "string" }
+                }
+            },
+            chart_data: {
+                type: "object",
+                properties: {
+                    type: { type: "string" },
+                    title: { type: "string" },
+                    labels: { type: "array", items: { type: "string" } },
+                    datasets: { type: "array", items: { type: "object" } }
+                }
+            },
+            client_data: { type: "object" },
+            sale_data: { type: "object" },
+            search_query: { type: "string" }
+        },
+        required: ["action", "reply_text"]
+    };
+
     let response;
     try {
-        const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-        console.error(`[LLM] Chamando Gemini ${MODEL_NAME}. history=${history.length}`);
-
-        const historyMessages = [
-            { role: "user", parts: [{ text: systemPrompt }] },
-            { role: "model", parts: [{ text: '{"action":"reply","reply_text":"Pronto. Sou o Agente Financeiro Executivo.","target_company_id":null}' }] },
-            ...history.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
-            { role: "user", parts: [{ text: user_text }] }
-        ];
-
-        const result = await genAI.models.generateContent({
-            model: MODEL_NAME,
-            contents: historyMessages,
-            config: { responseMimeType: "application/json" }
+        console.log(`[LLM] Chamando Base44 InvokeLLM. history=${history.length}`);
+        response = await base44.asServiceRole.integrations.Core.InvokeLLM({
+            prompt: fullPrompt,
+            response_json_schema: responseSchema
         });
-        const content = result.text;
-        console.error(`[LLM] Resposta raw: "${content?.slice(0, 300)}"`);
-        if (!content) throw new Error("Gemini resposta vazia");
-        response = JSON.parse(content);
-        console.error(`[LLM] action=${response.action}`);
-
+        console.log(`[LLM] action=${response?.action}`);
     } catch (llmError) {
         console.error("[LLM ERROR]:", llmError.message);
         await sendTelegram(chat_id, "😵‍💫 Erro na IA. Tente novamente.");
@@ -317,7 +256,7 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
         return Response.json({ status: "llm_error", error: llmError.message });
     }
 
-    // Executar ação
+    // ── Executar ação ─────────────────────────────────────────────────────────
     let finalReply = response.reply_text || "Ok.";
     const action = response.action;
     let cid = resolveCompanyId(response.target_company_id);
@@ -336,10 +275,9 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
     } else {
         try {
             if (action === "add_expense") {
-                const ed = response.expense_data;
+                const ed = response.expense_data || {};
                 const acct = accounts.find(a => a.id === ed.account_id) || accounts.find(a => a.company_id === cid && a.type === 'caixa') || accounts.find(a => a.company_id === cid);
                 const today = new Date().toISOString().split('T')[0];
-                // Converter due_date do formato DD/MM/AAAA para AAAA-MM-DD se necessário
                 let dueDate = ed.due_date || today;
                 if (dueDate && dueDate.includes('/')) {
                     const parts = dueDate.split('/');
@@ -348,17 +286,17 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
                 await base44.asServiceRole.entities.Transaction.create({
                     description: ed.description || "Lançamento via Bot",
                     amount: Number(ed.amount), original_amount: Number(ed.amount),
-                    type: ed.type || "despesa", category: ed.category || "Geral",
+                    type: ed.type || "despesa", category: ed.category || "Outras Despesas",
                     status: ed.is_paid ? "pago" : "pendente",
                     paid_amount: ed.is_paid ? Number(ed.amount) : 0,
                     due_date: dueDate,
                     payment_date: ed.is_paid ? today : null,
                     account_id: acct?.id || null, company_id: cid, notes: "Via TelegramBot"
                 });
-                finalReply = `✅ *${ed.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!*\n📝 ${ed.description}\n💲 *R$ ${Number(ed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n📁 Categoria: ${ed.category || 'Geral'}\n📅 Venc: ${dueDate.split('-').reverse().join('/')}\n${ed.is_paid ? '✅ *Pago*' : '🟡 Pendente'}`;
+                finalReply = `✅ *${ed.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!*\n📝 ${ed.description}\n💲 *R$ ${Number(ed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n📁 ${ed.category || 'Outras Despesas'}\n📅 Venc: ${dueDate.split('-').reverse().join('/')}\n${ed.is_paid ? '✅ *Pago*' : '🟡 Pendente'}`;
             }
             else if (action === "pay_bill") {
-                const pd = response.payment_data;
+                const pd = response.payment_data || {};
                 const pending = await base44.asServiceRole.entities.Transaction.filter({
                     company_id: cid, status: { $in: ['pendente', 'atrasado', 'parcial'] },
                     description: { $regex: pd.search_term || "", $options: 'i' }
@@ -376,7 +314,7 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
                 }
             }
             else if (action === "search_finance") {
-                const fq = response.finance_query;
+                const fq = response.finance_query || {};
                 const isOpen = ['aberto','pendente','atrasado'].includes(fq.status);
                 const filter = { company_id: cid };
                 if (fq.type && fq.type !== 'all') filter.type = fq.type;
@@ -401,8 +339,8 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
                 }
             }
             else if (action === "generate_chart") {
-                const cd = response.chart_data;
-                const cfg = { type: cd.type, data: { labels: cd.labels, datasets: cd.datasets.map((ds, i) => ({ label: ds.label, data: ds.data, backgroundColor: i === 0 ? 'rgba(54,162,235,0.5)' : 'rgba(255,99,132,0.5)', borderColor: i === 0 ? 'rgba(54,162,235,1)' : 'rgba(255,99,132,1)', borderWidth: 1 })) }, options: { title: { display: true, text: cd.title } } };
+                const cd = response.chart_data || {};
+                const cfg = { type: cd.type || 'bar', data: { labels: cd.labels || [], datasets: (cd.datasets || []).map((ds, i) => ({ label: ds.label, data: ds.data, backgroundColor: i === 0 ? 'rgba(54,162,235,0.5)' : 'rgba(255,99,132,0.5)', borderColor: i === 0 ? 'rgba(54,162,235,1)' : 'rgba(255,99,132,1)', borderWidth: 1 })) }, options: { title: { display: true, text: cd.title || '' } } };
                 await sendPhoto(chat_id, `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(cfg))}&width=500&height=300&backgroundColor=white`, response.reply_text || "Gráfico");
                 finalReply = response.reply_text || "Gráfico enviado 👆";
             }
@@ -417,11 +355,11 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
                 finalReply = prods.length ? `📦 *Produtos:*\n` + prods.map(p => `▫️ ${p.name} | R$ ${(p.sale_price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Est: ${p.current_stock}`).join("\n") : `Nenhum produto encontrado.`;
             }
             else if (action === "create_sale") {
-                const { client_name, items, payment_method } = response.sale_data;
+                const { client_name, items, payment_method } = response.sale_data || {};
                 const client = (await base44.asServiceRole.entities.Contact.filter({ name: { $regex: client_name, $options: 'i' }, company_id: cid }))[0];
                 if (!client) throw new Error(`Cliente "${client_name}" não encontrado.`);
                 let saleItems = [], total = 0;
-                for (const item of items) {
+                for (const item of (items || [])) {
                     const prod = (await base44.asServiceRole.entities.Product.filter({ name: { $regex: item.product_name, $options: 'i' }, company_id: cid }))[0];
                     if (!prod) throw new Error(`Produto "${item.product_name}" não encontrado.`);
                     const it = prod.sale_price * item.quantity; total += it;
@@ -436,7 +374,7 @@ ESTRUTURA JSON OBRIGATÓRIA (todos os campos sempre presentes):
         }
     }
 
-    // Salvar histórico (manter até 20 mensagens = 10 trocas)
+    // Salvar histórico (até 20 mensagens = 10 trocas)
     history.push({ role: "user", content: user_text });
     history.push({ role: "assistant", content: finalReply });
     if (history.length > 20) history = history.slice(-20);
