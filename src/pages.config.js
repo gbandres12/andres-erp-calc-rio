@@ -77,6 +77,7 @@ import Vehicles from './pages/Vehicles';
 import Warehouse from './pages/Warehouse';
 import Weighing from './pages/Weighing';
 import PurchaseOrders from './pages/PurchaseOrders';
+import RecurringTransactions from './pages/RecurringTransactions';
 import __Layout from './Layout.jsx';
 
 
@@ -111,6 +112,7 @@ export const PAGES = {
     "Warehouse": Warehouse,
     "Weighing": Weighing,
     "PurchaseOrders": PurchaseOrders,
+    "RecurringTransactions": RecurringTransactions,
 }
 
 export const pagesConfig = {

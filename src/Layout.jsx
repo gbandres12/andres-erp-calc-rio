@@ -6,7 +6,7 @@ import {
   Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
   BarChart3, Settings, LogOut, Menu, X, ChevronDown,
-  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine, Bot, TrendingUp, ClipboardList
+  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine, Bot, TrendingUp, ClipboardList, RepeatIcon
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -55,6 +55,7 @@ const navigationGroups = [
       { title: "Contas a Receber", url: "Receivables", icon: ArrowDownToLine },
       { title: "Contas a Pagar", url: "Payables", icon: ArrowUpFromLine },
       { title: "Lançamentos", url: "Transactions", icon: FileText },
+      { title: "Recorrências", url: "RecurringTransactions", icon: RepeatIcon },
       { title: "Relatório Diário", url: "DailyFinancialReport", icon: BarChart3 },
       { title: "Clientes/Fornecedores", url: "Contacts", icon: Users }
     ]
