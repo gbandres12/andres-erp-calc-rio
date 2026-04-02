@@ -193,7 +193,7 @@ Responda com a ação correta no formato JSON especificado.`;
     const responseSchema = {
         type: "object",
         properties: {
-            action: { type: "string", enum: ["reply","set_company","add_expense","pay_bill","search_finance","generate_chart","create_client","create_sale","search_products"] },
+            action: { type: "string" },
             reply_text: { type: "string" },
             target_company_id: { type: "string" },
             expense_data: {
@@ -242,12 +242,23 @@ Responda com a ação correta no formato JSON especificado.`;
     };
 
     let response;
-    try {
-        console.log(`[LLM] Chamando Base44 InvokeLLM. history=${history.length}`);
-        response = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const invokeLLM = async () => {
+        return await base44.asServiceRole.integrations.Core.InvokeLLM({
             prompt: fullPrompt,
             response_json_schema: responseSchema
         });
+    };
+
+    try {
+        console.log(`[LLM] Chamando Base44 InvokeLLM. history=${history.length}`);
+        try {
+            response = await invokeLLM();
+        } catch (firstErr) {
+            console.log(`[LLM] Primeira tentativa falhou: ${firstErr.message}. Tentando novamente...`);
+            await new Promise(r => setTimeout(r, 2000));
+            response = await invokeLLM();
+        }
+        if (!response || !response.action) throw new Error("Resposta da IA inválida ou vazia");
         console.log(`[LLM] action=${response?.action}`);
     } catch (llmError) {
         console.error("[LLM ERROR]:", llmError.message);
