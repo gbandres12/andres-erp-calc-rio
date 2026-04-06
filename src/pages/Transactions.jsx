@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap, ScanLine, FileText } from "lucide-react";
+import CategorySuggestion from "@/components/transactions/CategorySuggestion";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1134,6 +1135,14 @@ export default function Transactions() {
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder={formData.type === 'receita' ? "Ex: Venda de Mercadoria" : "Ex: Compra de Material"}
+                    />
+                    <CategorySuggestion
+                      description={formData.description}
+                      type={formData.type}
+                      transactions={transactions}
+                      onSuggest={(cat) => {
+                        setFormData(prev => ({ ...prev, category: cat }));
+                      }}
                     />
                   </div>
 

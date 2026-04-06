@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette, RefreshCw, Bot } from "lucide-react";
+import FinancialAlertsSettings from "@/components/settings/FinancialAlertsSettings";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -54,6 +55,7 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="general">Geral</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
+          <TabsTrigger value="alerts">Alertas Financeiros</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
           <TabsTrigger value="integrations">Integrações</TabsTrigger>
@@ -171,6 +173,10 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="alerts">
+          <FinancialAlertsSettings />
         </TabsContent>
 
         <TabsContent value="security">
