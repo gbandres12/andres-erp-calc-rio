@@ -1,4 +1,4 @@
-// processTelegramQueue v9 - Agente Financeiro Vertical (rewrite completo)
+// processTelegramQueue v10 - fix $in operator
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -116,9 +116,12 @@ async function executeAction(base44, action, response, companies, accounts, sess
     if (action === 'pay_bill') {
         const pd = response.payment || {};
         if (!cid) return '⚠️ Informe a filial.';
-        const pending = await base44.asServiceRole.entities.Transaction.filter({
-            company_id: cid, status: { $in: ['pendente', 'atrasado', 'parcial'] }
-        });
+        const [pend1, pend2, pend3] = await Promise.all([
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'pendente' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'atrasado' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'parcial' }),
+        ]);
+        const pending = [...pend1, ...pend2, ...pend3];
         const term = (pd.search_term || '').toLowerCase();
         const match = pending.find(t => {
             const nameMatch = !term || t.description.toLowerCase().includes(term);
@@ -136,21 +139,35 @@ async function executeAction(base44, action, response, companies, accounts, sess
 
     if (action === 'search_transactions') {
         const q = response.query || {};
-        // Resolver filial pelo nome mencionado na query
-        const targetComp = q.company_name ? resolveCompany(companies, q.company_name) : null;
+        console.log('[SEARCH] query from LLM:', JSON.stringify(q));
+        console.log('[SEARCH] target_company from LLM:', response.target_company);
+
+        // Resolver filial pelo nome - tenta query.company_name e target_company
+        const companyHint = q.company_name || response.target_company || null;
+        const targetComp = companyHint ? resolveCompany(companies, companyHint) : null;
         const searchCid = targetComp?.id || cid || null;
+        console.log('[SEARCH] companyHint:', companyHint, '→ resolved:', targetComp?.name, '| searchCid:', searchCid);
 
-        const filter = {};
-        if (searchCid) filter.company_id = searchCid;
-        if (q.type && q.type !== 'all') filter.type = q.type;
-        if (q.status && q.status !== 'all') {
-            filter.status = q.status === 'aberto' ? { $in: ['pendente', 'atrasado', 'parcial'] } : q.status;
+        const baseFilter = {};
+        if (searchCid) baseFilter.company_id = searchCid;
+        if (q.type && q.type !== 'all') baseFilter.type = q.type;
+        console.log('[SEARCH] baseFilter:', JSON.stringify(baseFilter), 'status:', q.status);
+
+        let txs = [];
+        if (!q.status || q.status === 'all') {
+            txs = await base44.asServiceRole.entities.Transaction.filter(baseFilter, 'due_date', 50);
+        } else if (q.status === 'aberto') {
+            // SDK não suporta $in, fazer 3 queries
+            const [pend, atras, parc] = await Promise.all([
+                base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: 'pendente' }, 'due_date', 25),
+                base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: 'atrasado' }, 'due_date', 25),
+                base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: 'parcial' }, 'due_date', 25),
+            ]);
+            txs = [...pend, ...atras, ...parc].sort((a, b) => (a.due_date||'').localeCompare(b.due_date||''));
+        } else {
+            txs = await base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: q.status }, 'due_date', 25);
         }
-        if (q.description_contains) filter.description = { $regex: q.description_contains, $options: 'i' };
-        if (q.start_date) filter.due_date = { ...filter.due_date, $gte: q.start_date };
-        if (q.end_date) filter.due_date = { ...filter.due_date, $lte: q.end_date };
-
-        const txs = await base44.asServiceRole.entities.Transaction.filter(filter, 'due_date', 25);
+        console.log('[SEARCH] txs found:', txs.length);
         if (!txs.length) return `🔍 Nenhuma transação encontrada${targetComp ? ` em ${targetComp.name}` : ''}.`;
 
         const sIcon = { pago: '✅', pendente: '🟡', atrasado: '🔴', parcial: '🟠' };
@@ -219,7 +236,7 @@ Deno.serve(async (req) => {
     let { chat_id, user_text, id: queueId, media_type, voice_file_id, photo_file_id } = item;
     chat_id = String(chat_id);
 
-    console.log(`[v9] chat=${chat_id} type=${media_type} text="${user_text?.slice(0, 80)}"`);
+    console.log(`[v10] chat=${chat_id} type=${media_type} text="${user_text?.slice(0, 80)}"`);
 
     // ── Processar mídia ───────────────────────────────────────────────────────
     if ((media_type === 'voice' && voice_file_id) || (media_type === 'photo' && photo_file_id)) {
