@@ -1,384 +1,360 @@
-// processTelegramQueue v8 - usando Base44 InvokeLLM (sem Gemini direto)
+// processTelegramQueue v9 - Agente Financeiro Vertical (rewrite completo)
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
-Deno.serve(async (req) => {
-    const base44 = createClientFromRequest(req);
-    const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
-    console.log(`[v8] INIT | BOT=${BOT_TOKEN ? 'OK' : 'MISSING'}`);
+// ── Telegram Helpers ──────────────────────────────────────────────────────────
+async function sendTelegram(chatId, text) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
+    });
+}
 
-    if (!BOT_TOKEN) return Response.json({ error: "No BOT_TOKEN" }, { status: 500 });
+async function sendAction(chatId, action = "typing") {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, action })
+    }).catch(() => {});
+}
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    const sendTelegram = async (chatId, text) => {
-        try {
-            const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
-            });
-            const j = await r.json();
-            if (!j.ok) console.error(`[SEND] Err: ${JSON.stringify(j)}`);
-        } catch (e) { console.error("[SEND] Exc:", e.message); }
-    };
+async function sendPhoto(chatId, photoUrl, caption) {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, photo: photoUrl, caption })
+    }).catch(() => {});
+}
 
-    const sendAction = async (chatId, action = "typing") => {
-        try {
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, action })
-            });
-        } catch (e) { console.error("[ACTION] Exc:", e.message); }
-    };
+// ── Upload mídia do Telegram → Base44 ────────────────────────────────────────
+async function uploadTelegramFile(base44, fileId) {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(`getFile failed: ${JSON.stringify(data)}`);
+    const dl = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${data.result.file_path}`);
+    if (!dl.ok) throw new Error(`Download failed HTTP ${dl.status}`);
+    const blob = new Blob([await dl.arrayBuffer()]);
+    const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
+    return file_url;
+}
 
-    const sendPhoto = async (chatId, photoUrl, caption) => {
-        try {
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, photo: photoUrl, caption })
-            });
-        } catch (e) { console.error("[PHOTO] Exc:", e.message); }
-    };
+// ── Formatar valor BRL ────────────────────────────────────────────────────────
+const brl = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const fmtDate = (d) => (d || '').split('-').reverse().join('/');
 
-    // Baixa arquivo do Telegram e faz upload para o Base44, retorna URL pública
-    const uploadTelegramFile = async (fileId) => {
-        const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
-        const fileData = await fileRes.json();
-        if (!fileData.ok) throw new Error(`Telegram getFile failed: ${JSON.stringify(fileData)}`);
-
-        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-        const dlRes = await fetch(fileUrl);
-        if (!dlRes.ok) throw new Error(`Download failed HTTP ${dlRes.status}`);
-
-        const arrayBuffer = await dlRes.arrayBuffer();
-        const blob = new Blob([arrayBuffer]);
-        const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
-        console.log(`[MEDIA] Uploaded to Base44: ${file_url}`);
-        return file_url;
-    };
-
-    // ── Parse payload ─────────────────────────────────────────────────────────
-    let payload;
-    try { payload = await req.json(); }
-    catch (e) { return Response.json({ error: "invalid_json" }, { status: 400 }); }
-
-    const queueItem = payload.data;
-    if (!queueItem || !queueItem.user_text) return Response.json({ status: "ignored" });
-
-    let { chat_id, user_text, id: queueId, media_type, voice_file_id, photo_file_id } = queueItem;
-    chat_id = String(chat_id);
-    console.log(`[v8] MSG chat=${chat_id} type=${media_type} text="${user_text?.slice(0, 60)}"`);
-
-    // ── Multimedia processing via Base44 InvokeLLM ────────────────────────────
-    if ((media_type === "voice" && voice_file_id) || (media_type === "photo" && photo_file_id)) {
-        const isVoice = media_type === "voice";
-        await sendAction(chat_id, isVoice ? "record_voice" : "upload_photo");
-
-        try {
-            const fileId = isVoice ? voice_file_id : photo_file_id;
-            const uploadedUrl = await uploadTelegramFile(fileId);
-
-            const prompt = isVoice
-                ? `Transcreva este áudio de voz em português brasileiro com precisão máxima. Responda SOMENTE com o texto transcrito, sem introduções ou prefixos. Mantenha números, valores monetários (R$), datas e nomes exatamente como falados. Se completamente inaudível, responda: [Áudio inaudível]`
-                : `Analise esta imagem. Se for comprovante, nota fiscal, boleto, PIX ou recibo, extraia: Valor, Data, Emitente/Fornecedor, Descrição, Número do documento, Forma de pagamento. Se for outro tipo de imagem, descreva brevemente com foco em relevância financeira. Seja objetivo e preciso.`;
-
-            const processedText = await base44.asServiceRole.integrations.Core.InvokeLLM({
-                prompt,
-                file_urls: [uploadedUrl]
-            });
-
-            if (isVoice) {
-                user_text = processedText;
-                await sendTelegram(chat_id, `🎤 *Ouvi:* "${user_text}"`);
-            } else {
-                const cap = user_text && user_text !== "[Photo Message]" ? `Legenda: ${user_text}\n` : "";
-                user_text = `${cap}[Análise da Imagem]: ${processedText}`;
-                await sendTelegram(chat_id, `📷 *Analisei a imagem:*\n${processedText}`);
-            }
-
-        } catch (mediaError) {
-            console.error("[MEDIA ERROR]:", mediaError.message);
-            await sendTelegram(chat_id, `😓 Não consegui processar o ${isVoice ? "áudio" : "imagem"}.\nErro: ${mediaError.message}`);
-            await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(() => {});
-            return Response.json({ status: "media_error", error: mediaError.message });
-        }
-    }
-
-    // ── Main LLM via Base44 InvokeLLM ─────────────────────────────────────────
-    sendAction(chat_id, "typing");
-
-    let session = (await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id }))[0];
-    if (!session) {
-        session = await base44.asServiceRole.entities.TelegramChatSession.create({ chat_id, history: [] });
-    }
-    let history = (session.history || []).slice(-10);
-
-    const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
-    const accounts = await base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true });
-    let currentCompanyId = session.selected_company_id;
-    const currentCompanyName = companies.find(c => c.id === currentCompanyId)?.name || "Nenhuma";
-
-    const resolveCompanyId = (id) => {
-        if (id) return companies.find(c => c.id === id) ? id : null;
-        if (currentCompanyId) return currentCompanyId;
-        if (companies.length === 1) return companies[0].id;
-        return null;
-    };
-
-    // Contexto financeiro - carrega filial ativa OU todas as filiais
-    const fmt = t => `  - ${t.description} | ${t.contact_name || ''} | R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Venc: ${(t.due_date || '').split('-').reverse().join('/')}`;
-    const companiesToLoad = currentCompanyId ? companies.filter(c => c.id === currentCompanyId) : companies;
-    
-    let financialContext = '';
-    for (const comp of companiesToLoad) {
+// ── Carregar contexto financeiro de uma ou todas as filiais ───────────────────
+async function loadFinancialContext(base44, companies, accounts, companyId) {
+    const targets = companyId ? companies.filter(c => c.id === companyId) : companies;
+    let ctx = '';
+    for (const comp of targets) {
         const [pp, pl, rp, rl] = await Promise.all([
             base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pendente' }),
             base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'atrasado' }),
             base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pendente' }),
-            base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'atrasado' })
+            base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'atrasado' }),
         ]);
-        const spp = pp.reduce((s, t) => s + t.amount, 0);
-        const spl = pl.reduce((s, t) => s + t.amount, 0);
-        const srp = rp.reduce((s, t) => s + t.amount, 0);
-        const srl = rl.reduce((s, t) => s + t.amount, 0);
-        const topLate = pl.sort((a, b) => b.amount - a.amount).slice(0, 5);
-        const topPend = pp.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')).slice(0, 3);
-        const compAccounts = accounts.filter(a => a.company_id === comp.id);
-        const totalBal = compAccounts.reduce((s, a) => s + (a.current_balance || 0), 0);
-        financialContext += `\n\n📍 FILIAL: ${comp.name}\n💰 Saldo: R$ ${totalBal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n🔴 A Pagar: Atrasado R$ ${spl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${pl.length}) | A vencer R$ ${spp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${pp.length})\n🟢 A Receber: Atrasado R$ ${srl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | A vencer R$ ${srp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n⚠️ Atrasadas: ${topLate.length ? topLate.map(fmt).join('\n') : '(Nenhuma)'}\n📅 Próximas: ${topPend.length ? topPend.map(fmt).join('\n') : '(Nenhuma)'}`;
+        const bal = accounts.filter(a => a.company_id === comp.id).reduce((s, a) => s + (a.current_balance || 0), 0);
+        const topLate = [...pl].sort((a, b) => b.amount - a.amount).slice(0, 5)
+            .map(t => `    • ${t.description} | ${brl(t.amount)} | venc ${fmtDate(t.due_date)}`).join('\n') || '    (nenhuma)';
+        const topPend = [...pp].sort((a, b) => (a.due_date||'').localeCompare(b.due_date||'')).slice(0, 3)
+            .map(t => `    • ${t.description} | ${brl(t.amount)} | venc ${fmtDate(t.due_date)}`).join('\n') || '    (nenhuma)';
+        ctx += `\n--- ${comp.name} (ID: ${comp.id}) ---
+  Saldo: ${brl(bal)}
+  A Pagar Atrasado: ${brl(pl.reduce((s,t)=>s+t.amount,0))} (${pl.length} contas)
+  A Pagar Pendente: ${brl(pp.reduce((s,t)=>s+t.amount,0))} (${pp.length} contas)
+  A Receber Atrasado: ${brl(rl.reduce((s,t)=>s+t.amount,0))} (${rl.length} contas)
+  A Receber Pendente: ${brl(rp.reduce((s,t)=>s+t.amount,0))} (${rp.length} contas)
+  Top Atrasadas:\n${topLate}
+  Próximas a vencer:\n${topPend}`;
     }
-    if (!financialContext) financialContext = 'Sem dados financeiros.';
+    return ctx || 'Sem dados.';
+}
 
-    const todayStr = new Date().toLocaleDateString('pt-BR');
-    const companyAccountsStr = accounts.filter(a => a.company_id === currentCompanyId)
-        .map(a => `  • ${a.name} (ID: ${a.id}, Tipo: ${a.type}, Saldo: R$ ${(a.current_balance||0).toLocaleString('pt-BR',{minimumFractionDigits:2})})`).join("\n") || "  (Nenhuma conta cadastrada)";
+// ── Resolver filial por nome ──────────────────────────────────────────────────
+function resolveCompany(companies, nameOrId) {
+    if (!nameOrId) return null;
+    return companies.find(c => c.id === nameOrId) ||
+           companies.find(c => c.name.toLowerCase().includes(nameOrId.toLowerCase())) ||
+           null;
+}
 
-    // Montar histórico como texto para o prompt (limitar tamanho)
-    const historyText = history.length > 0
-        ? "\n\nHISTÓRICO RECENTE:\n" + history.map(m => `${m.role === 'user' ? 'U' : 'A'}: ${m.content.slice(0, 200)}`).join("\n")
-        : "";
+// ── Executar ações ────────────────────────────────────────────────────────────
+async function executeAction(base44, action, response, companies, accounts, session, chatId) {
+    const cid = resolveCompany(companies, response.target_company)?.id ||
+                session.selected_company_id;
 
-    const allAccountsStr = accounts.map(a => `  • ${a.name} (ID:${a.id}, Filial:${companies.find(c=>c.id===a.company_id)?.name||a.company_id}, Saldo: R$ ${(a.current_balance||0).toLocaleString('pt-BR',{minimumFractionDigits:2})})`).join('\n') || '(Nenhuma conta)';
+    // Atualizar filial na sessão se mudou
+    if (response.target_company && resolveCompany(companies, response.target_company)?.id !== session.selected_company_id) {
+        const nc = resolveCompany(companies, response.target_company);
+        if (nc) {
+            await base44.asServiceRole.entities.TelegramChatSession.update(session.id, { selected_company_id: nc.id });
+            session.selected_company_id = nc.id;
+        }
+    }
 
-    const fullPrompt = `Agente financeiro de empresa com 3 filiais (mineração/calcário). Data: ${todayStr}.
+    if (action === 'add_transaction') {
+        const d = response.transaction || {};
+        if (!cid) return '⚠️ Informe a filial para registrar o lançamento.';
+        const today = new Date().toISOString().split('T')[0];
+        let due = d.due_date || today;
+        if (due.includes('/')) { const p = due.split('/'); due = `${p[2]}-${p[1]}-${p[0]}`; }
+        const acct = accounts.find(a => a.id === d.account_id) ||
+                     accounts.find(a => a.company_id === cid && a.type === 'caixa') ||
+                     accounts.find(a => a.company_id === cid);
+        await base44.asServiceRole.entities.Transaction.create({
+            description: d.description || 'Lançamento via Bot',
+            amount: Number(d.amount), original_amount: Number(d.amount),
+            type: d.type || 'despesa',
+            category: d.category || (d.type === 'receita' ? 'Outras Receitas' : 'Outras Despesas'),
+            status: d.is_paid ? 'pago' : 'pendente',
+            paid_amount: d.is_paid ? Number(d.amount) : 0,
+            due_date: due, payment_date: d.is_paid ? today : null,
+            account_id: acct?.id || null, company_id: cid, notes: 'Via TelegramBot'
+        });
+        return `✅ *${d.type === 'receita' ? 'Receita' : 'Despesa'} lançada!*\n📝 ${d.description}\n💰 ${brl(d.amount)}\n📁 ${d.category || 'Outras'}\n📅 Venc: ${fmtDate(due)}\n${d.is_paid ? '✅ Pago' : '🟡 Pendente'}`;
+    }
 
-FILIAIS DISPONÍVEIS (use o ID correto nas ações):
+    if (action === 'pay_bill') {
+        const pd = response.payment || {};
+        if (!cid) return '⚠️ Informe a filial.';
+        const pending = await base44.asServiceRole.entities.Transaction.filter({
+            company_id: cid, status: { $in: ['pendente', 'atrasado', 'parcial'] }
+        });
+        const term = (pd.search_term || '').toLowerCase();
+        const match = pending.find(t => {
+            const nameMatch = !term || t.description.toLowerCase().includes(term);
+            const amtMatch = !pd.amount || Math.abs(t.amount - pd.amount) < t.amount * 0.2;
+            return nameMatch && amtMatch;
+        });
+        if (!match) return `⚠️ Conta não encontrada: "${pd.search_term || ''}"`;
+        await base44.asServiceRole.entities.Transaction.update(match.id, {
+            status: 'pago', paid_amount: match.amount,
+            payment_date: new Date().toISOString().split('T')[0],
+            notes: (match.notes || '') + '\nBaixa via TelegramBot'
+        });
+        return `✅ *Baixa realizada!*\n${match.description} — ${brl(match.amount)}`;
+    }
+
+    if (action === 'search_transactions') {
+        const q = response.query || {};
+        // Resolver filial pelo nome mencionado na query
+        const targetComp = q.company_name ? resolveCompany(companies, q.company_name) : null;
+        const searchCid = targetComp?.id || cid || null;
+
+        const filter = {};
+        if (searchCid) filter.company_id = searchCid;
+        if (q.type && q.type !== 'all') filter.type = q.type;
+        if (q.status && q.status !== 'all') {
+            filter.status = q.status === 'aberto' ? { $in: ['pendente', 'atrasado', 'parcial'] } : q.status;
+        }
+        if (q.description_contains) filter.description = { $regex: q.description_contains, $options: 'i' };
+        if (q.start_date) filter.due_date = { ...filter.due_date, $gte: q.start_date };
+        if (q.end_date) filter.due_date = { ...filter.due_date, $lte: q.end_date };
+
+        const txs = await base44.asServiceRole.entities.Transaction.filter(filter, 'due_date', 25);
+        if (!txs.length) return `🔍 Nenhuma transação encontrada${targetComp ? ` em ${targetComp.name}` : ''}.`;
+
+        const sIcon = { pago: '✅', pendente: '🟡', atrasado: '🔴', parcial: '🟠' };
+        const lines = txs.map(t => {
+            const comp = companies.find(c => c.id === t.company_id);
+            return `${sIcon[t.status] || '▪️'} *${t.description}*${comp && !searchCid ? ` [${comp.name}]` : ''}\n   └ ${brl(t.amount)} | ${t.status} | ${fmtDate(t.due_date)}`;
+        });
+        const total = txs.reduce((s, t) => s + t.amount, 0);
+        const header = targetComp ? `📊 *${targetComp.name}* — ${txs.length} contas` : `📊 *${txs.length} transações encontradas*`;
+        return `${header}\n\n${lines.join('\n')}\n\n*Total: ${brl(total)}*`;
+    }
+
+    if (action === 'create_contact') {
+        if (!cid) return '⚠️ Informe a filial.';
+        const cd = { ...response.contact, company_id: cid, type: response.contact?.type || 'cliente' };
+        const ex = (await base44.asServiceRole.entities.Contact.filter({ name: { $regex: cd.name, $options: 'i' }, company_id: cid }))[0];
+        if (ex) return `⚠️ *Contato já existe:* ${ex.name}`;
+        const nc = await base44.asServiceRole.entities.Contact.create(cd);
+        return `✅ *Cadastrado!* ${nc.name}`;
+    }
+
+    if (action === 'search_products') {
+        const searchCid = cid || null;
+        const filter = { is_active: true };
+        if (searchCid) filter.company_id = searchCid;
+        if (response.search_term) filter.name = { $regex: response.search_term, $options: 'i' };
+        const prods = await base44.asServiceRole.entities.Product.filter(filter, '-name', 10);
+        if (!prods.length) return '📦 Nenhum produto encontrado.';
+        return `📦 *Produtos:*\n` + prods.map(p => `▫️ ${p.name} | ${brl(p.sale_price)} | Est: ${p.current_stock}`).join('\n');
+    }
+
+    if (action === 'generate_chart') {
+        const cd = response.chart || {};
+        const cfg = {
+            type: cd.type || 'bar',
+            data: {
+                labels: cd.labels || [],
+                datasets: (cd.datasets || []).map((ds, i) => ({
+                    label: ds.label, data: ds.data,
+                    backgroundColor: i === 0 ? 'rgba(54,162,235,0.5)' : 'rgba(255,99,132,0.5)',
+                    borderColor: i === 0 ? 'rgba(54,162,235,1)' : 'rgba(255,99,132,1)',
+                    borderWidth: 1
+                }))
+            },
+            options: { plugins: { title: { display: !!cd.title, text: cd.title || '' } } }
+        };
+        await sendPhoto(chatId, `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(cfg))}&width=500&height=300&backgroundColor=white`, cd.title || 'Gráfico');
+        return response.reply || 'Gráfico enviado 👆';
+    }
+
+    return null; // usa reply_text padrão
+}
+
+// ── Handler Principal ─────────────────────────────────────────────────────────
+Deno.serve(async (req) => {
+    if (!BOT_TOKEN) return Response.json({ error: 'No BOT_TOKEN' }, { status: 500 });
+
+    const base44 = createClientFromRequest(req);
+
+    let payload;
+    try { payload = await req.json(); } catch { return Response.json({ error: 'invalid_json' }, { status: 400 }); }
+
+    const item = payload.data;
+    if (!item?.user_text) return Response.json({ status: 'ignored' });
+
+    let { chat_id, user_text, id: queueId, media_type, voice_file_id, photo_file_id } = item;
+    chat_id = String(chat_id);
+
+    console.log(`[v9] chat=${chat_id} type=${media_type} text="${user_text?.slice(0, 80)}"`);
+
+    // ── Processar mídia ───────────────────────────────────────────────────────
+    if ((media_type === 'voice' && voice_file_id) || (media_type === 'photo' && photo_file_id)) {
+        const isVoice = media_type === 'voice';
+        await sendAction(chat_id, isVoice ? 'record_voice' : 'upload_photo');
+        try {
+            const fileId = isVoice ? voice_file_id : photo_file_id;
+            const url = await uploadTelegramFile(base44, fileId);
+            const prompt = isVoice
+                ? 'Transcreva este áudio em português brasileiro. Responda APENAS com o texto transcrito.'
+                : 'Analise esta imagem. Se for comprovante/nota fiscal, extraia: valor, data, fornecedor, descrição. Seja objetivo.';
+            const result = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt, file_urls: [url] });
+            if (isVoice) {
+                user_text = result;
+                await sendTelegram(chat_id, `🎤 *Ouvi:* "${user_text}"`);
+            } else {
+                const cap = user_text && user_text !== '[Photo Message]' ? `Legenda: ${user_text}\n` : '';
+                user_text = `${cap}[Imagem]: ${result}`;
+                await sendTelegram(chat_id, `📷 *Imagem analisada:*\n${result}`);
+            }
+        } catch (e) {
+            console.error('[MEDIA]', e.message);
+            await sendTelegram(chat_id, `😓 Erro ao processar mídia: ${e.message}`);
+            await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(() => {});
+            return Response.json({ status: 'media_error' });
+        }
+    }
+
+    await sendAction(chat_id, 'typing');
+
+    // ── Sessão e contexto ─────────────────────────────────────────────────────
+    let session = (await base44.asServiceRole.entities.TelegramChatSession.filter({ chat_id }))[0];
+    if (!session) session = await base44.asServiceRole.entities.TelegramChatSession.create({ chat_id, history: [] });
+
+    const [companies, accounts] = await Promise.all([
+        base44.asServiceRole.entities.Company.filter({ is_active: true }),
+        base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true })
+    ]);
+
+    const cid = session.selected_company_id;
+    const activeName = companies.find(c => c.id === cid)?.name || 'Nenhuma';
+    const today = new Date().toLocaleDateString('pt-BR');
+
+    const financialCtx = await loadFinancialContext(base44, companies, accounts, cid);
+
+    const history = (session.history || []).slice(-8).map(m =>
+        `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content.slice(0, 150)}`
+    ).join('\n');
+
+    // ── Prompt ────────────────────────────────────────────────────────────────
+    const prompt = `Você é um assistente financeiro de uma empresa com 3 filiais (mineração de calcário).
+Data: ${today}
+
+FILIAIS DISPONÍVEIS:
 ${companies.map(c => `  • ${c.name} → ID: ${c.id}`).join('\n')}
 
-FILIAL ATIVA NA SESSÃO: ${currentCompanyName} (ID: ${currentCompanyId || 'NENHUMA'})
+FILIAL ATIVA: ${activeName} (ID: ${cid || 'nenhuma'})
 
-TODAS AS CONTAS:
-${allAccountsStr}
+SITUAÇÃO FINANCEIRA (tempo real):
+${financialCtx}
 
-DADOS FINANCEIROS POR FILIAL (TEMPO REAL):
-${financialContext}
+CONTAS BANCÁRIAS:
+${accounts.map(a => `  • ${a.name} | ${companies.find(c=>c.id===a.company_id)?.name||'?'} | ${brl(a.current_balance)}`).join('\n') || '(nenhuma)'}
 
-ACÕES DISPONÍVEIS (action field):
-- reply: resposta simples/informativa (PADRÃO)
-- select_company: mudar filial (use target_company_id)
-- add_expense: lançar despesa/receita (use expense_data)
-- pay_bill: dar baixa em conta (use payment_data)
-- search_finance: buscar/listar transações (use finance_query)
-- create_client: cadastrar contato (use client_data)
-- search_products: buscar produtos (use search_query)
-- generate_chart: gerar gráfico (use chart_data)
+${history ? `HISTÓRICO:\n${history}\n` : ''}
+MENSAGEM DO USUÁRIO: ${user_text}
 
-REGRAS:
-1. Para perguntas sobre contas atrasadas/vencidas → action: search_finance com status: atrasado
-2. Para criar lançamento → action: add_expense
-3. Quando perguntarem sobre "todas as filiais" → responda com dados das 3 filiais (já estão no contexto)
-4. "paguei X" = add_expense com is_paid:true; "preciso pagar X" = is_paid:false
-5. Seja direto, use emojis, valores em R$ X.XXX,XX
-6. Para operações de criação, SEMPRE confirme a filial antes
-7. Para search_finance: se o usuário mencionar nome de filial (ex: "santarém", "mucajai"), coloque em finance_query.company_name. Se type não informado mas contexto indica despesa, use type: "despesa"
-8. finance_query deve sempre ter pelo menos: type ("despesa", "receita" ou "all") e status ("pendente", "atrasado", "all")${historyText}
+INSTRUÇÕES:
+- Responda em JSON com os campos: action, reply, e os dados específicos da ação.
+- Para consultar transações: action="search_transactions", query={type, status, company_name, description_contains}
+- Para lançar: action="add_transaction", transaction={description, amount, type, category, due_date, is_paid}
+- Para dar baixa: action="pay_bill", payment={search_term, amount}
+- Para cadastrar contato: action="create_contact", contact={name, phone, email, type}
+- Para buscar produtos: action="search_products", search_term="..."
+- Para gráfico: action="generate_chart", chart={type, title, labels, datasets}
+- Para respostas informativas: action="reply"
+- Se mencionar filial por nome (ex: "santarém", "mucajai", "roraima"), coloque em query.company_name ou target_company
+- Se type não mencionado em busca de "contas a pagar" → use type="despesa"
+- Se status não mencionado em "contas a pagar" → use status="aberto"
+- Seja direto, use emojis, valores em R$ X.XXX,XX`;
 
-MENSAGEM: ${user_text}
-
-Responda em JSON.`;
-
-    const responseSchema = {
-        type: "object",
-        properties: {
-            action: { type: "string" },
-            reply_text: { type: "string" },
-            target_company_id: { type: "string" },
-            expense_data: { type: "object", additionalProperties: true },
-            payment_data: { type: "object", additionalProperties: true },
-            finance_query: { type: "object", additionalProperties: true },
-            chart_data: { type: "object", additionalProperties: true },
-            client_data: { type: "object", additionalProperties: true },
-            sale_data: { type: "object", additionalProperties: true },
-            search_query: { type: "string" }
-        },
-        required: ["action", "reply_text"]
-    };
-
-    let response;
-    const invokeLLM = async () => {
-        return await base44.asServiceRole.integrations.Core.InvokeLLM({
-            prompt: fullPrompt,
-            response_json_schema: responseSchema
-        });
-    };
-
+    // ── Chamar LLM ────────────────────────────────────────────────────────────
+    let aiResponse;
     try {
-        console.log(`[LLM] Chamando Base44 InvokeLLM. history=${history.length}`);
-        try {
-            response = await invokeLLM();
-        } catch (firstErr) {
-            console.log(`[LLM] 1ª tentativa falhou: ${firstErr.message}. Retentando...`);
-            await new Promise(r => setTimeout(r, 2000));
-            response = await invokeLLM();
-        }
-        // Se action não veio, default para reply
-        if (!response) throw new Error("Resposta da IA vazia");
-        if (!response.action) response.action = "reply";
-        console.log(`[LLM] action=${response?.action}`);
-    } catch (llmError) {
-        console.error("[LLM ERROR]:", llmError.message);
-        await sendTelegram(chat_id, "😵‍💫 Erro na IA. Tente novamente.");
+        aiResponse = await base44.asServiceRole.integrations.Core.InvokeLLM({
+            prompt,
+            response_json_schema: {
+                type: 'object',
+                properties: {
+                    action: { type: 'string' },
+                    reply: { type: 'string' },
+                    target_company: { type: 'string' },
+                    transaction: { type: 'object', additionalProperties: true },
+                    payment: { type: 'object', additionalProperties: true },
+                    query: { type: 'object', additionalProperties: true },
+                    contact: { type: 'object', additionalProperties: true },
+                    search_term: { type: 'string' },
+                    chart: { type: 'object', additionalProperties: true }
+                },
+                required: ['action', 'reply']
+            }
+        });
+        if (!aiResponse) throw new Error('Resposta vazia');
+        if (!aiResponse.action) aiResponse.action = 'reply';
+        console.log(`[v9] action=${aiResponse.action}`);
+    } catch (e) {
+        console.error('[LLM]', e.message);
+        await sendTelegram(chat_id, '😵‍💫 Erro na IA. Tente novamente.');
         await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(() => {});
-        return Response.json({ status: "llm_error", error: llmError.message });
+        return Response.json({ status: 'llm_error', error: e.message });
     }
 
     // ── Executar ação ─────────────────────────────────────────────────────────
-    let finalReply = response.reply_text || "Ok.";
-    const action = response.action;
-    let cid = resolveCompanyId(response.target_company_id);
-
-    if (response.target_company_id && response.target_company_id !== currentCompanyId) {
-        const nc = companies.find(c => c.id === response.target_company_id);
-        if (nc) {
-            await base44.asServiceRole.entities.TelegramChatSession.update(session.id, { selected_company_id: nc.id });
-            currentCompanyId = nc.id; cid = nc.id;
-        }
-    }
-
-    const needsCompany = ["search_products","create_sale","create_client","add_expense","pay_bill","generate_chart"].includes(action);
-    if (needsCompany && !cid) {
-        finalReply = `🏢 *Qual filial?*\nOpções: ${companies.map(c => c.name).join(", ")}`;
-    } else {
+    let finalReply = aiResponse.reply || 'Ok.';
+    if (aiResponse.action !== 'reply') {
         try {
-            if (action === "add_expense") {
-                const ed = response.expense_data || {};
-                const acct = accounts.find(a => a.id === ed.account_id) || accounts.find(a => a.company_id === cid && a.type === 'caixa') || accounts.find(a => a.company_id === cid);
-                const today = new Date().toISOString().split('T')[0];
-                let dueDate = ed.due_date || today;
-                if (dueDate && dueDate.includes('/')) {
-                    const parts = dueDate.split('/');
-                    if (parts.length === 3) dueDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                }
-                await base44.asServiceRole.entities.Transaction.create({
-                    description: ed.description || "Lançamento via Bot",
-                    amount: Number(ed.amount), original_amount: Number(ed.amount),
-                    type: ed.type || "despesa", category: ed.category || "Outras Despesas",
-                    status: ed.is_paid ? "pago" : "pendente",
-                    paid_amount: ed.is_paid ? Number(ed.amount) : 0,
-                    due_date: dueDate,
-                    payment_date: ed.is_paid ? today : null,
-                    account_id: acct?.id || null, company_id: cid, notes: "Via TelegramBot"
-                });
-                finalReply = `✅ *${ed.type === 'receita' ? 'Receita' : 'Despesa'} Lançada!*\n📝 ${ed.description}\n💲 *R$ ${Number(ed.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n📁 ${ed.category || 'Outras Despesas'}\n📅 Venc: ${dueDate.split('-').reverse().join('/')}\n${ed.is_paid ? '✅ *Pago*' : '🟡 Pendente'}`;
-            }
-            else if (action === "pay_bill") {
-                const pd = response.payment_data || {};
-                const pending = await base44.asServiceRole.entities.Transaction.filter({
-                    company_id: cid, status: { $in: ['pendente', 'atrasado', 'parcial'] },
-                    description: { $regex: pd.search_term || "", $options: 'i' }
-                });
-                const match = pending.find(t => !pd.amount_approx || Math.abs(t.amount - pd.amount_approx) < (t.amount * 0.15));
-                if (match) {
-                    await base44.asServiceRole.entities.Transaction.update(match.id, {
-                        status: 'pago', paid_amount: match.amount,
-                        payment_date: new Date().toISOString().split('T')[0],
-                        notes: (match.notes || "") + "\nBaixa via TelegramBot"
-                    });
-                    finalReply = `✅ *Conta Paga!*\n${match.description} — R$ ${match.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                } else {
-                    finalReply = `⚠️ Não encontrei conta pendente com "${pd.search_term}".`;
-                }
-            }
-            else if (action === "search_finance") {
-                const fq = response.finance_query || {};
-                const isOpen = ['aberto','pendente','atrasado'].includes(fq.status);
-                
-                // Resolve company by name if provided in query
-                let searchCid = cid;
-                if (!searchCid && fq.company_name) {
-                    const matched = companies.find(c => c.name.toLowerCase().includes(fq.company_name.toLowerCase()));
-                    if (matched) searchCid = matched.id;
-                }
-                
-                const filter = {};
-                if (searchCid) filter.company_id = searchCid; // if null, search all companies
-                if (fq.type && fq.type !== 'all') filter.type = fq.type;
-                if (fq.category_contains) filter.category = { $regex: fq.category_contains, $options: 'i' };
-                if (fq.status && fq.status !== 'all') filter.status = fq.status === 'aberto' ? { $in: ['pendente', 'atrasado', 'parcial'] } : fq.status;
-                if (fq.start_date || fq.end_date) {
-                    filter.due_date = {};
-                    if (fq.start_date) filter.due_date.$gte = fq.start_date;
-                    if (fq.end_date) filter.due_date.$lte = fq.end_date;
-                }
-                const txs = await base44.asServiceRole.entities.Transaction.filter(filter, isOpen ? 'due_date' : '-due_date', 20);
-                const total = txs.reduce((s, t) => s + t.amount, 0);
-                if (txs.length > 0) {
-                    const sMap = { pago: '✅', pendente: '🟡', atrasado: '🔴', parcial: '🟠' };
-                    const lines = txs.map(t => {
-                        const d = (t.due_date || '').split('-').reverse().slice(0, 2).join('/');
-                        const compName = companies.find(c => c.id === t.company_id)?.name || '';
-                        return `${t.status === 'atrasado' ? '🚨' : '▪️'} *${t.description}*${compName ? ` [${compName}]` : ''}\n   └ R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | ${sMap[t.status] || ''} ${t.status} | ${d}`;
-                    });
-                    finalReply = `📊 *Resultado (${txs.length})*\n\n${lines.join("\n")}\n\n*Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*`;
-                } else {
-                    finalReply = `🔍 Nenhuma transação encontrada.`;
-                }
-            }
-            else if (action === "generate_chart") {
-                const cd = response.chart_data || {};
-                const cfg = { type: cd.type || 'bar', data: { labels: cd.labels || [], datasets: (cd.datasets || []).map((ds, i) => ({ label: ds.label, data: ds.data, backgroundColor: i === 0 ? 'rgba(54,162,235,0.5)' : 'rgba(255,99,132,0.5)', borderColor: i === 0 ? 'rgba(54,162,235,1)' : 'rgba(255,99,132,1)', borderWidth: 1 })) }, options: { title: { display: true, text: cd.title || '' } } };
-                await sendPhoto(chat_id, `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(cfg))}&width=500&height=300&backgroundColor=white`, response.reply_text || "Gráfico");
-                finalReply = response.reply_text || "Gráfico enviado 👆";
-            }
-            else if (action === "create_client") {
-                const cd = { ...response.client_data, company_id: cid, type: "cliente" };
-                const ex = (await base44.asServiceRole.entities.Contact.filter({ name: { $regex: cd.name, $options: 'i' }, company_id: cid }))[0];
-                if (ex) { finalReply = `⚠️ *Cliente já existe:* ${ex.name}`; }
-                else { const nc = await base44.asServiceRole.entities.Contact.create(cd); finalReply = `✅ *Cadastrado!* ${nc.name}`; }
-            }
-            else if (action === "search_products") {
-                const prods = await base44.asServiceRole.entities.Product.filter({ name: { $regex: response.search_query || "", $options: 'i' }, company_id: cid, is_active: true }, '-name', 10);
-                finalReply = prods.length ? `📦 *Produtos:*\n` + prods.map(p => `▫️ ${p.name} | R$ ${(p.sale_price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Est: ${p.current_stock}`).join("\n") : `Nenhum produto encontrado.`;
-            }
-            else if (action === "create_sale") {
-                const { client_name, items, payment_method } = response.sale_data || {};
-                const client = (await base44.asServiceRole.entities.Contact.filter({ name: { $regex: client_name, $options: 'i' }, company_id: cid }))[0];
-                if (!client) throw new Error(`Cliente "${client_name}" não encontrado.`);
-                let saleItems = [], total = 0;
-                for (const item of (items || [])) {
-                    const prod = (await base44.asServiceRole.entities.Product.filter({ name: { $regex: item.product_name, $options: 'i' }, company_id: cid }))[0];
-                    if (!prod) throw new Error(`Produto "${item.product_name}" não encontrado.`);
-                    const it = prod.sale_price * item.quantity; total += it;
-                    saleItems.push({ product_id: prod.id, product_name: prod.name, quantity: item.quantity, unit: prod.unit, unit_price: prod.sale_price, total: it, quantity_withdrawn: 0 });
-                }
-                const sale = await base44.asServiceRole.entities.Sale.create({ reference: `VEN-${Date.now().toString().slice(-6)}`, company_id: cid, client_id: client.id, client_name: client.name, seller_name: "TelegramBot", sale_date: new Date().toISOString().split('T')[0], items: saleItems, subtotal: total, total, payment_method: payment_method || "dinheiro", status: "concluida", payment_status: "pendente", withdrawal_status: "aguardando" });
-                finalReply = `✅ *Venda!* (${sale.reference})\n👤 ${client.name}\n💰 R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-            }
-        } catch (logicErr) {
-            console.error("[LOGIC ERROR]:", logicErr.message);
-            finalReply = `⚠️ *Erro:* ${logicErr.message}`;
+            const result = await executeAction(base44, aiResponse.action, aiResponse, companies, accounts, session, chat_id);
+            if (result) finalReply = result;
+        } catch (e) {
+            console.error('[ACTION]', e.message);
+            finalReply = `⚠️ Erro: ${e.message}`;
         }
     }
 
-    // Salvar histórico (até 16 mensagens = 8 trocas)
-    history.push({ role: "user", content: user_text });
-    history.push({ role: "assistant", content: finalReply });
-    if (history.length > 16) history = history.slice(-16);
+    // ── Salvar histórico e responder ──────────────────────────────────────────
+    let hist = [...(session.history || [])];
+    hist.push({ role: 'user', content: user_text });
+    hist.push({ role: 'assistant', content: finalReply });
+    if (hist.length > 20) hist = hist.slice(-20);
 
     await Promise.all([
-        base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history }),
+        base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history: hist }),
         sendTelegram(chat_id, finalReply),
         base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(() => {})
     ]);
 
-    return Response.json({ status: "success", action });
+    return Response.json({ status: 'success', action: aiResponse.action });
 });
