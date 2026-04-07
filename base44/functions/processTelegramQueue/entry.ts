@@ -188,7 +188,9 @@ REGRAS:
 3. Quando perguntarem sobre "todas as filiais" → responda com dados das 3 filiais (já estão no contexto)
 4. "paguei X" = add_expense com is_paid:true; "preciso pagar X" = is_paid:false
 5. Seja direto, use emojis, valores em R$ X.XXX,XX
-6. Para operações de criação, SEMPRE confirme a filial antes${historyText}
+6. Para operações de criação, SEMPRE confirme a filial antes
+7. Para search_finance: se o usuário mencionar nome de filial (ex: "santarém", "mucajai"), coloque em finance_query.company_name. Se type não informado mas contexto indica despesa, use type: "despesa"
+8. finance_query deve sempre ter pelo menos: type ("despesa", "receita" ou "all") e status ("pendente", "atrasado", "all")${historyText}
 
 MENSAGEM: ${user_text}
 
@@ -299,7 +301,16 @@ Responda em JSON.`;
             else if (action === "search_finance") {
                 const fq = response.finance_query || {};
                 const isOpen = ['aberto','pendente','atrasado'].includes(fq.status);
-                const filter = { company_id: cid };
+                
+                // Resolve company by name if provided in query
+                let searchCid = cid;
+                if (!searchCid && fq.company_name) {
+                    const matched = companies.find(c => c.name.toLowerCase().includes(fq.company_name.toLowerCase()));
+                    if (matched) searchCid = matched.id;
+                }
+                
+                const filter = {};
+                if (searchCid) filter.company_id = searchCid; // if null, search all companies
                 if (fq.type && fq.type !== 'all') filter.type = fq.type;
                 if (fq.category_contains) filter.category = { $regex: fq.category_contains, $options: 'i' };
                 if (fq.status && fq.status !== 'all') filter.status = fq.status === 'aberto' ? { $in: ['pendente', 'atrasado', 'parcial'] } : fq.status;
@@ -314,9 +325,10 @@ Responda em JSON.`;
                     const sMap = { pago: '✅', pendente: '🟡', atrasado: '🔴', parcial: '🟠' };
                     const lines = txs.map(t => {
                         const d = (t.due_date || '').split('-').reverse().slice(0, 2).join('/');
-                        return `${t.status === 'atrasado' ? '🚨' : '▪️'} *${t.description}*\n   └ R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | ${sMap[t.status] || ''} ${t.status} | ${d}`;
+                        const compName = companies.find(c => c.id === t.company_id)?.name || '';
+                        return `${t.status === 'atrasado' ? '🚨' : '▪️'} *${t.description}*${compName ? ` [${compName}]` : ''}\n   └ R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | ${sMap[t.status] || ''} ${t.status} | ${d}`;
                     });
-                    finalReply = `📊 *Resultado*\n\n${lines.join("\n")}\n\n*Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*`;
+                    finalReply = `📊 *Resultado (${txs.length})*\n\n${lines.join("\n")}\n\n*Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*`;
                 } else {
                     finalReply = `🔍 Nenhuma transação encontrada.`;
                 }
