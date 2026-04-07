@@ -150,7 +150,8 @@ async function executeAction(base44, action, response, companies, accounts, sess
 
         const baseFilter = {};
         if (searchCid) baseFilter.company_id = searchCid;
-        if (q.type && q.type !== 'all') baseFilter.type = q.type;
+        // Só aceitar type válido
+        if (q.type && ['receita', 'despesa'].includes(q.type)) baseFilter.type = q.type;
 
         // Filtro por data de pagamento (lançamentos/fluxo de caixa)
         if (q.payment_date) baseFilter.payment_date = q.payment_date;
@@ -312,8 +313,10 @@ MENSAGEM DO USUÁRIO: ${user_text}
 INSTRUÇÕES:
 - Responda em JSON com os campos: action, reply, e os dados específicos da ação.
 - Para consultar transações/lançamentos: action="search_transactions", query={type, status, company_name, payment_date}
-  * "lançamentos", "fluxo de caixa", "entradas e saídas", "o que foi pago/recebido hoje" → status="pago", payment_date=hoje (${new Date().toISOString().split('T')[0]})
-  * "contas a pagar", "contas a receber", "pendências", "atrasados" → status="aberto" ou status="atrasado"
+  * CAMPO type SÓ ACEITA: "receita", "despesa" ou omitido (para ambos). NUNCA coloque outro valor!
+  * "lançamentos", "movimentações", "fluxo de caixa", "entradas e saídas", "o que foi pago/recebido hoje" → status="pago", payment_date=hoje (${new Date().toISOString().split('T')[0]}), NÃO preencher type
+  * "contas a pagar", "pendências", "atrasados" → status="aberto" ou status="atrasado", type="despesa"
+  * "contas a receber" → status="aberto" ou status="atrasado", type="receita"
   * Nunca misture lançamentos (pago) com contas pendentes (pendente/atrasado) na mesma busca
 - Para lançar: action="add_transaction", transaction={description, amount, type, category, due_date, is_paid}
 - Para dar baixa: action="pay_bill", payment={search_term, amount}
