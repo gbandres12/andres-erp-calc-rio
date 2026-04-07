@@ -187,46 +187,12 @@ Responda em JSON conforme schema.`;
             action: { type: "string" },
             reply_text: { type: "string" },
             target_company_id: { type: "string" },
-            expense_data: {
-                type: "object",
-                properties: {
-                    description: { type: "string" },
-                    amount: { type: "number" },
-                    type: { type: "string" },
-                    category: { type: "string" },
-                    account_id: { type: "string" },
-                    is_paid: { type: "boolean" },
-                    due_date: { type: "string" }
-                }
-            },
-            payment_data: {
-                type: "object",
-                properties: {
-                    search_term: { type: "string" },
-                    amount_approx: { type: "number" }
-                }
-            },
-            finance_query: {
-                type: "object",
-                properties: {
-                    type: { type: "string" },
-                    status: { type: "string" },
-                    category_contains: { type: "string" },
-                    start_date: { type: "string" },
-                    end_date: { type: "string" }
-                }
-            },
-            chart_data: {
-                type: "object",
-                properties: {
-                    type: { type: "string" },
-                    title: { type: "string" },
-                    labels: { type: "array", items: { type: "string" } },
-                    datasets: { type: "array", items: { type: "object" } }
-                }
-            },
-            client_data: { type: "object" },
-            sale_data: { type: "object" },
+            expense_data: { type: "object", additionalProperties: true },
+            payment_data: { type: "object", additionalProperties: true },
+            finance_query: { type: "object", additionalProperties: true },
+            chart_data: { type: "object", additionalProperties: true },
+            client_data: { type: "object", additionalProperties: true },
+            sale_data: { type: "object", additionalProperties: true },
             search_query: { type: "string" }
         },
         required: ["action", "reply_text"]
