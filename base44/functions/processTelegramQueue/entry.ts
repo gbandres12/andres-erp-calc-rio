@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     if (!session) {
         session = await base44.asServiceRole.entities.TelegramChatSession.create({ chat_id, history: [] });
     }
-    let history = (session.history || []).slice(-20);
+    let history = (session.history || []).slice(-10);
 
     const companies = await base44.asServiceRole.entities.Company.filter({ is_active: true });
     const accounts = await base44.asServiceRole.entities.FinancialAccount.filter({ is_active: true });
@@ -154,41 +154,32 @@ Deno.serve(async (req) => {
     const companyAccountsStr = accounts.filter(a => a.company_id === currentCompanyId)
         .map(a => `  • ${a.name} (ID: ${a.id}, Tipo: ${a.type}, Saldo: R$ ${(a.current_balance||0).toLocaleString('pt-BR',{minimumFractionDigits:2})})`).join("\n") || "  (Nenhuma conta cadastrada)";
 
-    // Montar histórico como texto para o prompt
+    // Montar histórico como texto para o prompt (limitar tamanho)
     const historyText = history.length > 0
-        ? "\n\nHISTÓRICO DA CONVERSA:\n" + history.map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content}`).join("\n")
+        ? "\n\nHISTÓRICO RECENTE:\n" + history.map(m => `${m.role === 'user' ? 'U' : 'A'}: ${m.content.slice(0, 200)}`).join("\n")
         : "";
 
-    const fullPrompt = `Você é o AGENTE FINANCEIRO EXECUTIVO de uma empresa agroindustrial. Data de hoje: ${todayStr}.
+    const fullPrompt = `Agente financeiro de empresa agroindustrial. Data: ${todayStr}.
 
-═══════════════════════════════
-FILIAIS DISPONÍVEIS:
-${companies.map(c => `  • ${c.name} (ID: ${c.id})`).join("\n")}
+FILIAIS: ${companies.map(c => `${c.name} (ID:${c.id})`).join(', ')}
+FILIAL ATIVA: ${currentCompanyName} (ID:${currentCompanyId || 'null'})
 
-FILIAL ATIVA: ${currentCompanyName} (ID: ${currentCompanyId || 'null'})
-
-CONTAS DA FILIAL ATIVA:
+CONTAS ATIVAS:
 ${companyAccountsStr}
 
-SITUAÇÃO FINANCEIRA ATUAL:
+SITUAÇÃO FINANCEIRA:
 ${financialContext}
-═══════════════════════════════
 
-REGRAS DE COMPORTAMENTO:
-1. Toda operação financeira EXIGE filial selecionada. Se não houver, pergunte antes de qualquer ação.
-2. Ao receber transcrição de áudio (texto normal), processe como pedido normal.
-3. Ao receber análise de imagem (começa com "[Análise da Imagem]"), extraia os dados e pergunte ao usuário se deseja lançar como despesa/receita antes de criar.
-4. Nos relatórios financeiros, sempre mostre: saldo, total a pagar, total a receber, e destaque contas atrasadas.
-5. Ao listar transações, ordene por urgência: atrasadas primeiro, depois por vencimento.
-6. Seja direto e objetivo. Use emojis para facilitar leitura rápida no celular.
-7. Valores monetários sempre no formato R$ X.XXX,XX (padrão brasileiro).
-8. Ao lançar despesa de comprovante, confirme com o usuário os dados extraídos antes de salvar.
-9. Para áudios transcritos: "paguei X para Y" = add_expense com is_paid:true; "preciso pagar X" = add_expense com is_paid:false.
-10. Se a pergunta for sobre relatório geral, use search_finance para buscar dados e formate uma resposta completa.${historyText}
+REGRAS:
+1. Toda operação exige filial selecionada.
+2. "paguei X para Y" = add_expense com is_paid:true; "preciso pagar X" = add_expense com is_paid:false.
+3. Ao receber [Análise da Imagem], pergunte antes de criar lançamento.
+4. Seja direto. Use emojis. Valores em R$ X.XXX,XX.
+5. Para relatório geral, use search_finance.${historyText}
 
-MENSAGEM ATUAL DO USUÁRIO: ${user_text}
+USUÁRIO: ${user_text}
 
-Responda com a ação correta no formato JSON especificado.`;
+Responda em JSON conforme schema.`;
 
     const responseSchema = {
         type: "object",
@@ -254,11 +245,13 @@ Responda com a ação correta no formato JSON especificado.`;
         try {
             response = await invokeLLM();
         } catch (firstErr) {
-            console.log(`[LLM] Primeira tentativa falhou: ${firstErr.message}. Tentando novamente...`);
+            console.log(`[LLM] 1ª tentativa falhou: ${firstErr.message}. Retentando...`);
             await new Promise(r => setTimeout(r, 2000));
             response = await invokeLLM();
         }
-        if (!response || !response.action) throw new Error("Resposta da IA inválida ou vazia");
+        // Se action não veio, default para reply
+        if (!response) throw new Error("Resposta da IA vazia");
+        if (!response.action) response.action = "reply";
         console.log(`[LLM] action=${response?.action}`);
     } catch (llmError) {
         console.error("[LLM ERROR]:", llmError.message);
@@ -385,10 +378,10 @@ Responda com a ação correta no formato JSON especificado.`;
         }
     }
 
-    // Salvar histórico (até 20 mensagens = 10 trocas)
+    // Salvar histórico (até 16 mensagens = 8 trocas)
     history.push({ role: "user", content: user_text });
     history.push({ role: "assistant", content: finalReply });
-    if (history.length > 20) history = history.slice(-20);
+    if (history.length > 16) history = history.slice(-16);
 
     await Promise.all([
         base44.asServiceRole.entities.TelegramChatSession.update(session.id, { history }),
