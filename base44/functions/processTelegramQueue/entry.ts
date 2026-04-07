@@ -142,7 +142,7 @@ async function executeAction(base44, action, response, companies, accounts, sess
         console.log('[SEARCH] query from LLM:', JSON.stringify(q));
         console.log('[SEARCH] target_company from LLM:', response.target_company);
 
-        // Resolver filial pelo nome - tenta query.company_name e target_company
+        // Resolver filial pelo nome
         const companyHint = q.company_name || response.target_company || null;
         const targetComp = companyHint ? resolveCompany(companies, companyHint) : null;
         const searchCid = targetComp?.id || cid || null;
@@ -151,13 +151,16 @@ async function executeAction(base44, action, response, companies, accounts, sess
         const baseFilter = {};
         if (searchCid) baseFilter.company_id = searchCid;
         if (q.type && q.type !== 'all') baseFilter.type = q.type;
+
+        // Filtro por data de pagamento (lançamentos/fluxo de caixa)
+        if (q.payment_date) baseFilter.payment_date = q.payment_date;
+
         console.log('[SEARCH] baseFilter:', JSON.stringify(baseFilter), 'status:', q.status);
 
         let txs = [];
         if (!q.status || q.status === 'all') {
-            txs = await base44.asServiceRole.entities.Transaction.filter(baseFilter, 'due_date', 50);
+            txs = await base44.asServiceRole.entities.Transaction.filter(baseFilter, '-payment_date', 50);
         } else if (q.status === 'aberto') {
-            // SDK não suporta $in, fazer 3 queries
             const [pend, atras, parc] = await Promise.all([
                 base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: 'pendente' }, 'due_date', 25),
                 base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: 'atrasado' }, 'due_date', 25),
@@ -165,7 +168,7 @@ async function executeAction(base44, action, response, companies, accounts, sess
             ]);
             txs = [...pend, ...atras, ...parc].sort((a, b) => (a.due_date||'').localeCompare(b.due_date||''));
         } else {
-            txs = await base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: q.status }, 'due_date', 25);
+            txs = await base44.asServiceRole.entities.Transaction.filter({ ...baseFilter, status: q.status }, q.status === 'pago' ? '-payment_date' : 'due_date', 50);
         }
         console.log('[SEARCH] txs found:', txs.length);
         if (!txs.length) return `🔍 Nenhuma transação encontrada${targetComp ? ` em ${targetComp.name}` : ''}.`;
@@ -173,10 +176,12 @@ async function executeAction(base44, action, response, companies, accounts, sess
         const sIcon = { pago: '✅', pendente: '🟡', atrasado: '🔴', parcial: '🟠' };
         const lines = txs.map(t => {
             const comp = companies.find(c => c.id === t.company_id);
-            return `${sIcon[t.status] || '▪️'} *${t.description}*${comp && !searchCid ? ` [${comp.name}]` : ''}\n   └ ${brl(t.amount)} | ${t.status} | ${fmtDate(t.due_date)}`;
+            const dateLabel = t.status === 'pago' ? fmtDate(t.payment_date) : fmtDate(t.due_date);
+            const datePrefix = t.status === 'pago' ? 'pg' : 'venc';
+            return `${sIcon[t.status] || '▪️'} *${t.description}*${comp && !searchCid ? ` [${comp.name}]` : ''}\n   └ ${brl(t.amount)} | ${t.type === 'receita' ? '📥' : '📤'} ${t.type} | ${datePrefix} ${dateLabel}`;
         });
         const total = txs.reduce((s, t) => s + t.amount, 0);
-        const header = targetComp ? `📊 *${targetComp.name}* — ${txs.length} contas` : `📊 *${txs.length} transações encontradas*`;
+        const header = targetComp ? `📊 *${targetComp.name}* — ${txs.length} lançamentos` : `📊 *${txs.length} transações encontradas*`;
         return `${header}\n\n${lines.join('\n')}\n\n*Total: ${brl(total)}*`;
     }
 
@@ -306,7 +311,10 @@ MENSAGEM DO USUÁRIO: ${user_text}
 
 INSTRUÇÕES:
 - Responda em JSON com os campos: action, reply, e os dados específicos da ação.
-- Para consultar transações: action="search_transactions", query={type, status, company_name, description_contains}
+- Para consultar transações/lançamentos: action="search_transactions", query={type, status, company_name, payment_date}
+  * "lançamentos", "fluxo de caixa", "entradas e saídas", "o que foi pago/recebido hoje" → status="pago", payment_date=hoje (${new Date().toISOString().split('T')[0]})
+  * "contas a pagar", "contas a receber", "pendências", "atrasados" → status="aberto" ou status="atrasado"
+  * Nunca misture lançamentos (pago) com contas pendentes (pendente/atrasado) na mesma busca
 - Para lançar: action="add_transaction", transaction={description, amount, type, category, due_date, is_paid}
 - Para dar baixa: action="pay_bill", payment={search_term, amount}
 - Para cadastrar contato: action="create_contact", contact={name, phone, email, type}
