@@ -124,31 +124,29 @@ Deno.serve(async (req) => {
         return null;
     };
 
-    // Contexto financeiro
-    let financialContext = "Selecione uma filial para ver os dados.";
-    if (currentCompanyId) {
+    // Contexto financeiro - carrega filial ativa OU todas as filiais
+    const fmt = t => `  - ${t.description} | ${t.contact_name || ''} | R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Venc: ${(t.due_date || '').split('-').reverse().join('/')}`;
+    const companiesToLoad = currentCompanyId ? companies.filter(c => c.id === currentCompanyId) : companies;
+    
+    let financialContext = '';
+    for (const comp of companiesToLoad) {
         const [pp, pl, rp, rl] = await Promise.all([
-            base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'pendente' }),
-            base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'despesa', status: 'atrasado' }),
-            base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'pendente' }),
-            base44.asServiceRole.entities.Transaction.filter({ company_id: currentCompanyId, type: 'receita', status: 'atrasado' })
+            base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pendente' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'atrasado' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pendente' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'atrasado' })
         ]);
         const spp = pp.reduce((s, t) => s + t.amount, 0);
         const spl = pl.reduce((s, t) => s + t.amount, 0);
         const srp = rp.reduce((s, t) => s + t.amount, 0);
         const srl = rl.reduce((s, t) => s + t.amount, 0);
         const topLate = pl.sort((a, b) => b.amount - a.amount).slice(0, 5);
-        const topPend = pp.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')).slice(0, 5);
-        const compAccounts = accounts.filter(a => a.company_id === currentCompanyId);
+        const topPend = pp.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')).slice(0, 3);
+        const compAccounts = accounts.filter(a => a.company_id === comp.id);
         const totalBal = compAccounts.reduce((s, a) => s + (a.current_balance || 0), 0);
-        const fmt = t => `- ${t.description} | ${t.contact_name || 'Sem contato'} | R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Venc: ${(t.due_date || '').split('-').reverse().join('/')}`;
-        financialContext = `
-💰 SALDO: R$ ${totalBal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-🔴 A PAGAR: Atrasado R$ ${spl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${pl.length}) | A vencer R$ ${spp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${pp.length})
-🟢 A RECEBER: Atrasado R$ ${srl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | A vencer R$ ${srp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-⚠️ TOP ATRASADAS: ${topLate.length ? topLate.map(fmt).join("\n") : "(Nenhum)"}
-📅 PRÓXIMAS: ${topPend.length ? topPend.map(fmt).join("\n") : "(Nenhuma)"}`;
+        financialContext += `\n\n📍 FILIAL: ${comp.name}\n💰 Saldo: R$ ${totalBal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n🔴 A Pagar: Atrasado R$ ${spl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${pl.length}) | A vencer R$ ${spp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${pp.length})\n🟢 A Receber: Atrasado R$ ${srl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | A vencer R$ ${srp.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n⚠️ Atrasadas: ${topLate.length ? topLate.map(fmt).join('\n') : '(Nenhuma)'}\n📅 Próximas: ${topPend.length ? topPend.map(fmt).join('\n') : '(Nenhuma)'}`;
     }
+    if (!financialContext) financialContext = 'Sem dados financeiros.';
 
     const todayStr = new Date().toLocaleDateString('pt-BR');
     const companyAccountsStr = accounts.filter(a => a.company_id === currentCompanyId)
@@ -159,27 +157,42 @@ Deno.serve(async (req) => {
         ? "\n\nHISTÓRICO RECENTE:\n" + history.map(m => `${m.role === 'user' ? 'U' : 'A'}: ${m.content.slice(0, 200)}`).join("\n")
         : "";
 
-    const fullPrompt = `Agente financeiro de empresa agroindustrial. Data: ${todayStr}.
+    const allAccountsStr = accounts.map(a => `  • ${a.name} (ID:${a.id}, Filial:${companies.find(c=>c.id===a.company_id)?.name||a.company_id}, Saldo: R$ ${(a.current_balance||0).toLocaleString('pt-BR',{minimumFractionDigits:2})})`).join('\n') || '(Nenhuma conta)';
 
-FILIAIS: ${companies.map(c => `${c.name} (ID:${c.id})`).join(', ')}
-FILIAL ATIVA: ${currentCompanyName} (ID:${currentCompanyId || 'null'})
+    const fullPrompt = `Agente financeiro de empresa com 3 filiais (mineração/calcário). Data: ${todayStr}.
 
-CONTAS ATIVAS:
-${companyAccountsStr}
+FILIAIS DISPONÍVEIS (use o ID correto nas ações):
+${companies.map(c => `  • ${c.name} → ID: ${c.id}`).join('\n')}
 
-SITUAÇÃO FINANCEIRA:
+FILIAL ATIVA NA SESSÃO: ${currentCompanyName} (ID: ${currentCompanyId || 'NENHUMA'})
+
+TODAS AS CONTAS:
+${allAccountsStr}
+
+DADOS FINANCEIROS POR FILIAL (TEMPO REAL):
 ${financialContext}
 
+ACÕES DISPONÍVEIS (action field):
+- reply: resposta simples/informativa (PADRÃO)
+- select_company: mudar filial (use target_company_id)
+- add_expense: lançar despesa/receita (use expense_data)
+- pay_bill: dar baixa em conta (use payment_data)
+- search_finance: buscar/listar transações (use finance_query)
+- create_client: cadastrar contato (use client_data)
+- search_products: buscar produtos (use search_query)
+- generate_chart: gerar gráfico (use chart_data)
+
 REGRAS:
-1. Toda operação exige filial selecionada.
-2. "paguei X para Y" = add_expense com is_paid:true; "preciso pagar X" = add_expense com is_paid:false.
-3. Ao receber [Análise da Imagem], pergunte antes de criar lançamento.
-4. Seja direto. Use emojis. Valores em R$ X.XXX,XX.
-5. Para relatório geral, use search_finance.${historyText}
+1. Para perguntas sobre contas atrasadas/vencidas → action: search_finance com status: atrasado
+2. Para criar lançamento → action: add_expense
+3. Quando perguntarem sobre "todas as filiais" → responda com dados das 3 filiais (já estão no contexto)
+4. "paguei X" = add_expense com is_paid:true; "preciso pagar X" = is_paid:false
+5. Seja direto, use emojis, valores em R$ X.XXX,XX
+6. Para operações de criação, SEMPRE confirme a filial antes${historyText}
 
-USUÁRIO: ${user_text}
+MENSAGEM: ${user_text}
 
-Responda em JSON conforme schema.`;
+Responda em JSON.`;
 
     const responseSchema = {
         type: "object",
@@ -239,7 +252,7 @@ Responda em JSON conforme schema.`;
         }
     }
 
-    const needsCompany = ["search_products","create_sale","create_client","add_expense","pay_bill","search_finance","generate_chart"].includes(action);
+    const needsCompany = ["search_products","create_sale","create_client","add_expense","pay_bill","generate_chart"].includes(action);
     if (needsCompany && !cid) {
         finalReply = `🏢 *Qual filial?*\nOpções: ${companies.map(c => c.name).join(", ")}`;
     } else {
