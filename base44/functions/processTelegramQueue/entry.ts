@@ -81,28 +81,34 @@ async function classifyIntent(base44, userText, session, companies, accounts) {
         return `• ${a.name} (${comp?.name || '?'}): ${brl(a.current_balance)}`;
     }).join('\n');
 
-    const prompt = `Você é FINAN, assistente financeiro de empresa de mineração de calcário.
+    const prompt = `Você é FINAN, especialista financeiro de uma empresa de mineração de calcário. Responda SEMPRE em português do Brasil, de forma clara e profissional.
 Hoje: ${todayStr}. Filial ativa: ${activeName} (ID: ${cid || 'nenhuma'})
 
-FILIAIS:
+FILIAIS DISPONÍVEIS:
 ${companyList}
 
-SALDOS:
+SALDOS ATUAIS:
 ${accountList}
 
-${history ? `HISTÓRICO:\n${history}\n` : ''}
-MENSAGEM: "${userText}"
+${history ? `HISTÓRICO DA CONVERSA:\n${history}\n` : ''}
+MENSAGEM DO USUÁRIO: "${userText}"
 
-Classifique a intenção e retorne JSON com action e parâmetros.
+INSTRUÇÕES IMPORTANTES:
+1. Classifique a intenção do usuário e determine a action correta.
+2. O campo "reply" DEVE ser uma resposta COMPLETA, útil e contextual em português — não apenas um placeholder. Para saudações, apresente-se brevemente e LISTE o que você pode fazer. Para dúvidas, responda diretamente com base no contexto disponível.
+3. Se não houver filial ativa ("nenhuma"), inclua no reply uma instrução clara pedindo ao usuário para informar ou escolher a filial antes de consultas financeiras.
+4. Para comandos ambíguos ou com informação insuficiente: classifique como "reply" e explique no campo reply O QUE está faltando e peça de forma específica (ex: "Para registrar a despesa, informe o valor e a categoria.").
+5. NUNCA invente dados. Se não tiver certeza da intenção, pergunte.
+6. Aceite variações de linguagem: "oi", "olá", "bom dia" → reply com apresentação. "quanto tenho", "saldo" → check_balance. "o que vence", "dívidas" → upcoming_bills. "entrei X reais" → add_transaction receita. "paguei X" → add_transaction despesa ou pay_bill.
 
-AÇÕES:
-- reply: conversa simples, explicações
+AÇÕES DISPONÍVEIS:
+- reply: conversa simples, esclarecimentos, informações insuficientes
 - financial_summary: resumo financeiro (receitas/despesas/resultado). query={company_name?, period?}
 - check_balance: consultar saldo de contas. query={company_name?}
 - search_transactions: buscar lançamentos. query={type?, status?, company_name?, period?, start_date?, end_date?, keyword?}
-  * type SOMENTE: "receita" ou "despesa" (NUNCA outro valor)
-  * "movimentações/fluxo de caixa/o que entrou e saiu" → status="pago", sem type
-  * "contas a pagar/despesas pendentes" → type="despesa", status="aberto"  
+  * type SOMENTE: "receita" ou "despesa"
+  * "movimentações/fluxo de caixa" → status="pago", sem type
+  * "contas a pagar/despesas pendentes" → type="despesa", status="aberto"
   * "contas a receber/receitas pendentes" → type="receita", status="aberto"
   * period: today|yesterday|this_week|last_week|this_month|last_month|this_year
 - upcoming_bills: vencimentos próximos. query={company_name?, days?, type?}
@@ -461,7 +467,7 @@ Deno.serve(async (req) => {
     }
 
     // PHASE 2: Executar ação (só carrega dados necessários)
-    let finalReply = ai.reply || 'Ok.';
+    let finalReply = ai.reply || '';
     if (ai.action !== 'reply') {
         try {
             const result = await executeAction(base44, ai, companies, accounts, session);
@@ -469,6 +475,19 @@ Deno.serve(async (req) => {
         } catch (e) {
             console.error('[EXEC]', e.message);
             finalReply = `⚠️ Erro ao executar: ${e.message}`;
+        }
+    }
+
+    // Se reply ainda estiver vazio, gerar resposta contextual rica
+    if (!finalReply) {
+        try {
+            const hist = (session.history || []).slice(-8).map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content.slice(0, 200)}`).join('\n');
+            finalReply = await base44.asServiceRole.integrations.Core.InvokeLLM({
+                prompt: `Você é FINAN, especialista financeiro de uma empresa de mineração de calcário. Responda em português do Brasil de forma concisa, útil e profissional.\n\n${hist ? `Contexto da conversa:\n${hist}\n\n` : ''}Usuário disse: "${user_text}"\n\nResponda diretamente e com contexto.`,
+                model: 'claude_sonnet_4_6'
+            });
+        } catch(e) {
+            finalReply = 'Olá! Como posso ajudar com finanças ou vendas?';
         }
     }
 
