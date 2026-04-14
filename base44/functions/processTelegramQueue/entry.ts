@@ -121,9 +121,8 @@ AÇÕES DISPONÍVEIS:
 RESPONDA APENAS JSON:
 { "action": "...", "reply": "...", "target_company": "...", "query": {}, "transaction": {}, "payment": {}, "contact": {}, "search_term": "" }`;
 
-    return await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt,
-        model: 'claude_sonnet_4_6',
         response_json_schema: {
             type: 'object',
             properties: {
@@ -139,6 +138,8 @@ RESPONDA APENAS JSON:
             required: ['action', 'reply']
         }
     });
+    console.log(`[classify] raw result:`, JSON.stringify(result)?.slice(0, 200));
+    return result;
 }
 
 // ── PHASE 2: Executar ação com dados carregados sob demanda ──────────────────
@@ -478,16 +479,16 @@ Deno.serve(async (req) => {
         }
     }
 
-    // Se reply ainda estiver vazio, gerar resposta contextual rica
+    // Se reply ainda estiver vazio, gerar resposta contextual
     if (!finalReply) {
         try {
-            const hist = (session.history || []).slice(-8).map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content.slice(0, 200)}`).join('\n');
+            const hist = (session.history || []).slice(-6).map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content.slice(0, 200)}`).join('\n');
             finalReply = await base44.asServiceRole.integrations.Core.InvokeLLM({
-                prompt: `Você é FINAN, especialista financeiro de uma empresa de mineração de calcário. Responda em português do Brasil de forma concisa, útil e profissional.\n\n${hist ? `Contexto da conversa:\n${hist}\n\n` : ''}Usuário disse: "${user_text}"\n\nResponda diretamente e com contexto.`,
-                model: 'claude_sonnet_4_6'
+                prompt: `Você é FINAN, assistente financeiro de uma empresa de mineração de calcário. Responda em português do Brasil de forma concisa e útil.\n\n${hist ? `Histórico:\n${hist}\n\n` : ''}Usuário disse: "${user_text}"\n\nResponda diretamente.`
             });
         } catch(e) {
-            finalReply = 'Olá! Como posso ajudar com finanças ou vendas?';
+            console.error('[FALLBACK]', e.message);
+            finalReply = 'Olá! Sou o FINAN, seu assistente financeiro. Como posso ajudar?';
         }
     }
 
