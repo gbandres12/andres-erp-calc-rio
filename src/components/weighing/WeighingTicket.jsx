@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Printer } from "lucide-react";
+import { Printer, FileDown } from "lucide-react";
+import { jsPDF } from "jspdf";
 
 const formatDateTime = (dt) => {
   if (!dt) return "__/__/____ __:__";
@@ -66,9 +67,127 @@ export default function WeighingTicket({ weighing, company, onClose }) {
     win.document.close();
   };
 
+  const handleGeneratePdf = () => {
+    const w = weighing;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+    const pageW = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(0, 0, pageW, 24, "F");
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text((company?.name?.toUpperCase() || "EMPRESA") + " — TICKET DE PESAGEM", pageW / 2, 9, { align: "center" });
+    if (company?.address) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${company.address}${company.city ? `, ${company.city}/${company.state}` : ""}`, pageW / 2, 14, { align: "center" });
+    }
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("COMPROVANTE DE PESAGEM", pageW / 2, 20, { align: "center" });
+
+    // Ticket info bar
+    doc.setDrawColor(180);
+    doc.setLineWidth(0.3);
+    doc.line(8, 26, pageW - 8, 26);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Ticket: ${w.ticket_number || w.reference}   Ref: ${w.reference}   Data: ${formatDateTime(w.tare_datetime || w.entry_time || w.created_date)}`, 8, 31);
+    doc.line(8, 34, pageW - 8, 34);
+
+    // Data rows
+    const rows = [
+      ["Cliente", w.client_name],
+      ["Motorista", w.driver_name],
+      ["Transportador", w.transporter],
+      ["Produto", w.product],
+      ["Origem", w.origin],
+      ["Destino", w.destination],
+      ["Placa Cavalinho", w.vehicle_plate],
+      ["Placa 1º Reboque", w.vehicle_plate2],
+      ["Placa 2º Reboque", w.vehicle_plate3],
+    ].filter(([, val]) => val);
+
+    let y = 41;
+    doc.setFontSize(9);
+    rows.forEach(([lbl, val]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(`${lbl}:`, 8, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(String(val), 55, y);
+      doc.setDrawColor(220);
+      doc.line(8, y + 2, pageW - 8, y + 2);
+      y += 8;
+    });
+
+    // Weights box
+    y += 4;
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(8, y, pageW - 16, 36, 2, 2, "F");
+    doc.setDrawColor(180);
+    doc.roundedRect(8, y, pageW - 16, 36, 2, 2, "S");
+
+    doc.setFontSize(9);
+    const wItems = [
+      ["Tara", w.tare],
+      ["Peso Bruto", w.gross],
+    ];
+    let wy = y + 8;
+    wItems.forEach(([lbl, kg]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(lbl + ":", 14, wy);
+      doc.setFont("helvetica", "normal");
+      doc.text(Number(kg || 0).toLocaleString("pt-BR") + " Kg", pageW - 14, wy, { align: "right" });
+      wy += 8;
+    });
+
+    // Net weight highlighted
+    doc.setFillColor(212, 237, 218);
+    doc.roundedRect(10, wy - 4, pageW - 20, 10, 2, 2, "F");
+    doc.setDrawColor(40, 167, 69);
+    doc.roundedRect(10, wy - 4, pageW - 20, 10, 2, 2, "S");
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 100, 0);
+    doc.text("PESO LÍQUIDO:", 14, wy + 3);
+    doc.text(Number(w.net || 0).toLocaleString("pt-BR") + " Kg  |  " + (Number(w.net || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 3 }) + " t", pageW - 14, wy + 3, { align: "right" });
+    doc.setTextColor(0);
+
+    // Operator
+    if (w.operator) {
+      y = wy + 14;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(120);
+      doc.text(`Operador: ${w.operator}`, 8, y);
+      doc.setTextColor(0);
+    }
+
+    // Signatures
+    const sigY = doc.internal.pageSize.getHeight() - 22;
+    doc.setFontSize(8);
+    doc.setDrawColor(80);
+    const sigs = ["Emitente", "Motorista", "Fiscal de Operação"];
+    const sigW = (pageW - 24) / 3;
+    sigs.forEach((s, i) => {
+      const sx = 8 + i * (sigW + 4);
+      doc.line(sx, sigY, sx + sigW, sigY);
+      doc.setFont("helvetica", "normal");
+      doc.text(s, sx + sigW / 2, sigY + 4, { align: "center" });
+    });
+
+    const filename = `ticket-${w.ticket_number || w.reference}.pdf`;
+    doc.save(filename);
+  };
+
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end gap-2 mb-4">
+        <Button onClick={handleGeneratePdf} variant="outline" className="gap-2">
+          <FileDown className="w-4 h-4" />
+          Gerar PDF (WhatsApp)
+        </Button>
         <Button onClick={handlePrint} className="gap-2">
           <Printer className="w-4 h-4" />
           Imprimir Ticket (A4 Paisagem)
