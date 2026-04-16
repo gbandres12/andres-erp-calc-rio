@@ -146,6 +146,23 @@ export default function Layout({ children, currentPageName }) {
         return { ...group, items: filteredItems };
       }).filter(Boolean);
     }
+
+    if (user.custom_role === 'scale_operator') {
+      const allowed = {
+        "Principal": ['CompanySelector'],
+        "Gestão de Materiais": ['Products'],
+        "Logística": ['Vehicles', 'Weighing'],
+        "Comercial": ['Sales', 'SaleWithdrawals'],
+      };
+      return navigationGroups.map(group => {
+        const allowedItems = allowed[group.title];
+        if (!allowedItems) return null;
+        const filteredItems = group.items.filter(item => allowedItems.includes(item.url));
+        if (filteredItems.length === 0) return null;
+        return { ...group, items: filteredItems };
+      }).filter(Boolean);
+    }
+
     return navigationGroups;
   }, [user]);
 
