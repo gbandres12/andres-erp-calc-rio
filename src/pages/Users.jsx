@@ -113,10 +113,28 @@ export default function UsersPage() {
                     </div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => handleEdit(user)}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Permissões
-                </Button>
+                <div className="text-right">
+                  {user.allowed_companies?.length > 0 ? (
+                    <div className="text-xs text-slate-500 mb-2 text-right">
+                      {user.allowed_companies.map(cid => {
+                        const c = companies.find(co => co.id === cid);
+                        return c ? (
+                          <span key={cid} className="inline-block bg-purple-50 text-purple-700 border border-purple-200 rounded px-2 py-0.5 mr-1 mb-1 text-xs">
+                            {c.name}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 mb-2">
+                      {user.custom_role === 'admin' ? 'Todas as filiais' : 'Nenhuma filial definida'}
+                    </p>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(user)}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Permissões
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
