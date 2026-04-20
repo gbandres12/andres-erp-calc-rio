@@ -92,13 +92,24 @@ export default function UsersPage() {
                   <div>
                     <p className="font-medium text-slate-900">{user.full_name || 'Sem nome'}</p>
                     <p className="text-sm text-slate-500">{user.email}</p>
-                    <div className="flex gap-2 mt-1">
+                    <div className="flex gap-2 mt-1 flex-wrap">
                       <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                        Sistema: {user.role}
+                        {user.role}
                       </Badge>
-                      <Badge variant="outline" className={user.custom_role === 'operator' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-blue-50 text-blue-700 border-blue-200'}>
-                        Perfil: {user.custom_role === 'operator' ? 'Operador' : 'Admin'}
-                      </Badge>
+                      {(() => {
+                        const roleMap = {
+                          admin: { label: 'Admin', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+                          operator: { label: 'Operador (Sem Financeiro)', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                          scale_operator: { label: 'Op. Balança/Vendas', className: 'bg-orange-50 text-orange-700 border-orange-200' },
+                        };
+                        const r = roleMap[user.custom_role] || { label: user.custom_role || 'Admin', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+                        return <Badge variant="outline" className={r.className}>{r.label}</Badge>;
+                      })()}
+                      {user.allowed_companies?.length > 0 && (
+                        <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
+                          {user.allowed_companies.length} filial(is)
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -130,7 +141,8 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin (Acesso Total)</SelectItem>
-                    <SelectItem value="operator">Operador (Sem Financeiro/Dashboards)</SelectItem>
+                    <SelectItem value="operator">Operador (Sem Financeiro)</SelectItem>
+                    <SelectItem value="scale_operator">Operador de Balança/Vendas (Sem Financeiro, só Pesagem e Vendas)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
