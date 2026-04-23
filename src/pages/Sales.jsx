@@ -21,6 +21,7 @@ import A4Receipt from "../components/receipts/A4Receipt";
 import PaymentReceipt from "../components/receipts/PaymentReceipt";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
+import SalePaymentDialog from "@/components/sales/SalePaymentDialog";
 
 export default function Sales() {
   const queryClient = useQueryClient();
@@ -215,6 +216,9 @@ export default function Sales() {
       toast.error("Erro ao criar venda: " + error.message);
     }
   });
+
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [saleToPayment, setSaleToPayment] = useState(null);
 
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
   const [saleToInvoice, setSaleToInvoice] = useState(null);
@@ -1129,6 +1133,16 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Receber Pagamento */}
+      <SalePaymentDialog
+        sale={saleToPayment}
+        accounts={accounts}
+        company={companies.find(c => c.id === selectedCompanyId)}
+        open={isPaymentDialogOpen}
+        onClose={() => { setIsPaymentDialogOpen(false); setSaleToPayment(null); }}
+        onSuccess={() => { queryClient.invalidateQueries(['sales']); queryClient.invalidateQueries(['accounts']); queryClient.invalidateQueries(['transactions']); }}
+      />
+
       {/* Dialog Novo Cliente Rápido */}
       <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1309,6 +1323,17 @@ export default function Sales() {
                         >
                           <FileText className="w-4 h-4 mr-1" />
                           Faturar Venda
+                        </Button>
+                      )}
+
+                      {sale.status === 'faturada' && sale.payment_status !== 'pago' && (
+                        <Button
+                          size="sm"
+                          onClick={() => { setSaleToPayment(sale); setIsPaymentDialogOpen(true); }}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <DollarSign className="w-4 h-4 mr-1" />
+                          Receber
                         </Button>
                       )}
                       
