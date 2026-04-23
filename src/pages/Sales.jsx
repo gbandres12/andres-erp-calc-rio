@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -521,6 +521,35 @@ export default function Sales() {
       console.error("Erro ao preparar recibo:", error);
       toast.error("Erro ao preparar recibo");
     }
+  };
+
+  const handleSendWhatsApp = (sale, client) => {
+    const phone = client?.phone?.replace(/\D/g, '');
+    const items = (sale.items || [])
+      .map(i => `• ${i.product_name} — ${Number(i.quantity).toLocaleString('pt-BR')} ${i.unit} x ${formatBRL(i.unit_price)} = *${formatBRL(i.total)}*`)
+      .join('\n');
+
+    const msg = [
+      `🧾 *PEDIDO DE VENDA — ${sale.reference}*`,
+      `📅 Data: ${formatDate(sale.sale_date)}`,
+      `👤 Cliente: ${sale.client_name}`,
+      ``,
+      `*Itens:*`,
+      items,
+      ``,
+      sale.discount > 0 ? `🏷️ Desconto: ${formatBRL(sale.discount)}` : null,
+      sale.shipping > 0 ? `🚚 Frete: ${formatBRL(sale.shipping)}` : null,
+      `💰 *Total: ${formatBRL(sale.total)}*`,
+      sale.paid_amount > 0 ? `✅ Pago: ${formatBRL(sale.paid_amount)}` : null,
+      sale.remaining_amount > 0 ? `⏳ Saldo: ${formatBRL(sale.remaining_amount)}` : null,
+      sale.notes ? `\n📝 ${sale.notes}` : null,
+    ].filter(Boolean).join('\n');
+
+    const url = phone
+      ? `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+
+    window.open(url, '_blank');
   };
 
   const totalSales = sales.reduce((sum, s) => sum + (s.total || 0), 0);
@@ -1290,6 +1319,16 @@ export default function Sales() {
                       >
                         <Printer className="w-4 h-4 mr-1" />
                         Pedido
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-green-500 text-green-600 hover:bg-green-50"
+                        onClick={() => handleSendWhatsApp(sale, contacts.find(c => c.id === sale.client_id))}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-1" />
+                        WhatsApp
                       </Button>
 
                       {sale.status === 'faturada' && (
