@@ -100,9 +100,14 @@ export default function Sales() {
 
   const { data: sales = [] } = useQuery({
     queryKey: ['sales', selectedCompanyId],
-    queryFn: () => base44.entities.Sale.filter({ 
-      company_id: selectedCompanyId
-    }, '-created_date'),
+    queryFn: async () => {
+      const result = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
+      return result.sort((a, b) => {
+        const da = a.sale_date || a.created_date || '';
+        const db = b.sale_date || b.created_date || '';
+        return db.localeCompare(da); // mais recente primeiro
+      });
+    },
     initialData: []
   });
 
