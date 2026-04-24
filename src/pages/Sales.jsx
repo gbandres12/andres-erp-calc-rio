@@ -107,10 +107,10 @@ export default function Sales() {
         const da = a.sale_date || '';
         const db = b.sale_date || '';
         if (db !== da) return db.localeCompare(da);
-        // Depois pelo número da referência (decrescente)
-        const na = parseInt((a.reference || '').replace('VENDA-', '')) || 0;
-        const nb = parseInt((b.reference || '').replace('VENDA-', '')) || 0;
-        return nb - na;
+        // Depois por data de criação (decrescente)
+        const ca = a.created_date || '';
+        const cb = b.created_date || '';
+        return cb.localeCompare(ca);
       });
     },
     initialData: []
@@ -145,7 +145,9 @@ export default function Sales() {
       // Buscar TODAS as vendas para garantir referência única global
       const allSales = await base44.entities.Sale.list('-created_date', 1000);
       const maxNum = allSales.reduce((max, s) => {
-        const n = parseInt((s.reference || '').replace('VENDA-', '')) || 0;
+        // Extrai apenas os dígitos no final da referência (ex: VENDA-00001, VEN-519423)
+        const match = (s.reference || '').match(/(\d+)$/);
+        const n = match ? parseInt(match[1]) : 0;
         return n > max ? n : max;
       }, 0);
       const newRef = `VENDA-${String(maxNum + 1).padStart(5, '0')}`;
