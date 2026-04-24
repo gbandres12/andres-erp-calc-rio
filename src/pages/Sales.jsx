@@ -103,9 +103,14 @@ export default function Sales() {
     queryFn: async () => {
       const result = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
       return result.sort((a, b) => {
-        const da = a.sale_date || a.created_date || '';
-        const db = b.sale_date || b.created_date || '';
-        return db.localeCompare(da); // mais recente primeiro
+        // Primeiro por data de emissão (decrescente)
+        const da = a.sale_date || '';
+        const db = b.sale_date || '';
+        if (db !== da) return db.localeCompare(da);
+        // Depois pelo número da referência (decrescente)
+        const na = parseInt((a.reference || '').replace('VENDA-', '')) || 0;
+        const nb = parseInt((b.reference || '').replace('VENDA-', '')) || 0;
+        return nb - na;
       });
     },
     initialData: []
@@ -137,9 +142,9 @@ export default function Sales() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data) => {
-      // Buscar todas as vendas da empresa para gerar número sequencial único por empresa
-      const companySales = await base44.entities.Sale.filter({ company_id: selectedCompanyId }, '-created_date', 500);
-      const maxNum = companySales.reduce((max, s) => {
+      // Buscar TODAS as vendas para garantir referência única global
+      const allSales = await base44.entities.Sale.list('-created_date', 1000);
+      const maxNum = allSales.reduce((max, s) => {
         const n = parseInt((s.reference || '').replace('VENDA-', '')) || 0;
         return n > max ? n : max;
       }, 0);
