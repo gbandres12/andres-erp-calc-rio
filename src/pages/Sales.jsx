@@ -27,7 +27,7 @@ import SaleEditDialog from "@/components/sales/SaleEditDialog";
 export default function Sales() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
+  const [selectedCompanyId] = useState(() => localStorage.getItem('selectedCompanyId'));
   const [activeTab, setActiveTab] = useState("dados");
   const [openClientCombobox, setOpenClientCombobox] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,7 +100,10 @@ export default function Sales() {
 
   const { data: sales = [] } = useQuery({
     queryKey: ['sales', selectedCompanyId],
+    refetchOnMount: true,
+    staleTime: 0,
     queryFn: async () => {
+      if (!selectedCompanyId) return [];
       const result = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
       return result.sort((a, b) => {
         // Primeiro por data de emissão (decrescente)
