@@ -270,13 +270,36 @@ export default function Sales() {
 
   const invoiceSaleMutation = useMutation({
     mutationFn: async ({ sale, payments }) => {
-      console.log("💰 Faturando venda:", sale.reference);
+      // 1. Marcar venda como faturada
+      await base44.entities.Sale.update(sale.id, { status: 'faturada' });
 
-      await base44.entities.Sale.update(sale.id, {
-        status: 'faturada'
-      });
+      // 2. Se havia entrada paga no rascunho (SalePayment sem Transaction),
+      //    criar Transaction correspondente para que o saldo da conta bata.
+      const existingPayments = await base44.entities.SalePayment.filter({ sale_id: sale.id });
+      const entradaJaPaga = sale.paid_amount || 0;
+      
+      if (entradaJaPaga > 0 && existingPayments.length > 0) {
+        // Verificar se já existe Transaction para esta entrada
+        for (const ep of existingPayments) {
+          await base44.entities.Transaction.create({
+            description: `${sale.reference} - Entrada - ${sale.client_name}`,
+            amount: ep.amount,
+            type: 'receita',
+            category: 'Vendas',
+            status: 'pago',
+            due_date: ep.payment_date,
+            payment_date: ep.payment_date,
+            account_id: ep.account_id,
+            contact_id: sale.client_id,
+            contact_name: sale.client_name,
+            company_id: selectedCompanyId,
+            paid_amount: ep.amount,
+            notes: `Venda: ${sale.reference} - entrada`
+          });
+        }
+      }
 
-      // Processar pagamentos fracionados
+      // 3. Processar pagamentos registrados no faturamento
       let totalPaidNow = 0;
       for (const payment of payments) {
         if (payment.amount > 0) {
@@ -311,12 +334,14 @@ export default function Sales() {
         }
       }
 
-      // Criar conta a receber para o saldo restante
-      const remainingAmount = sale.total - totalPaidNow;
-      if (remainingAmount > 0.01) {
+      // 4. Criar conta a receber para o saldo ainda pendente
+      const newPaidAmount = entradaJaPaga + totalPaidNow;
+      const newRemainingAmount = sale.total - newPaidAmount;
+
+      if (newRemainingAmount > 0.01) {
         await base44.entities.Transaction.create({
           description: `${sale.reference} - Saldo a Receber - ${sale.client_name}`,
-          amount: remainingAmount,
+          amount: newRemainingAmount,
           type: 'receita',
           category: 'Vendas',
           status: 'pendente',
@@ -329,16 +354,14 @@ export default function Sales() {
         });
       }
 
-      // Atualizar venda
-      const newPaidAmount = (sale.paid_amount || 0) + totalPaidNow;
-      const newRemainingAmount = sale.total - newPaidAmount;
+      // 5. Atualizar status da venda
       let paymentStatus = 'pendente';
       if (newRemainingAmount <= 0.01) paymentStatus = 'pago';
       else if (newPaidAmount > 0) paymentStatus = 'parcial';
 
       await base44.entities.Sale.update(sale.id, {
         paid_amount: newPaidAmount,
-        remaining_amount: newRemainingAmount,
+        remaining_amount: Math.max(0, newRemainingAmount),
         payment_status: paymentStatus
       });
 
@@ -452,11 +475,13 @@ export default function Sales() {
     }
 
     setSaleToInvoice(sale);
+    // Saldo restante = total - entrada já paga no rascunho
+    const restante = (sale.total || 0) - (sale.paid_amount || 0);
     setInvoicePayments([{
-      description: "Pagamento 1",
-      amount: 0,
+      description: "Pagamento no faturamento",
+      amount: restante > 0 ? restante : 0,
       date: getTodayDate(),
-      account_id: "",
+      account_id: accounts[0]?.id || "",
       payment_method: "dinheiro"
     }]);
     setIsInvoiceDialogOpen(true);
@@ -993,7 +1018,7 @@ export default function Sales() {
           {saleToInvoice && (
             <div className="space-y-4">
               <Card className="bg-blue-50">
-                <CardContent className="pt-4">
+                <CardContent className="pt-4 space-y-2">
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-semibold">{saleToInvoice.reference}</p>
@@ -1003,6 +1028,16 @@ export default function Sales() {
                       <p className="text-sm text-slate-600">Valor Total</p>
                       <p className="text-2xl font-bold text-blue-600">{formatBRL(saleToInvoice.total)}</p>
                     </div>
+                  </div>
+                  {(saleToInvoice.paid_amount || 0) > 0 && (
+                    <div className="flex justify-between text-sm border-t pt-2">
+                      <span className="text-green-700 font-medium">✅ Entrada já paga (rascunho):</span>
+                      <span className="text-green-700 font-bold">{formatBRL(saleToInvoice.paid_amount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span className="text-orange-700">Saldo a quitar agora:</span>
+                    <span className="text-orange-700">{formatBRL((saleToInvoice.total || 0) - (saleToInvoice.paid_amount || 0))}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1092,16 +1127,22 @@ export default function Sales() {
                       <span>Total da Venda:</span>
                       <span className="font-bold">{formatBRL(saleToInvoice.total)}</span>
                     </div>
+                    {(saleToInvoice.paid_amount || 0) > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Entrada já paga:</span>
+                        <span className="font-bold">{formatBRL(saleToInvoice.paid_amount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
-                      <span>Total Pagamentos Registrados:</span>
-                      <span className="font-bold text-green-600">
+                      <span>Pagamentos neste faturamento:</span>
+                      <span className="font-bold text-blue-600">
                         {formatBRL(invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0))}
                       </span>
                     </div>
                     <div className="flex justify-between border-t pt-2">
-                      <span className="font-semibold">Saldo a Receber:</span>
+                      <span className="font-semibold">Saldo Pendente:</span>
                       <span className="font-bold text-orange-600">
-                        {formatBRL(saleToInvoice.total - invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0))}
+                        {formatBRL(Math.max(0, saleToInvoice.total - (saleToInvoice.paid_amount || 0) - invoicePayments.reduce((sum, p) => sum + (p.amount || 0), 0)))}
                       </span>
                     </div>
                   </div>
