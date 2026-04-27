@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,25 @@ import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
 export default function Sales() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const selectedCompanyId = localStorage.getItem('selectedCompanyId');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => localStorage.getItem('selectedCompanyId'));
+
+  // Sincroniza ao montar e ao mudar de filial
+  useEffect(() => {
+    const id = localStorage.getItem('selectedCompanyId');
+    if (id !== selectedCompanyId) {
+      setSelectedCompanyId(id);
+    }
+
+    const onStorage = (e) => {
+      if (e.key === 'selectedCompanyId') {
+        setSelectedCompanyId(e.newValue);
+        queryClient.invalidateQueries(['sales']);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [activeTab, setActiveTab] = useState("dados");
   const [openClientCombobox, setOpenClientCombobox] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
