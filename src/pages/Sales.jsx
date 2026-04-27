@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle, Pencil } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle, Pencil, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,6 +23,7 @@ import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatte
 import { ProductSelector } from "@/components/sales/ProductSelector";
 import SalePaymentDialog from "@/components/sales/SalePaymentDialog";
 import SaleEditDialog from "@/components/sales/SaleEditDialog";
+import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
 
 export default function Sales() {
   const queryClient = useQueryClient();
@@ -241,6 +242,9 @@ export default function Sales() {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [saleToEdit, setSaleToEdit] = useState(null);
+
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [saleToCancel, setSaleToCancel] = useState(null);
 
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
   const [saleToInvoice, setSaleToInvoice] = useState(null);
@@ -1155,6 +1159,14 @@ export default function Sales() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Cancelar Venda */}
+      <SaleCancelDialog
+        sale={saleToCancel}
+        open={isCancelDialogOpen}
+        onClose={() => { setIsCancelDialogOpen(false); setSaleToCancel(null); }}
+        onSuccess={() => { queryClient.invalidateQueries(['sales']); queryClient.invalidateQueries(['transactions']); queryClient.invalidateQueries(['accounts']); }}
+      />
+
       {/* Dialog Editar Venda */}
       <SaleEditDialog
         sale={saleToEdit}
@@ -1396,6 +1408,18 @@ export default function Sales() {
                         <MessageCircle className="w-4 h-4 mr-1" />
                         WhatsApp
                       </Button>
+
+                      {sale.status !== 'cancelada' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-400 text-red-600 hover:bg-red-50"
+                          onClick={() => { setSaleToCancel(sale); setIsCancelDialogOpen(true); }}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Cancelar
+                        </Button>
+                      )}
 
                       {sale.status === 'faturada' && (
                         <Popover>
