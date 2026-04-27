@@ -27,7 +27,7 @@ import SaleEditDialog from "@/components/sales/SaleEditDialog";
 export default function Sales() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedCompanyId] = useState(() => localStorage.getItem('selectedCompanyId'));
+  const selectedCompanyId = localStorage.getItem('selectedCompanyId');
   const [activeTab, setActiveTab] = useState("dados");
   const [openClientCombobox, setOpenClientCombobox] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
