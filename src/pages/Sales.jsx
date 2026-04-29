@@ -60,6 +60,9 @@ export default function Sales() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStart, setFilterStart] = useState("");
   const [filterEnd, setFilterEnd] = useState("");
+  const [filterClient, setFilterClient] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState("");
   
   // Novo Cliente State
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false);
@@ -1316,23 +1319,72 @@ export default function Sales() {
       {/* Filtros */}
       <Card className="mb-6">
         <CardContent className="pt-4 pb-4">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
               <Input
-                placeholder="Buscar por referência, cliente ou status..."
+                placeholder="Buscar por referência ou observações..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-9"
               />
             </div>
-            <Label className="text-sm font-medium">Data:</Label>
-            <Input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)} className="w-40" />
-            <span className="text-slate-500">até</span>
-            <Input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)} className="w-40" />
-            {(filterStart || filterEnd) && (
-              <Button variant="outline" size="sm" onClick={() => { setFilterStart(""); setFilterEnd(""); }}>
-                Limpar
+
+            <Select value={filterClient} onValueChange={setFilterClient}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Todos os clientes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os clientes</SelectItem>
+                {[...new Map(sales.map(s => [s.client_id, s.client_name])).entries()]
+                  .filter(([id, name]) => id && name)
+                  .sort((a, b) => (a[1] || '').localeCompare(b[1] || ''))
+                  .map(([id, name]) => (
+                    <SelectItem key={id} value={id}>{name}</SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos status</SelectItem>
+                <SelectItem value="rascunho">Rascunho</SelectItem>
+                <SelectItem value="faturada">Faturada</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
+                <SelectItem value="cancelada">Cancelada</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Pgto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos pgto</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="parcial">Parcial</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-slate-500 whitespace-nowrap">De:</Label>
+              <Input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)} className="w-36" />
+              <Label className="text-sm text-slate-500">até:</Label>
+              <Input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)} className="w-36" />
+            </div>
+
+            {(filterStart || filterEnd || filterClient || filterStatus || filterPaymentStatus) && (
+              <Button variant="outline" size="sm" onClick={() => {
+                setFilterStart(""); setFilterEnd("");
+                setFilterClient(""); setFilterStatus("");
+                setFilterPaymentStatus("");
+              }}>
+                Limpar filtros
               </Button>
             )}
           </div>
@@ -1386,10 +1438,13 @@ export default function Sales() {
         <CardContent>
           <div className="space-y-4">
             {sales.filter(sale => {
-              const matchText = sale.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                sale.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                sale.status?.toLowerCase().includes(searchTerm.toLowerCase());
+              const matchText = !searchTerm ||
+                sale.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                sale.notes?.toLowerCase().includes(searchTerm.toLowerCase());
               if (!matchText) return false;
+              if (filterClient && filterClient !== 'all' && sale.client_id !== filterClient) return false;
+              if (filterStatus && filterStatus !== 'all' && sale.status !== filterStatus) return false;
+              if (filterPaymentStatus && filterPaymentStatus !== 'all' && sale.payment_status !== filterPaymentStatus) return false;
               if (filterStart && sale.sale_date < filterStart) return false;
               if (filterEnd && sale.sale_date > filterEnd) return false;
               return true;
