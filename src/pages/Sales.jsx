@@ -136,11 +136,7 @@ export default function Sales() {
       if (!selectedCompanyId) return [];
       const result = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
       return result.sort((a, b) => {
-        // Primeiro por data de emissão (decrescente)
-        const da = a.sale_date || '';
-        const db = b.sale_date || '';
-        if (db !== da) return db.localeCompare(da);
-        // Depois por data de criação (decrescente)
+        // Ordenar por data de criação (decrescente) como critério principal
         const ca = a.created_date || '';
         const cb = b.created_date || '';
         return cb.localeCompare(ca);
