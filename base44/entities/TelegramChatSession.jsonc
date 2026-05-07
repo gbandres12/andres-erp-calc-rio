@@ -1,0 +1,37 @@
+{
+  "name": "TelegramChatSession",
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "Telegram Chat ID"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "Base44 Agent Conversation ID (Legacy)"
+    },
+    "selected_company_id": {
+      "type": "string",
+      "description": "ID da filial selecionada atualmente pelo usu\u00e1rio"
+    },
+    "history": {
+      "type": "array",
+      "description": "Chat history for context",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "chat_id"
+  ]
+}

@@ -1,0 +1,183 @@
+{
+  "name": "Sale",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "string",
+      "description": "N\u00famero \u00fanico (VENDA-00001)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID do cliente"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Nome do cliente (cache)"
+    },
+    "seller_name": {
+      "type": "string",
+      "description": "Nome do vendedor"
+    },
+    "sale_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da venda"
+    },
+    "quote_id": {
+      "type": "string",
+      "description": "ID do or\u00e7amento de origem (se aplic\u00e1vel)"
+    },
+    "items": {
+      "type": "array",
+      "description": "Itens da venda",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "quantity_withdrawn": {
+            "type": "number",
+            "default": 0
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number",
+            "default": 0
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number",
+      "description": "Subtotal"
+    },
+    "discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Desconto total"
+    },
+    "shipping": {
+      "type": "number",
+      "default": 0,
+      "description": "Frete"
+    },
+    "total": {
+      "type": "number",
+      "description": "Valor total"
+    },
+    "paid_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor pago (entrada + parcelas pagas)"
+    },
+    "remaining_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor restante a pagar"
+    },
+    "payment_method": {
+      "type": "string",
+      "description": "Forma de pagamento principal"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "rascunho",
+        "faturada",
+        "concluida",
+        "cancelada"
+      ],
+      "default": "rascunho",
+      "description": "Status da venda"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "parcial",
+        "pago"
+      ],
+      "default": "pendente",
+      "description": "Status do pagamento"
+    },
+    "withdrawal_status": {
+      "type": "string",
+      "enum": [
+        "aguardando",
+        "parcial",
+        "total"
+      ],
+      "default": "aguardando",
+      "description": "Status da retirada"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "reference",
+    "client_id",
+    "items",
+    "total"
+  ],
+  "rls": {
+    "create": {
+      "data.company_id": {
+        "$in": "{{user.data.allowed_companies}}"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

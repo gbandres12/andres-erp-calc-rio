@@ -1,0 +1,42 @@
+{
+  "name": "TelegramMessageQueue",
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string"
+    },
+    "user_text": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "message_id": {
+      "type": "string"
+    },
+    "raw_data": {
+      "type": "string"
+    },
+    "voice_file_id": {
+      "type": "string",
+      "description": "ID do arquivo de voz se houver"
+    },
+    "photo_file_id": {
+      "type": "string",
+      "description": "ID do arquivo de foto se houver"
+    },
+    "media_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "voice",
+        "photo"
+      ],
+      "default": "text"
+    }
+  },
+  "required": [
+    "chat_id",
+    "user_text"
+  ]
+}

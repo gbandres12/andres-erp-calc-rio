@@ -1,0 +1,110 @@
+{
+  "name": "Transaction",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Valor L\u00edquido (Final)"
+    },
+    "original_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor Original (Cheio) antes do desconto"
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "valor",
+        "porcentagem"
+      ],
+      "default": "valor",
+      "description": "Tipo de desconto aplicado"
+    },
+    "discount_value": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor ou taxa do desconto digitado"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "receita",
+        "despesa"
+      ],
+      "description": "Tipo"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categoria"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "pago",
+        "atrasado",
+        "parcial"
+      ],
+      "default": "pendente",
+      "description": "Status"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de vencimento"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de pagamento"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID da conta"
+    },
+    "contact_id": {
+      "type": "string",
+      "description": "ID do cliente/fornecedor"
+    },
+    "contact_name": {
+      "type": "string",
+      "description": "Nome do contato (cache)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "cost_center": {
+      "type": "string",
+      "description": "Centro de custo"
+    },
+    "paid_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor pago"
+    },
+    "discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor monet\u00e1rio total do desconto calculado"
+    },
+    "attachment_url": {
+      "type": "string",
+      "description": "URL do comprovante"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "description",
+    "amount",
+    "type",
+    "category"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "name": "PurchaseOrderPayment",
+  "type": "object",
+  "properties": {
+    "purchase_order_id": {
+      "type": "string",
+      "description": "ID do pedido de compra"
+    },
+    "purchase_order_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia do pedido (cache)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Valor pago neste pagamento"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do pagamento"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID da conta financeira usada"
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Nome da conta (cache)"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "pix",
+        "transferencia",
+        "boleto",
+        "cheque",
+        "dinheiro"
+      ],
+      "description": "Forma de pagamento"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    }
+  },
+  "required": [
+    "purchase_order_id",
+    "amount",
+    "payment_date",
+    "account_id"
+  ]
+}

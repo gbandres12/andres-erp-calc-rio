@@ -1,0 +1,98 @@
+{
+  "name": "Transfer",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "string",
+      "description": "Refer\u00eancia \u00fanica (TRF000001)"
+    },
+    "product_id": {
+      "type": "string",
+      "description": "ID do produto"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Nome do produto (cache)"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Quantidade transferida"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unidade de medida"
+    },
+    "origin_company_id": {
+      "type": "string",
+      "description": "ID da empresa de origem"
+    },
+    "destination_company_id": {
+      "type": "string",
+      "description": "ID da empresa de destino"
+    },
+    "origin_name": {
+      "type": "string",
+      "description": "Nome da origem (cache)"
+    },
+    "destination_name": {
+      "type": "string",
+      "description": "Nome do destino (cache)"
+    },
+    "weighing_id": {
+      "type": "string",
+      "description": "ID da pesagem associada"
+    },
+    "condition": {
+      "type": "string",
+      "description": "Condi\u00e7\u00e3o do item"
+    },
+    "ca_certificate": {
+      "type": "string",
+      "description": "Certificado de Aprova\u00e7\u00e3o"
+    },
+    "expiration_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de validade"
+    },
+    "unit_cost": {
+      "type": "number",
+      "description": "Custo unit\u00e1rio"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "enviado",
+        "recebido",
+        "cancelado"
+      ],
+      "default": "enviado",
+      "description": "Status da transfer\u00eancia"
+    },
+    "sent_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data de envio"
+    },
+    "received_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data de recebimento"
+    },
+    "shipment_id": {
+      "type": "string",
+      "description": "ID da remessa (se agrupada)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "reference",
+    "product_id",
+    "quantity",
+    "origin_company_id",
+    "destination_company_id"
+  ]
+}

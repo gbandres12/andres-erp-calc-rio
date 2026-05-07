@@ -1,0 +1,59 @@
+{
+  "name": "SaleWithdrawal",
+  "type": "object",
+  "properties": {
+    "sale_id": {
+      "type": "string",
+      "description": "ID da venda"
+    },
+    "sale_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia da venda"
+    },
+    "product_id": {
+      "type": "string",
+      "description": "ID do produto"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Nome do produto"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Quantidade retirada"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unidade"
+    },
+    "weighing_id": {
+      "type": "string",
+      "description": "ID da pesagem associada"
+    },
+    "withdrawal_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora da retirada"
+    },
+    "responsible": {
+      "type": "string",
+      "description": "Respons\u00e1vel pela retirada"
+    },
+    "vehicle_plate": {
+      "type": "string",
+      "description": "Placa do ve\u00edculo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    },
+    "company_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sale_id",
+    "product_id",
+    "quantity"
+  ]
+}

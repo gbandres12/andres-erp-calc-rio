@@ -1,0 +1,33 @@
+{
+  "name": "SalesTelegramQueue",
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string"
+    },
+    "user_text": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "message_id": {
+      "type": "string"
+    },
+    "voice_file_id": {
+      "type": "string"
+    },
+    "media_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "voice"
+      ],
+      "default": "text"
+    }
+  },
+  "required": [
+    "chat_id",
+    "user_text"
+  ]
+}

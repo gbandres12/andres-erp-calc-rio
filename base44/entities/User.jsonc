@@ -1,0 +1,25 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "allowed_companies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs das empresas permitidas"
+    },
+    "custom_role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "operator"
+      ],
+      "default": "admin",
+      "description": "Perfil de acesso"
+    }
+  },
+  "required": [
+    "allowed_companies"
+  ]
+}

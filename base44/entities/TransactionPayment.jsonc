@@ -1,0 +1,66 @@
+{
+  "name": "TransactionPayment",
+  "type": "object",
+  "properties": {
+    "transaction_id": {
+      "type": "string",
+      "description": "ID da transa\u00e7\u00e3o principal"
+    },
+    "transaction_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia da transa\u00e7\u00e3o (cache)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Valor do pagamento/abatimento"
+    },
+    "discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor do desconto concedido neste pagamento"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do pagamento"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID da conta que recebeu/pagou"
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Nome da conta (cache)"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "dinheiro",
+        "pix",
+        "transferencia",
+        "cartao_debito",
+        "cartao_credito",
+        "cheque"
+      ],
+      "description": "Forma de pagamento"
+    },
+    "responsible": {
+      "type": "string",
+      "description": "Respons\u00e1vel pelo lan\u00e7amento"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    }
+  },
+  "required": [
+    "transaction_id",
+    "amount",
+    "payment_date",
+    "account_id"
+  ]
+}

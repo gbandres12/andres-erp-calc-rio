@@ -1,0 +1,65 @@
+{
+  "name": "SupplierQuoteRequest",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "ID do produto (opcional se for item avulso)"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Nome do produto (cache ou manual)"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Quantidade desejada"
+    },
+    "urgency": {
+      "type": "string",
+      "enum": [
+        "baixa",
+        "media",
+        "alta"
+      ],
+      "default": "media",
+      "description": "N\u00edvel de urg\u00eancia"
+    },
+    "requester_name": {
+      "type": "string",
+      "description": "Nome do comprador/solicitante"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es para o agente/fornecedores"
+    },
+    "requested_suppliers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs dos fornecedores selecionados"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "em_andamento",
+        "concluido",
+        "cancelado"
+      ],
+      "default": "pendente",
+      "description": "Status da solicita\u00e7\u00e3o"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    }
+  },
+  "required": [
+    "product_name",
+    "quantity",
+    "urgency",
+    "company_id",
+    "requester_name"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome completo"
+    },
+    "document": {
+      "type": "string",
+      "description": "CPF"
+    },
+    "registration_number": {
+      "type": "string",
+      "description": "Matr\u00edcula"
+    },
+    "position": {
+      "type": "string",
+      "description": "Cargo"
+    },
+    "department": {
+      "type": "string",
+      "description": "Setor"
+    },
+    "shift": {
+      "type": "string",
+      "description": "Turno"
+    },
+    "aso_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do ASO"
+    },
+    "aso_expiration": {
+      "type": "string",
+      "format": "date",
+      "description": "Validade do ASO"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

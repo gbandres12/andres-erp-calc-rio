@@ -1,0 +1,100 @@
+{
+  "name": "Contact",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "cliente",
+        "fornecedor",
+        "ambos"
+      ],
+      "description": "Tipo de contato"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nome"
+    },
+    "document": {
+      "type": "string",
+      "description": "CPF/CNPJ"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Telefone"
+    },
+    "address": {
+      "type": "string",
+      "description": "Endere\u00e7o"
+    },
+    "city": {
+      "type": "string",
+      "description": "Cidade"
+    },
+    "state": {
+      "type": "string",
+      "description": "Estado"
+    },
+    "zip_code": {
+      "type": "string",
+      "description": "CEP"
+    },
+    "credit_balance": {
+      "type": "number",
+      "default": 0,
+      "description": "Saldo de cr\u00e9dito"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa/filial"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Contato ativo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "prospect",
+        "cliente"
+      ],
+      "default": "prospect",
+      "description": "Status do contato (prospect ou cliente)"
+    },
+    "planted_area": {
+      "type": "number",
+      "description": "\u00c1rea plantada em hectares"
+    },
+    "limestone_applied": {
+      "type": "number",
+      "description": "M\u00e9dia de calc\u00e1rio aplicado em toneladas"
+    },
+    "gypsum_applied": {
+      "type": "number",
+      "description": "M\u00e9dia de gesso aplicado em toneladas"
+    },
+    "purchase_potential": {
+      "type": "string",
+      "enum": [
+        "baixo",
+        "medio",
+        "alto"
+      ],
+      "description": "Potencial de compra"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "company_id"
+  ]
+}

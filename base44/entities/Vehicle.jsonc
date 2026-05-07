@@ -1,0 +1,85 @@
+{
+  "name": "Vehicle",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo do ve\u00edculo (VEI001)"
+    },
+    "plate": {
+      "type": "string",
+      "description": "Placa do ve\u00edculo"
+    },
+    "brand": {
+      "type": "string",
+      "description": "Marca"
+    },
+    "model": {
+      "type": "string",
+      "description": "Modelo"
+    },
+    "year": {
+      "type": "string",
+      "description": "Ano"
+    },
+    "fleet_type": {
+      "type": "string",
+      "enum": [
+        "propria",
+        "agregada"
+      ],
+      "description": "Tipo de frota"
+    },
+    "capacity": {
+      "type": "number",
+      "description": "Capacidade em toneladas"
+    },
+    "odometer": {
+      "type": "number",
+      "description": "Hod\u00f4metro atual"
+    },
+    "driver_name": {
+      "type": "string",
+      "description": "Nome do motorista"
+    },
+    "driver_license": {
+      "type": "string",
+      "description": "CNH do motorista"
+    },
+    "cost_center": {
+      "type": "string",
+      "description": "Centro de custo"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "rfid_tag": {
+      "type": "string",
+      "description": "Tag RFID"
+    },
+    "qr_code": {
+      "type": "string",
+      "description": "QR Code \u00fanico"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "parado",
+        "manutencao",
+        "inativo"
+      ],
+      "default": "ativo",
+      "description": "Status do ve\u00edculo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "code",
+    "plate"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "Refueling",
+  "type": "object",
+  "properties": {
+    "vehicle_id": {
+      "type": "string",
+      "description": "ID do ve\u00edculo"
+    },
+    "vehicle_plate": {
+      "type": "string",
+      "description": "Placa do ve\u00edculo"
+    },
+    "tank_id": {
+      "type": "string",
+      "description": "ID do tanque"
+    },
+    "fuel_type": {
+      "type": "string",
+      "description": "Tipo de combust\u00edvel"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Quantidade em litros"
+    },
+    "cost_per_liter": {
+      "type": "number",
+      "description": "Custo por litro"
+    },
+    "total_cost": {
+      "type": "number",
+      "description": "Custo total"
+    },
+    "odometer": {
+      "type": "number",
+      "description": "Hod\u00f4metro no abastecimento"
+    },
+    "supplier": {
+      "type": "string",
+      "description": "Fornecedor"
+    },
+    "responsible": {
+      "type": "string",
+      "description": "Respons\u00e1vel"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "vehicle_id",
+    "quantity",
+    "fuel_type"
+  ]
+}

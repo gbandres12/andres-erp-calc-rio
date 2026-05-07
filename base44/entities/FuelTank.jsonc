@@ -1,0 +1,51 @@
+{
+  "name": "FuelTank",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome do tanque"
+    },
+    "fuel_type": {
+      "type": "string",
+      "enum": [
+        "diesel_s10",
+        "diesel_s500",
+        "arla32",
+        "gasolina"
+      ],
+      "description": "Tipo de combust\u00edvel"
+    },
+    "capacity": {
+      "type": "number",
+      "description": "Capacidade total em litros"
+    },
+    "current_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "Estoque atual em litros"
+    },
+    "min_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "Estoque m\u00ednimo"
+    },
+    "location": {
+      "type": "string",
+      "description": "Localiza\u00e7\u00e3o f\u00edsica"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "name",
+    "fuel_type",
+    "capacity"
+  ]
+}

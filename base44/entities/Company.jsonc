@@ -1,0 +1,43 @@
+{
+  "name": "Company",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome da empresa/filial"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico da empresa"
+    },
+    "cnpj": {
+      "type": "string",
+      "description": "CNPJ da empresa"
+    },
+    "address": {
+      "type": "string",
+      "description": "Endere\u00e7o completo"
+    },
+    "city": {
+      "type": "string",
+      "description": "Cidade"
+    },
+    "state": {
+      "type": "string",
+      "description": "Estado"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Telefone"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Empresa ativa"
+    }
+  },
+  "required": [
+    "name",
+    "code"
+  ]
+}

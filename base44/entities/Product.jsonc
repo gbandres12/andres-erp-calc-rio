@@ -1,0 +1,107 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico do produto (PROD000001)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nome do produto"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o detalhada"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categoria do produto"
+    },
+    "material_type": {
+      "type": "string",
+      "enum": [
+        "bruto",
+        "processado",
+        "mercadoria",
+        "insumo"
+      ],
+      "default": "mercadoria",
+      "description": "Tipo do material (Bruto=Pedra, Processado=P\u00f3, etc)"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "novo",
+        "usado",
+        "recondicionado"
+      ],
+      "default": "novo",
+      "description": "Condi\u00e7\u00e3o do produto"
+    },
+    "size": {
+      "type": "string",
+      "description": "Tamanho"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "UN",
+        "KG",
+        "TON",
+        "L",
+        "M",
+        "M2",
+        "M3"
+      ],
+      "default": "UN",
+      "description": "Unidade de medida"
+    },
+    "cost_price": {
+      "type": "number",
+      "description": "Pre\u00e7o de custo"
+    },
+    "sale_price": {
+      "type": "number",
+      "description": "Pre\u00e7o de venda"
+    },
+    "profit_margin": {
+      "type": "number",
+      "description": "Margem de lucro (%)"
+    },
+    "min_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "Estoque m\u00ednimo"
+    },
+    "max_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "Estoque m\u00e1ximo"
+    },
+    "current_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "Estoque atual calculado"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL da imagem do produto"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa/filial"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Produto ativo"
+    }
+  },
+  "required": [
+    "name",
+    "code",
+    "unit",
+    "company_id"
+  ]
+}

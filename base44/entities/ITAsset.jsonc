@@ -1,0 +1,81 @@
+{
+  "name": "ITAsset",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome/Descri\u00e7\u00e3o"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "computador",
+        "notebook",
+        "impressora",
+        "nobreak",
+        "monitor",
+        "roteador",
+        "outro"
+      ],
+      "description": "Tipo de equipamento"
+    },
+    "serial_number": {
+      "type": "string",
+      "description": "N\u00famero de s\u00e9rie"
+    },
+    "asset_number": {
+      "type": "string",
+      "description": "N\u00famero de patrim\u00f4nio"
+    },
+    "brand": {
+      "type": "string",
+      "description": "Marca"
+    },
+    "model": {
+      "type": "string",
+      "description": "Modelo"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "em_uso",
+        "em_estoque",
+        "manutencao",
+        "baixado"
+      ],
+      "default": "em_estoque",
+      "description": "Status"
+    },
+    "location": {
+      "type": "string",
+      "description": "Localiza\u00e7\u00e3o"
+    },
+    "responsible_user": {
+      "type": "string",
+      "description": "Usu\u00e1rio respons\u00e1vel"
+    },
+    "acquisition_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de aquisi\u00e7\u00e3o"
+    },
+    "supplier": {
+      "type": "string",
+      "description": "Fornecedor"
+    },
+    "invoice_number": {
+      "type": "string",
+      "description": "Nota fiscal"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}

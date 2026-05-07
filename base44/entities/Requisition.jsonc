@@ -1,0 +1,70 @@
+{
+  "name": "Requisition",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "string",
+      "description": "N\u00famero \u00fanico (REQ000001)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "requester_name": {
+      "type": "string",
+      "description": "Nome do solicitante"
+    },
+    "department": {
+      "type": "string",
+      "description": "Setor solicitante"
+    },
+    "location": {
+      "type": "string",
+      "description": "Local de uso"
+    },
+    "items": {
+      "type": "array",
+      "description": "Itens requisitados",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "quantity_requested": {
+            "type": "number"
+          },
+          "quantity_delivered": {
+            "type": "number"
+          },
+          "quantity_returned": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "aguardando_retirada",
+        "concluida",
+        "recusada",
+        "aguardando_devolucao"
+      ],
+      "default": "pendente"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "reference",
+    "company_id",
+    "requester_name",
+    "items"
+  ]
+}

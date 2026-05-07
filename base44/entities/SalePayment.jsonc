@@ -1,0 +1,51 @@
+{
+  "name": "SalePayment",
+  "type": "object",
+  "properties": {
+    "sale_id": {
+      "type": "string",
+      "description": "ID da venda"
+    },
+    "sale_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia da venda"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "dinheiro",
+        "pix",
+        "cartao_credito",
+        "cartao_debito",
+        "transferencia",
+        "cheque"
+      ],
+      "description": "Forma de pagamento"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Valor pago"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do pagamento"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Conta que recebeu o pagamento"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    },
+    "company_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sale_id",
+    "payment_method",
+    "amount"
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "name": "Quote",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "string",
+      "description": "N\u00famero \u00fanico do or\u00e7amento (ORC-00001)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID do cliente"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Nome do cliente (cache)"
+    },
+    "seller_name": {
+      "type": "string",
+      "description": "Nome do vendedor"
+    },
+    "quote_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de emiss\u00e3o do or\u00e7amento"
+    },
+    "validity_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de validade do or\u00e7amento"
+    },
+    "items": {
+      "type": "array",
+      "description": "Itens do or\u00e7amento",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number",
+            "default": 0
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number",
+      "description": "Subtotal"
+    },
+    "discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Desconto total"
+    },
+    "shipping": {
+      "type": "number",
+      "default": 0,
+      "description": "Frete"
+    },
+    "total": {
+      "type": "number",
+      "description": "Valor total"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "rascunho",
+        "enviado",
+        "aprovado",
+        "rejeitado",
+        "convertido",
+        "expirado"
+      ],
+      "default": "rascunho",
+      "description": "Status do or\u00e7amento"
+    },
+    "converted_sale_id": {
+      "type": "string",
+      "description": "ID da venda gerada a partir deste or\u00e7amento"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "reference",
+    "client_id",
+    "items",
+    "total"
+  ]
+}

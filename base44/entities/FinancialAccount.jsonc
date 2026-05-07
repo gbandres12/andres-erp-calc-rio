@@ -1,0 +1,50 @@
+{
+  "name": "FinancialAccount",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome da conta"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "banco",
+        "caixa",
+        "carteira_digital"
+      ],
+      "description": "Tipo de conta"
+    },
+    "bank_name": {
+      "type": "string",
+      "description": "Nome do banco"
+    },
+    "account_number": {
+      "type": "string",
+      "description": "N\u00famero da conta"
+    },
+    "initial_balance": {
+      "type": "number",
+      "default": 0,
+      "description": "Saldo inicial"
+    },
+    "current_balance": {
+      "type": "number",
+      "default": 0,
+      "description": "Saldo atual"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Conta ativa"
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}

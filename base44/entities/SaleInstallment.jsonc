@@ -1,0 +1,68 @@
+{
+  "name": "SaleInstallment",
+  "type": "object",
+  "properties": {
+    "sale_id": {
+      "type": "string",
+      "description": "ID da venda"
+    },
+    "sale_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia da venda"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID do cliente"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Nome do cliente"
+    },
+    "installment_number": {
+      "type": "number",
+      "description": "N\u00famero da parcela (1, 2, 3...)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Valor da parcela"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de vencimento"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do pagamento"
+    },
+    "paid_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor pago"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "pago",
+        "atrasado"
+      ],
+      "default": "pendente",
+      "description": "Status da parcela"
+    },
+    "transaction_id": {
+      "type": "string",
+      "description": "ID do lan\u00e7amento financeiro vinculado"
+    },
+    "company_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sale_id",
+    "installment_number",
+    "amount",
+    "due_date"
+  ]
+}
