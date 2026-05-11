@@ -81,40 +81,54 @@ async function classifyIntent(base44, userText, session, companies, accounts) {
         return `• ${a.name} (${comp?.name || '?'}): ${brl(a.current_balance)}`;
     }).join('\n');
 
-    const prompt = `Você é FINAN, especialista financeiro de uma empresa de mineração de calcário. Responda SEMPRE em português do Brasil, de forma clara e profissional.
+    const prompt = `Você é FINAN, assistente financeiro especializado de uma empresa de mineração de calcário com múltiplas filiais. Responda SEMPRE em português do Brasil, de forma clara e profissional.
 Hoje: ${todayStr}. Filial ativa: ${activeName} (ID: ${cid || 'nenhuma'})
 
 FILIAIS DISPONÍVEIS:
 ${companyList}
 
-SALDOS ATUAIS:
+SALDOS ATUAIS POR CONTA:
 ${accountList}
 
 ${history ? `HISTÓRICO DA CONVERSA:\n${history}\n` : ''}
 MENSAGEM DO USUÁRIO: "${userText}"
 
-INSTRUÇÕES IMPORTANTES:
-1. Classifique a intenção do usuário e determine a action correta.
-2. O campo "reply" DEVE ser uma resposta COMPLETA, útil e contextual em português — não apenas um placeholder. Para saudações, apresente-se brevemente e LISTE o que você pode fazer. Para dúvidas, responda diretamente com base no contexto disponível.
-3. Se não houver filial ativa ("nenhuma"), inclua no reply uma instrução clara pedindo ao usuário para informar ou escolher a filial antes de consultas financeiras.
-4. Para comandos ambíguos ou com informação insuficiente: classifique como "reply" e explique no campo reply O QUE está faltando e peça de forma específica (ex: "Para registrar a despesa, informe o valor e a categoria.").
-5. NUNCA invente dados. Se não tiver certeza da intenção, pergunte.
-6. Aceite variações de linguagem: "oi", "olá", "bom dia" → reply com apresentação. "quanto tenho", "saldo" → check_balance. "o que vence", "dívidas" → upcoming_bills. "entrei X reais" → add_transaction receita. "paguei X" → add_transaction despesa ou pay_bill.
+INSTRUÇÕES GERAIS:
+1. Classifique a intenção e retorne a action mais adequada.
+2. O campo "reply" DEVE ser uma resposta completa em português — nunca deixe vazio ou como placeholder.
+3. Se não houver filial ativa, solicite que o usuário informe antes de consultas financeiras. Liste as filiais disponíveis.
+4. Para informações insuficientes: classifique como "reply" e diga exatamente o que falta.
+5. NUNCA invente dados. Se não tiver certeza, pergunte.
+6. Quando o usuário mencionar uma filial pelo nome (ex: "Santarém", "Fazenda"), identifique o ID correto pela lista de filiais e use em target_company.
+7. Para operações sem filial específica mencionada, use a filial ativa atual.
+
+MAPEAMENTO DE LINGUAGEM NATURAL:
+- "oi/olá/bom dia/boa tarde" → reply com apresentação e lista de capacidades
+- "saldo/quanto tenho/caixa" → check_balance
+- "o que vence/dívidas/pagar" → upcoming_bills
+- "relatório diário/fluxo do dia/como foi hoje/fechamento do dia" → daily_report
+- "recebi X/entrou X reais" → add_transaction (type=receita, is_paid=true)
+- "paguei X/gastei X" → add_transaction (type=despesa, is_paid=true)
+- "tenho conta a pagar de X" → add_transaction (type=despesa, is_paid=false)
+- "dar baixa/quitar/paguei a conta de X" → pay_bill
+- "resumo/relatório mensal/resultado do mês" → financial_summary
+- "lançamentos/movimentações/extrato" → search_transactions
 
 AÇÕES DISPONÍVEIS:
 - reply: conversa simples, esclarecimentos, informações insuficientes
 - financial_summary: resumo financeiro (receitas/despesas/resultado). query={company_name?, period?}
+- daily_report: relatório diário de fluxo de caixa com entradas, saídas e saldo. query={company_name?, date?}
 - check_balance: consultar saldo de contas. query={company_name?}
 - search_transactions: buscar lançamentos. query={type?, status?, company_name?, period?, start_date?, end_date?, keyword?}
-  * type SOMENTE: "receita" ou "despesa"
-  * "movimentações/fluxo de caixa" → status="pago", sem type
-  * "contas a pagar/despesas pendentes" → type="despesa", status="aberto"
-  * "contas a receber/receitas pendentes" → type="receita", status="aberto"
+  * type: "receita" ou "despesa" (omita para ambos)
+  * status: "pago" | "pendente" | "atrasado" | "aberto" (aberto = pendente+atrasado)
   * period: today|yesterday|this_week|last_week|this_month|last_month|this_year
 - upcoming_bills: vencimentos próximos. query={company_name?, days?, type?}
 - add_transaction: lançar transação. transaction={description, amount, type, category, due_date?, payment_date?, is_paid?, contact_name?}
-- pay_bill: dar baixa em conta. payment={search_term, amount?, payment_date?}
-- select_company: trocar filial. target_company=nome
+  * Categorias receita: "Vendas", "Outras Receitas", "Serviços"
+  * Categorias despesa: "Combustível", "Manutenção", "Salários", "Fornecedores", "Administrativo", "Outras Despesas"
+- pay_bill: dar baixa em conta pendente. payment={search_term, amount?, payment_date?}
+- select_company: trocar filial ativa. target_company=nome_ou_id
 - search_contacts: buscar contatos. search_term=nome
 - create_contact: cadastrar contato. contact={name, phone?, email?, type, document?}
 
@@ -154,9 +168,14 @@ async function executeAction(base44, ai, companies, accounts, session) {
     // ── select_company ────────────────────────────────────────────────────────
     if (action === 'select_company') {
         const nc = resolveCompany(companies, target_company || companyHint);
-        if (!nc) return `⚠️ Filial não encontrada: "${target_company}".\nFiliais disponíveis:\n${companies.map(c=>`• ${c.name}`).join('\n')}`;
+        if (!nc) {
+            return `⚠️ Filial não encontrada: "${target_company}".\n\nFiliais disponíveis:\n${companies.map(c=>`• ${c.name}`).join('\n')}\n\nDigite o nome da filial para selecionar.`;
+        }
         await base44.asServiceRole.entities.TelegramChatSession.update(session.id, { selected_company_id: nc.id });
-        return `✅ *Filial alterada para ${nc.name}*`;
+        session.selected_company_id = nc.id;
+        const compAccounts = accounts.filter(a => a.company_id === nc.id);
+        const saldoTotal = compAccounts.reduce((s,a)=>s+(a.current_balance||0),0);
+        return `✅ *Filial: ${nc.name}*\n🏦 Saldo total: ${brl(saldoTotal)}\n\nO que deseja fazer?`;
     }
 
     // ── check_balance ─────────────────────────────────────────────────────────
@@ -218,6 +237,80 @@ async function executeAction(base44, ai, companies, accounts, session) {
             report += '\n';
         }
         return report.trim() || '📊 Sem dados para o período.';
+    }
+
+    // ── daily_report ──────────────────────────────────────────────────────────
+    if (action === 'daily_report') {
+        const reportDate = query.date || today();
+        const range = { start: reportDate, end: reportDate };
+        const targets = targetComp ? [targetComp] : (cid ? companies.filter(c=>c.id===cid) : companies);
+        const fmtReportDate = reportDate.split('-').reverse().join('/');
+
+        let report = `📋 *Relatório Diário — ${fmtReportDate}*\n\n`;
+
+        for (const comp of targets) {
+            const [entradas, saidas, pendDesp, pendRec] = await Promise.all([
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pago' }, '-payment_date', 100),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pago' }, '-payment_date', 100),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pendente' }, 'due_date', 30),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pendente' }, 'due_date', 30),
+            ]);
+
+            const entradasDia = filterByDateRange(entradas, 'payment_date', range);
+            const saidasDia = filterByDateRange(saidas, 'payment_date', range);
+            const totalEntradas = entradasDia.reduce((s,t)=>s+t.amount,0);
+            const totalSaidas = saidasDia.reduce((s,t)=>s+t.amount,0);
+            const resultado = totalEntradas - totalSaidas;
+            const compAccounts = accounts.filter(a=>a.company_id===comp.id);
+            const saldoCaixa = compAccounts.reduce((s,a)=>s+(a.current_balance||0),0);
+
+            // Vencendo hoje
+            const hoje = today();
+            const vencendoHoje = [...pendDesp,...pendRec].filter(t=>t.due_date===hoje);
+
+            report += `🏢 *${comp.name}*\n${'─'.repeat(30)}\n`;
+
+            // Entradas do dia
+            if (entradasDia.length > 0) {
+                report += `\n📥 *Entradas (${entradasDia.length}):*\n`;
+                entradasDia.slice(0,6).forEach(t => {
+                    report += `  ✅ ${t.description}\n     └ ${brl(t.amount)}${t.contact_name?' | '+t.contact_name:''}${t.category?' | '+t.category:''}\n`;
+                });
+                if (entradasDia.length > 6) report += `  _(+${entradasDia.length-6} mais)_\n`;
+                report += `  *Subtotal: ${brl(totalEntradas)}*\n`;
+            } else {
+                report += `\n📥 *Entradas:* nenhuma\n`;
+            }
+
+            // Saídas do dia
+            if (saidasDia.length > 0) {
+                report += `\n📤 *Saídas (${saidasDia.length}):*\n`;
+                saidasDia.slice(0,6).forEach(t => {
+                    report += `  ✅ ${t.description}\n     └ ${brl(t.amount)}${t.contact_name?' | '+t.contact_name:''}${t.category?' | '+t.category:''}\n`;
+                });
+                if (saidasDia.length > 6) report += `  _(+${saidasDia.length-6} mais)_\n`;
+                report += `  *Subtotal: ${brl(totalSaidas)}*\n`;
+            } else {
+                report += `\n📤 *Saídas:* nenhuma\n`;
+            }
+
+            // Resultado
+            report += `\n📊 *Resultado do dia:* ${resultado >= 0 ? '🟢' : '🔴'} ${brl(resultado)}\n`;
+            report += `🏦 *Saldo em caixa:* ${brl(saldoCaixa)}\n`;
+
+            // Alertas de vencimento hoje
+            if (vencendoHoje.length > 0) {
+                report += `\n⏰ *Vence hoje (${vencendoHoje.length}):*\n`;
+                vencendoHoje.slice(0,4).forEach(t => {
+                    const icon = t.type==='receita'?'📥':'📤';
+                    report += `  ${icon} ${t.description} | ${brl(t.amount)}\n`;
+                });
+            }
+
+            report += '\n';
+        }
+
+        return report.trim();
     }
 
     // ── search_transactions ───────────────────────────────────────────────────
