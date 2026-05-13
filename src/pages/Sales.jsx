@@ -24,6 +24,8 @@ import { ProductSelector } from "@/components/sales/ProductSelector";
 import SalePaymentDialog from "@/components/sales/SalePaymentDialog";
 import SaleEditDialog from "@/components/sales/SaleEditDialog";
 import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
+import SaleAdjustDialog from "@/components/sales/SaleAdjustDialog";
+import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
 
 export default function Sales() {
   const queryClient = useQueryClient();
@@ -270,6 +272,12 @@ export default function Sales() {
 
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [saleToCancel, setSaleToCancel] = useState(null);
+
+  const [isAdjustDialogOpen, setIsAdjustDialogOpen] = useState(false);
+  const [saleToAdjust, setSaleToAdjust] = useState(null);
+
+  const [isDeleteAuthOpen, setIsDeleteAuthOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
   const [saleToInvoice, setSaleToInvoice] = useState(null);
@@ -1239,6 +1247,29 @@ export default function Sales() {
         onSuccess={() => { queryClient.invalidateQueries(['sales']); queryClient.invalidateQueries(['transactions']); queryClient.invalidateQueries(['accounts']); }}
       />
 
+      {/* Dialog Ajustar Venda */}
+      <SaleAdjustDialog
+        sale={saleToAdjust}
+        open={isAdjustDialogOpen}
+        onClose={() => { setIsAdjustDialogOpen(false); setSaleToAdjust(null); }}
+        onSuccess={() => { queryClient.invalidateQueries(['sales']); queryClient.invalidateQueries(['transactions']); queryClient.invalidateQueries(['accounts']); }}
+      />
+
+      {/* Dialog Autenticação para Deletar */}
+      <DeleteAuthDialog
+        open={isDeleteAuthOpen}
+        onClose={() => { setIsDeleteAuthOpen(false); setPendingDelete(null); }}
+        onSuccess={() => {
+          if (pendingDelete?.type === 'sale') {
+            base44.entities.Sale.delete(pendingDelete.id);
+            queryClient.invalidateQueries(['sales']);
+          }
+          setIsDeleteAuthOpen(false);
+          setPendingDelete(null);
+        }}
+        itemType={pendingDelete?.type === 'sale' ? 'venda' : 'lançamento'}
+      />
+
       {/* Dialog Editar Venda */}
       <SaleEditDialog
         sale={saleToEdit}
@@ -1513,6 +1544,18 @@ export default function Sales() {
                         <Pencil className="w-4 h-4 mr-1" />
                         Editar
                       </Button>
+
+                      {sale.status === 'rascunho' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-blue-400 text-blue-600 hover:bg-blue-50"
+                          onClick={() => { setSaleToAdjust(sale); setIsAdjustDialogOpen(true); }}
+                        >
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Ajustar Qtd
+                        </Button>
+                      )}
 
                       <Button
                         variant="outline"
