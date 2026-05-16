@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Save, Edit3 } from "lucide-react";
-import { formatBRL } from "@/components/utils/formatters";
+import { formatBRL, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
@@ -15,6 +15,15 @@ import { toast } from "sonner";
 export default function SaleEditDialog({ sale, products, contacts, open, onClose, onSuccess }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [payments, setPayments] = useState([]);
+
+  useEffect(() => {
+    if (sale && open) {
+      base44.entities.SalePayment.filter({ sale_id: sale.id }).then(p => {
+        setPayments(p.sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || '')));
+      });
+    }
+  }, [sale, open]);
 
   // Inicializar form quando a venda muda
   useEffect(() => {
@@ -270,6 +279,46 @@ export default function SaleEditDialog({ sale, products, contacts, open, onClose
             </CardContent>
           </Card>
         </div>
+
+          {/* Histórico de Recebimentos */}
+          {payments.length > 0 && (
+            <div>
+              <Label className="font-semibold text-slate-700 mb-3 block">Histórico de Recebimentos</Label>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">Data</th>
+                      <th className="text-right px-3 py-2 font-semibold text-slate-600">Recebido</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">Forma</th>
+                      <th className="text-left px-3 py-2 font-semibold text-slate-600">Obs.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p, i) => (
+                      <tr key={p.id} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                        <td className="px-3 py-2 text-slate-700">{formatDate(p.payment_date)}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-green-700">{formatBRL(p.amount)}</td>
+                        <td className="px-3 py-2 text-slate-600 capitalize">{p.payment_method?.replace('_', ' ')}</td>
+                        <td className="px-3 py-2 text-slate-500 text-xs">{p.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-100 border-t">
+                    <tr>
+                      <td className="px-3 py-2 font-bold text-slate-700">SALDO A RECEBER</td>
+                      <td className="px-3 py-2 text-right font-bold text-orange-600 text-base">
+                        {formatBRL(Math.max(0, (sale.total || 0) - payments.reduce((s, p) => s + (p.amount || 0), 0)))}
+                      </td>
+                      <td colSpan={2} className="px-3 py-2 text-xs text-slate-500">
+                        Total pago: {formatBRL(payments.reduce((s, p) => s + (p.amount || 0), 0))} de {formatBRL(sale.total || 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
 
         <div className="flex justify-end gap-3 pt-4 border-t mt-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
