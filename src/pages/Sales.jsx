@@ -468,12 +468,33 @@ export default function Sales() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
+    if (!formData.client_id) {
+      toast.error("Selecione o cliente antes de salvar.");
+      setActiveTab("dados");
+      return;
+    }
+
+    const hasProductFilled = formData.items.some(i => i.product_id && i.quantity > 0);
+    if (!hasProductFilled) {
+      toast.error("Adicione ao menos um item com produto e quantidade.");
+      setActiveTab("itens");
+      return;
+    }
+
+    const initialPayment = paymentData.initial_payment === '' ? 0 : parseFloat(paymentData.initial_payment) || 0;
+
+    if (initialPayment > 0 && !paymentData.account_id) {
+      toast.error("Selecione a conta que receberá o pagamento.");
+      setActiveTab("pagamento");
+      return;
+    }
+
     const dataToSend = {
       ...formData,
-      discount: formData.discount === '' ? 0 : parseFloat(formData.discount),
-      shipping: formData.shipping === '' ? 0 : parseFloat(formData.shipping),
-      initial_payment: paymentData.initial_payment === '' ? 0 : parseFloat(paymentData.initial_payment),
+      discount: formData.discount === '' ? 0 : parseFloat(formData.discount) || 0,
+      shipping: formData.shipping === '' ? 0 : parseFloat(formData.shipping) || 0,
+      initial_payment: initialPayment,
       payment_method: paymentData.payment_method,
       account_id: paymentData.account_id,
       installments: paymentData.installments,
@@ -941,10 +962,9 @@ export default function Sales() {
                       </Select>
                     </div>
                     <div className="col-span-2 space-y-2">
-                      <Label>Conta que Receberá *</Label>
-                      <Select
-                        required
-                        value={paymentData.account_id}
+                     <Label>Conta que Receberá {paymentData.initial_payment > 0 ? '*' : ''}</Label>
+                     <Select
+                       value={paymentData.account_id}
                         onValueChange={(value) => setPaymentData({ ...paymentData, account_id: value })}
                       >
                         <SelectTrigger>
