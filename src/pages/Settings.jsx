@@ -305,9 +305,6 @@ export default function Settings() {
                   onClick={async () => {
                      try {
                       const toastId = toast.loading("Configurando Webhook Financeiro...");
-                      // Reutilizando a lógica, assumindo que existe uma função similar ou adaptando
-                      // Como não criamos uma func especifica pra setup do financeiro agora, 
-                      // vamos deixar apenas informativo ou criar a func se necessário depois.
                       toast.info("Configuração manual necessária ou função pendente.");
                     } catch (e) {
                       toast.error("Erro: " + e.message);
@@ -319,6 +316,24 @@ export default function Settings() {
                   <Bot className="w-4 h-4 mr-2" />
                   Configurar Webhook Financeiro (Em breve)
                 </Button>
+              </div>
+
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-semibold text-slate-900 mb-1">🤖 Agente Comercial Mucajaí</h3>
+                <p className="text-sm text-slate-500 mb-4">
+                  Conecte seu Telegram ao agente comercial inteligente da unidade Mucajaí.
+                  Consulte vendas, financeiro e clientes diretamente pelo Telegram.
+                </p>
+                <a
+                  href={base44.agents.getTelegramConnectURL('mucajai_comercial')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button className="bg-blue-500 hover:bg-blue-600 text-white">
+                    <Bot className="w-4 h-4 mr-2" />
+                    Conectar no Telegram — Mucajaí Comercial
+                  </Button>
+                </a>
               </div>
             </CardContent>
           </Card>
