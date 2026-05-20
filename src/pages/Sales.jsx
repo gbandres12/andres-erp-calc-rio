@@ -263,7 +263,8 @@ export default function Sales() {
       toast.success("Venda criada como rascunho. Fature para gerar lançamentos financeiros!");
     },
     onError: (error) => {
-      toast.error("Erro ao criar venda: " + error.message);
+      console.error("ERRO CRIAR VENDA:", error, JSON.stringify(error));
+      toast.error("Erro ao criar venda: " + (error?.message || JSON.stringify(error)));
     }
   });
 
