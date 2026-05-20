@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import OpenAI from 'npm:openai';
 import { GoogleGenerativeAI } from "npm:@google/generative-ai@^0.12.0";
 
@@ -102,10 +102,10 @@ export async function processSalesQueue(req) {
         const historyText = history.slice(-10).map(msg => `${msg.role === 'user' ? 'User' : 'Bot'}: ${msg.content}`).join("\n");
 
         // 3. Prompt Otimizado
-        const systemPrompt = `Você é o "Assistente Comercial" da Calcário Amazônia.
+        const systemPrompt = `Você é o "Assistente Comercial" da CBA Calcário — Unidade Mucajaí, Roraima.
         Sua função é ajudar o VENDEDOR (usuário) a registrar leads e vendas no sistema de forma rápida e eficiente.
         
-        IMPORTANTE: Você trabalha EXCLUSIVAMENTE para a "Calcário Amazônia". JAMAIS mencione "Andres Tech" ou outros sistemas.
+        IMPORTANTE: Você trabalha EXCLUSIVAMENTE para a "CBA Calcário". JAMAIS mencione "Andres Tech" ou outros sistemas.
 
         CONTEXTO ATUAL:
         Filial Selecionada: ${currentCompanyName} (ID: ${currentCompanyId || 'não definida'})
