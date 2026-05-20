@@ -127,7 +127,7 @@ export default function Layout({ children, currentPageName }) {
       return navigationGroups.map(group => {
         if (group.title === "Financeiro") return null;
         if (group.title === "Comercial") {
-          const allowed = ['SaleWithdrawals'];
+          const allowed = ['Sales', 'SaleWithdrawals', 'Quotes'];
           const filteredItems = group.items.filter(item => allowed.includes(item.url));
           if (filteredItems.length === 0) return null;
           return { ...group, items: filteredItems };
