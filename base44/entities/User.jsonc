@@ -13,7 +13,8 @@
       "type": "string",
       "enum": [
         "admin",
-        "operator"
+        "operator",
+        "scale_operator"
       ],
       "default": "admin",
       "description": "Perfil de acesso"

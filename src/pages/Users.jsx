@@ -45,7 +45,7 @@ export default function UsersPage() {
   const handleEdit = (user) => {
     setEditingUser({
       id: user.id,
-      custom_role: user.custom_role || 'admin',
+      custom_role: user.custom_role || '',
       allowed_companies: user.allowed_companies || []
     });
     setIsDialogOpen(true);
@@ -98,11 +98,11 @@ export default function UsersPage() {
                       </Badge>
                       {(() => {
                         const roleMap = {
-                          admin: { label: 'Admin', className: 'bg-blue-50 text-blue-700 border-blue-200' },
-                          operator: { label: 'Operador (Sem Financeiro)', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-                          scale_operator: { label: 'Op. Balança/Vendas', className: 'bg-orange-50 text-orange-700 border-orange-200' },
+                          admin: { label: 'Admin — Acesso Total', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+                          operator: { label: 'Operador — Vendas + Clientes', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+                          scale_operator: { label: 'Op. Balança — Pesagem + Vendas', className: 'bg-orange-50 text-orange-700 border-orange-200' },
                         };
-                        const r = roleMap[user.custom_role] || { label: user.custom_role || 'Admin', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+                        const r = roleMap[user.custom_role] || { label: user.custom_role ? user.custom_role : '⚠️ Sem perfil definido', className: user.custom_role ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200' };
                         return <Badge variant="outline" className={r.className}>{r.label}</Badge>;
                       })()}
                       {user.allowed_companies?.length > 0 && (
@@ -158,9 +158,9 @@ export default function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin (Acesso Total)</SelectItem>
-                    <SelectItem value="operator">Operador (Sem Financeiro)</SelectItem>
-                    <SelectItem value="scale_operator">Operador de Balança/Vendas (Sem Financeiro, só Pesagem e Vendas)</SelectItem>
+                   <SelectItem value="admin">🔵 Admin — Acesso total ao sistema</SelectItem>
+                   <SelectItem value="operator">🟡 Operador — Vendas, Orçamentos, Retiradas e Clientes/Fornecedores</SelectItem>
+                   <SelectItem value="scale_operator">🟠 Op. Balança — Apenas Pesagem, Vendas e Retiradas</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
