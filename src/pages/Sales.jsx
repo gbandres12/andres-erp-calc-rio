@@ -111,7 +111,10 @@ export default function Sales() {
 
   const { data: contacts = [] } = useQuery({
     queryKey: ['contacts'],
-    queryFn: () => base44.entities.Contact.filter({ is_active: true, type: ['cliente', 'ambos'] }),
+    queryFn: async () => {
+      const all = await base44.entities.Contact.filter({ is_active: true });
+      return all.filter(c => !c.type || c.type === 'cliente' || c.type === 'ambos');
+    },
     initialData: []
   });
 
