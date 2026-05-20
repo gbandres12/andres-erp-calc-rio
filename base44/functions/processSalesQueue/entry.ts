@@ -1,12 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import OpenAI from 'npm:openai';
 
 
 export async function processSalesQueue(req) {
     const base44 = createClientFromRequest(req);
     const SALES_BOT_TOKEN = Deno.env.get("SALES_BOT_TOKEN");
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     if (!SALES_BOT_TOKEN) return Response.json({ error: "Missing SALES_BOT_TOKEN" }, { status: 500 });
 
@@ -52,32 +49,18 @@ export async function processSalesQueue(req) {
 
         let finalUserText = user_text;
 
-        // --- Processamento de Voz (Opcional - Requer OpenAI Key original para Whisper) ---
+        // --- Processamento de Voz ---
         if (media_type === "voice" && voice_file_id) {
-            // Nota: OpenRouter não suporta Whisper via SDK padrão da OpenAI facilmente.
-            // Se tiver a chave da OpenAI, usamos. Se não, avisamos.
-            const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
-            if (OPENAI_KEY) {
-                try {
-                    const fileRes = await fetch(`https://api.telegram.org/bot${SALES_BOT_TOKEN}/getFile?file_id=${voice_file_id}`);
-                    const fileData = await fileRes.json();
-                    const audioUrl = `https://api.telegram.org/file/bot${SALES_BOT_TOKEN}/${fileData.result.file_path}`;
-                    const audioBlob = await (await fetch(audioUrl)).blob();
-                    
-                    const openaiAudio = new OpenAI({ apiKey: OPENAI_KEY });
-                    const transcription = await openaiAudio.audio.transcriptions.create({
-                        file: new File([audioBlob], "voice.ogg", { type: "audio/ogg" }),
-                        model: "whisper-1",
-                        language: "pt"
-                    });
-                    finalUserText = transcription.text;
-                    await sendTelegram(chat_id, `🎤 *Ouvi:* "${finalUserText}"`);
-                } catch (e) {
-                    console.error("Voice Error", e);
-                    await sendTelegram(chat_id, "⚠️ Erro ao processar áudio.");
-                }
-            } else {
-                await sendTelegram(chat_id, "⚠️ Áudio não suportado sem OPENAI_API_KEY configurada (apenas texto por enquanto).");
+            try {
+                const fileRes = await fetch(`https://api.telegram.org/bot${SALES_BOT_TOKEN}/getFile?file_id=${voice_file_id}`);
+                const fileData = await fileRes.json();
+                const audioUrl = `https://api.telegram.org/file/bot${SALES_BOT_TOKEN}/${fileData.result.file_path}`;
+                const transcription = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
+                finalUserText = transcription;
+                await sendTelegram(chat_id, `🎤 *Ouvi:* "${finalUserText}"`);
+            } catch (e) {
+                console.error("Voice Error", e);
+                await sendTelegram(chat_id, "⚠️ Erro ao processar áudio.");
             }
         }
         // --------------------------------------------------------------------------------
@@ -203,52 +186,23 @@ export async function processSalesQueue(req) {
         IMPORTANTE: JAMAIS envie o JSON para o usuário. O campo 'reply_text' é o único que o usuário verá.
         `;
 
-        // Seleção de Modelo com Fallback Robusto (OpenAI -> Gemini)
-        let responseContent;
-        let usedProvider = "none";
-
-        const tryOpenRouter = async () => {
-             const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
-             if (!OPENROUTER_KEY) throw new Error("OpenRouter API Key missing");
-             usedProvider = "openrouter";
-             const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                 method: "POST",
-                 headers: { "Authorization": `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json" },
-                 body: JSON.stringify({
-                     model: "openai/gpt-4o-mini",
-                     messages: [
-                         { role: "system", content: systemPrompt },
-                         { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
-                     ],
-                     response_format: { type: "json_object" }
-                 })
-             });
-             const data = await res.json();
-             if (!res.ok || !data.choices) throw new Error(data.error?.message || JSON.stringify(data));
-             return data.choices[0].message.content;
-        };
-
-        if (OPENAI_API_KEY) {
-            try {
-                // Tenta OpenAI Primeiro
-                const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-4o-mini",
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
-                    ],
-                    response_format: { type: "json_object" }
-                });
-                usedProvider = "openai";
-                responseContent = completion.choices[0].message.content;
-            } catch (err) {
-                console.warn("OpenAI Failed, falling back to OpenRouter:", err.message);
-                responseContent = await tryOpenRouter();
+        // Chamar IA da Base44
+        const aiResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+            prompt: `${systemPrompt}\n\nHistórico:\n${historyText}\n\nUsuário atual: ${finalUserText}`,
+            response_json_schema: {
+                type: "object",
+                properties: {
+                    action: { type: "string" },
+                    reply_text: { type: "string" },
+                    target_company_id: { type: "string" },
+                    search_query: { type: "string" },
+                    client_data: { type: "object" },
+                    sale_data: { type: "object" }
+                },
+                required: ["action", "reply_text"]
             }
-        } else {
-            responseContent = await tryOpenRouter();
-        }
+        });
+        const responseContent = JSON.stringify(aiResult);
         // Debug Log
         console.log("AI Response:", responseContent);
 
