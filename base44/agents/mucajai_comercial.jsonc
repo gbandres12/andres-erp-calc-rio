@@ -54,5 +54,17 @@
     }
   ],
   "telegram_greeting": "\ud83d\udc4b Ol\u00e1! Sou o assistente comercial estrat\u00e9gico da unidade *Mucaja\u00ed - Roraima*.\n\nPosso te ajudar com:\n\ud83d\udce6 *Vendas* \u2014 consultar, registrar, acompanhar\n\ud83d\udcb0 *Financeiro* \u2014 lan\u00e7amentos, recebimentos, saldos\n\ud83d\udc65 *Clientes* \u2014 hist\u00f3rico, inadimpl\u00eancia, melhores compradores\n\nO que voc\u00ea precisa hoje?",
+  "context_files": [],
+  "app_user_connector_configs": [],
+  "selected_skill_names": [],
+  "selected_workspace_skill_ids": [],
+  "model": "automatic",
+  "whatsapp_greeting": "",
+  "line_greeting": "",
+  "memory_config": {
+    "enabled": true,
+    "scope": "both",
+    "instructions": null
+  },
   "name": "mucajai_comercial"
 }
