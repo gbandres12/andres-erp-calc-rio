@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import OpenAI from 'npm:openai';
-import { GoogleGenerativeAI } from "npm:@google/generative-ai@^0.12.0";
+
 
 export async function processSalesQueue(req) {
     const base44 = createClientFromRequest(req);
@@ -207,19 +207,25 @@ export async function processSalesQueue(req) {
         let responseContent;
         let usedProvider = "none";
 
-        const tryGemini = async () => {
-             if (!GEMINI_API_KEY) throw new Error("Gemini API Key missing");
-             
-             const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-             const model = genAI.getGenerativeModel({ 
-                model: "gemini-2.0-flash",
-                systemInstruction: systemPrompt,
-                generationConfig: { responseMimeType: "application/json" }
+        const tryOpenRouter = async () => {
+             const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
+             if (!OPENROUTER_KEY) throw new Error("OpenRouter API Key missing");
+             usedProvider = "openrouter";
+             const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                 method: "POST",
+                 headers: { "Authorization": `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json" },
+                 body: JSON.stringify({
+                     model: "openai/gpt-4o-mini",
+                     messages: [
+                         { role: "system", content: systemPrompt },
+                         { role: "user", content: `Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}` }
+                     ],
+                     response_format: { type: "json_object" }
+                 })
              });
-             
-             usedProvider = "gemini";
-             const result = await model.generateContent(`Histórico:\n${historyText}\n\nUsuário atual: ${finalUserText}`);
-             return result.response.text();
+             const data = await res.json();
+             if (!res.ok || !data.choices) throw new Error(data.error?.message || JSON.stringify(data));
+             return data.choices[0].message.content;
         };
 
         if (OPENAI_API_KEY) {
@@ -237,13 +243,11 @@ export async function processSalesQueue(req) {
                 usedProvider = "openai";
                 responseContent = completion.choices[0].message.content;
             } catch (err) {
-                console.warn("OpenAI Failed (Quota/Error), falling back to Gemini:", err.message);
-                // Fallback para Gemini se falhar
-                responseContent = await tryGemini();
+                console.warn("OpenAI Failed, falling back to OpenRouter:", err.message);
+                responseContent = await tryOpenRouter();
             }
         } else {
-            // Se não tem OpenAI, vai direto pro Gemini
-            responseContent = await tryGemini();
+            responseContent = await tryOpenRouter();
         }
         // Debug Log
         console.log("AI Response:", responseContent);
