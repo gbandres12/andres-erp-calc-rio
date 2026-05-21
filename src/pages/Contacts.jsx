@@ -43,23 +43,18 @@ export default function Contacts() {
   const { data: contacts = [], isLoading, isFetching, error } = useQuery({
     queryKey: ['contacts', selectedCompanyId],
     queryFn: async () => {
-      // Busca todos os contatos ativos para garantir que contatos antigos (sem filial) também apareçam
-      console.log('🔄 Buscando contatos...');
-      // Aumentando limite para 1000 e otimizando filtro
-      const result = await base44.entities.Contact.filter({ 
-        is_active: true,
-      }, '-created_date', 1000);
-      
-      // Filtra para mostrar contatos desta filial OU contatos sem filial definida (legado/global)
-      const filtered = result.filter(c => !c.company_id || c.company_id === selectedCompanyId);
-      
-      return filtered;
+      if (!selectedCompanyId) return [];
+      const result = await base44.entities.Contact.filter(
+        { company_id: selectedCompanyId },
+        '-created_date',
+        2000
+      );
+      return result;
     },
     enabled: !!selectedCompanyId,
-    staleTime: 2 * 60 * 1000, // 2 minutos - reduzido
-    cacheTime: 10 * 60 * 1000, // 10 minutos
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // MUDADO: sempre recarrega ao montar
+    refetchOnMount: true,
   });
 
   // Query companies CORRIGIDA
