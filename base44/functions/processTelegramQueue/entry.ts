@@ -584,10 +584,7 @@ async function processMedia(base44, mediaType, fileId, userText) {
     const blob = new Blob([await dl.arrayBuffer()]);
     const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
     if (mediaType === 'voice') {
-        return await base44.asServiceRole.integrations.Core.InvokeLLM({
-            prompt: 'Transcreva este áudio em português. Responda APENAS com o texto transcrito.',
-            file_urls: [file_url], model: 'gemini_3_flash'
-        });
+        return await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: file_url });
     }
     const cap = userText && userText !== '[Photo Message]' ? `Legenda: ${userText}\n` : '';
     const desc = await base44.asServiceRole.integrations.Core.InvokeLLM({

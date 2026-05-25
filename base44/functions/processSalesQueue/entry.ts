@@ -403,10 +403,7 @@ async function processMedia(base44, fileId) {
     const dl = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${data.result.file_path}`);
     const blob = new Blob([await dl.arrayBuffer()]);
     const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
-    return await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt: 'Transcreva este áudio em português. Responda APENAS com o texto transcrito.',
-        file_urls: [file_url], model: 'gemini_3_flash'
-    });
+    return await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: file_url });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
