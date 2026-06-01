@@ -537,7 +537,7 @@ async function executeAction(base44, ai, companies, accounts, session) {
         const term = (pd.search_term || '').toLowerCase();
         const match = pending.find(t =>
             (!term || t.description.toLowerCase().includes(term)) &&
-            (!pd.amount || Math.abs(t.amount - pd.amount) < t.amount * 0.3)
+            (!pd.amount || Math.abs(t.amount - pd.amount) < t.amount * 0.1)
         );
         if (!match) {
             const sug = pending.filter(t=>t.description.toLowerCase().includes(term.split(' ')[0]||'')).slice(0,3)

@@ -105,6 +105,47 @@
     "description",
     "amount",
     "type",
-    "category"
-  ]
+    "category",
+    "company_id"
+  ],
+  "rls": {
+    "create": {
+      "data.company_id": {
+        "$in": "{{user.data.allowed_companies}}"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

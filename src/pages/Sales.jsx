@@ -104,15 +104,16 @@ export default function Sales() {
   });
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => base44.entities.Product.filter({ is_active: true }),
+    queryKey: ['products', selectedCompanyId],
+    queryFn: () => selectedCompanyId ? base44.entities.Product.filter({ is_active: true, company_id: selectedCompanyId }) : Promise.resolve([]),
     initialData: []
   });
 
   const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts'],
+    queryKey: ['contacts', selectedCompanyId],
     queryFn: async () => {
-      const all = await base44.entities.Contact.filter({ is_active: true });
+      if (!selectedCompanyId) return [];
+      const all = await base44.entities.Contact.filter({ is_active: true, company_id: selectedCompanyId });
       return all.filter(c => !c.type || c.type === 'cliente' || c.type === 'ambos');
     },
     initialData: []
@@ -128,8 +129,8 @@ export default function Sales() {
   });
 
   const { data: companies = [] } = useQuery({
-    queryKey: ['companies', selectedCompanyId],
-    queryFn: () => selectedCompanyId ? base44.entities.Company.list() : Promise.resolve([]),
+    queryKey: ['company', selectedCompanyId],
+    queryFn: () => selectedCompanyId ? base44.entities.Company.filter({ id: selectedCompanyId }) : Promise.resolve([]),
     initialData: []
   });
 
@@ -176,15 +177,10 @@ export default function Sales() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data) => {
-      // Buscar TODAS as vendas para garantir referência única global
-      const allSales = await base44.entities.Sale.list('-created_date', 1000);
-      const maxNum = allSales.reduce((max, s) => {
-        // Extrai apenas os dígitos no final da referência (ex: VENDA-00001, VEN-519423)
-        const match = (s.reference || '').match(/(\d+)$/);
-        const n = match ? parseInt(match[1]) : 0;
-        return n > max ? n : max;
-      }, 0);
-      const newRef = `VENDA-${String(maxNum + 1).padStart(5, '0')}`;
+      // Referência única baseada em timestamp+random — sem race condition
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).slice(2, 5).toUpperCase();
+      const newRef = `VENDA-${timestamp}-${random}`;
 
       const subtotal = data.items.reduce((sum, item) => sum + item.total, 0);
       const total = subtotal - data.discount + data.shipping;
@@ -298,8 +294,10 @@ export default function Sales() {
       const entradaJaPaga = sale.paid_amount || 0;
       
       if (entradaJaPaga > 0 && existingPayments.length > 0) {
-        // Verificar se já existe Transaction para esta entrada
         for (const ep of existingPayments) {
+          // Idempotência: verificar se Transaction já foi criada para este pagamento
+          const existing = await base44.entities.Transaction.filter({ notes: `entrada:${ep.id}` });
+          if (existing.length > 0) continue;
           await base44.entities.Transaction.create({
             description: `${sale.reference} - Entrada - ${sale.client_name}`,
             amount: ep.amount,
@@ -313,7 +311,7 @@ export default function Sales() {
             contact_name: sale.client_name,
             company_id: selectedCompanyId,
             paid_amount: ep.amount,
-            notes: `Venda: ${sale.reference} - entrada`
+            notes: `entrada:${ep.id}`
           });
         }
       }
@@ -386,8 +384,8 @@ export default function Sales() {
 
       return sale;
     },
-    onSuccess: () => {
-      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
+    onSuccess: async () => {
+      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['sales']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['transactions']);
@@ -1283,10 +1281,15 @@ export default function Sales() {
       <DeleteAuthDialog
         open={isDeleteAuthOpen}
         onClose={() => { setIsDeleteAuthOpen(false); setPendingDelete(null); }}
-        onSuccess={() => {
+        onSuccess={async () => {
           if (pendingDelete?.type === 'sale') {
-            base44.entities.Sale.delete(pendingDelete.id);
-            queryClient.invalidateQueries(['sales']);
+            try {
+              await base44.entities.Sale.delete(pendingDelete.id);
+              queryClient.invalidateQueries(['sales']);
+              toast.success('Venda excluída com sucesso.');
+            } catch (err) {
+              toast.error('Erro ao excluir venda: ' + err.message);
+            }
           }
           setIsDeleteAuthOpen(false);
           setPendingDelete(null);

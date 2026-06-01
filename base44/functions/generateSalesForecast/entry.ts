@@ -1,7 +1,7 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.12';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { GoogleGenAI } from 'npm:@google/genai@1.0.1';
 
-export async function generateSalesForecast(req) {
+Deno.serve(async (req) => {
     if (req.method !== 'POST') {
         return new Response('Method Not Allowed', { status: 405 });
     }
@@ -103,7 +103,7 @@ export async function generateSalesForecast(req) {
         }
         `;
 
-        // 5. Call LLM (Gemini - sem custo de OpenRouter)
+        // 5. Call LLM (Gemini)
         const geminiKey = Deno.env.get("GEMINI_API_KEY");
         const genAI = new GoogleGenAI({ apiKey: geminiKey });
 
@@ -124,6 +124,4 @@ export async function generateSalesForecast(req) {
         console.error("Sales Forecast Error:", error);
         return Response.json({ error: error.message }, { status: 500 });
     }
-}
-
-Deno.serve(generateSalesForecast);
+});

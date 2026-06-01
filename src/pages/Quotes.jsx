@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -47,14 +46,14 @@ export default function Quotes() {
   });
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => base44.entities.Product.filter({ is_active: true }),
+    queryKey: ['products', selectedCompanyId],
+    queryFn: () => selectedCompanyId ? base44.entities.Product.filter({ is_active: true, company_id: selectedCompanyId }) : Promise.resolve([]),
     initialData: []
   });
 
   const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts'],
-    queryFn: () => base44.entities.Contact.filter({ is_active: true, type: ['cliente', 'ambos'] }),
+    queryKey: ['contacts', selectedCompanyId],
+    queryFn: () => selectedCompanyId ? base44.entities.Contact.filter({ is_active: true, company_id: selectedCompanyId }) : Promise.resolve([]),
     initialData: []
   });
 

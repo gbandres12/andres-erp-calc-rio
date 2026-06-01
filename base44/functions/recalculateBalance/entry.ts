@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
     try {
@@ -38,19 +38,16 @@ Deno.serve(async (req) => {
             
             // Buscar todas as transações da conta
             const transactions = await base44.entities.Transaction.filter({
-                account_id: account.id
-            }, undefined, 10000); // Limite alto para pegar tudo
+                account_id: account.id,
+                status: 'pago'
+            }, undefined, 10000); // Somente transações pagas
 
             let totalReceitas = 0;
             let totalDespesas = 0;
 
             transactions.forEach(t => {
-                let valor = t.paid_amount || 0;
-                
-                // Fallback para transações antigas marcadas como pago mas sem paid_amount
-                if (t.status === 'pago' && valor === 0) {
-                    valor = t.amount || 0;
-                }
+                // paid_amount é source of truth; fallback para amount em registros antigos
+                const valor = t.paid_amount || t.amount || 0;
 
                 if (t.type === 'receita') {
                     totalReceitas += valor;
