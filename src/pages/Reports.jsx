@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Package, TruckIcon, DollarSign, ShoppingCart, Fuel, Scale, Users, AlertTriangle, FileText, Download, Calendar as CalendarIcon, Printer, ArrowUpCircle, ArrowDownCircle, Building2 } from "lucide-react";
+import { BarChart3, TrendingUp, Package, TruckIcon, DollarSign, ShoppingCart, Fuel, Scale, Users, AlertTriangle, FileText, Download, Calendar as CalendarIcon, Printer, ArrowUpCircle, ArrowDownCircle, Building2, Search } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Legend } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -23,16 +23,20 @@ export default function Reports() {
   const isOperator = user?.custom_role === 'operator';
 
   const [selectedCompanyId] = React.useState(localStorage.getItem('selectedCompanyId'));
+
+  // "Draft" filter states — only applied on button click
+  const defaultStart = (() => {
+    const d = new Date(); d.setDate(d.getDate() - 90);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
+  const [draftStart, setDraftStart] = useState(defaultStart);
+  const [draftEnd, setDraftEnd] = useState(getTodayDate());
+  const [draftCompanyId, setDraftCompanyId] = useState(localStorage.getItem('selectedCompanyId') || 'all');
+
+  // Applied filter states — used for data filtering
   const [filterCompanyId, setFilterCompanyId] = useState(localStorage.getItem('selectedCompanyId') || 'all');
   const [period, setPeriod] = useState("30");
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 90); // Default to 90 days for better trend analysis
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  });
+  const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(getTodayDate());
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -397,13 +401,14 @@ export default function Reports() {
         
         {/* Global Date Filter */}
         <Card className="bg-slate-50 border-slate-200">
-            <CardContent className="p-4 flex items-end gap-4 flex-wrap">
+            <CardContent className="p-4">
+              <div className="flex items-end gap-3 flex-wrap">
                 <div className="space-y-1">
                     <Label>Data Inicial</Label>
                     <Input 
                         type="date" 
-                        value={startDate} 
-                        onChange={(e) => setStartDate(e.target.value)} 
+                        value={draftStart} 
+                        onChange={(e) => setDraftStart(e.target.value)} 
                         className="bg-white w-[160px]"
                     />
                 </div>
@@ -411,15 +416,15 @@ export default function Reports() {
                     <Label>Data Final</Label>
                     <Input 
                         type="date" 
-                        value={endDate} 
-                        onChange={(e) => setEndDate(e.target.value)} 
+                        value={draftEnd} 
+                        onChange={(e) => setDraftEnd(e.target.value)} 
                         className="bg-white w-[160px]"
                     />
                 </div>
                 
                 <div className="space-y-1">
                     <Label>Filial / Empresa</Label>
-                    <Select value={filterCompanyId} onValueChange={setFilterCompanyId}>
+                    <Select value={draftCompanyId} onValueChange={setDraftCompanyId}>
                         <SelectTrigger className="w-[200px] bg-white">
                             <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
@@ -432,46 +437,53 @@ export default function Reports() {
                     </Select>
                 </div>
 
-                <div className="pb-1">
-                    <Button variant="outline" onClick={() => {
-                        setEndDate(getTodayDate());
-                        const d = new Date();
-                        d.setDate(d.getDate() - 30);
-                        const year = d.getFullYear();
-                        const month = String(d.getMonth() + 1).padStart(2, '0');
-                        const day = String(d.getDate()).padStart(2, '0');
-                        setStartDate(`${year}-${month}-${day}`);
-                    }}>
-                        Últimos 30 dias
-                    </Button>
-                </div>
+                <Button variant="outline" onClick={() => {
+                    const d = new Date(); d.setDate(d.getDate() - 30);
+                    const s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    setDraftStart(s); setDraftEnd(getTodayDate());
+                }}>
+                    Últimos 30 dias
+                </Button>
 
-                {/* Novos Filtros: Busca e Categoria */}
-                <div className="w-full flex gap-4 mt-2 border-t pt-4">
-                    <div className="flex-1 space-y-1">
-                        <Label>Buscar (Descrição, Obs)</Label>
-                        <Input 
-                            placeholder="Ex: Combustível, Manutenção..." 
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-white"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <Label>Categoria</Label>
-                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                            <SelectTrigger className="w-[200px] bg-white">
-                                <SelectValue placeholder="Todas" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todas as Categorias</SelectItem>
-                                {categories.map(cat => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
+                <Button 
+                    className="bg-slate-800 hover:bg-slate-700 text-white gap-2"
+                    onClick={() => {
+                        setStartDate(draftStart);
+                        setEndDate(draftEnd);
+                        setFilterCompanyId(draftCompanyId);
+                    }}
+                >
+                    <Search className="w-4 h-4" />
+                    Aplicar Filtros
+                </Button>
+              </div>
+
+              {/* Busca e Categoria */}
+              <div className="flex gap-4 mt-4 pt-4 border-t">
+                  <div className="flex-1 space-y-1">
+                      <Label>Buscar (Descrição, Obs)</Label>
+                      <Input 
+                          placeholder="Ex: Combustível, Manutenção..." 
+                          value={searchTerm} 
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="bg-white"
+                      />
+                  </div>
+                  <div className="space-y-1">
+                      <Label>Categoria</Label>
+                      <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger className="w-[200px] bg-white">
+                              <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="all">Todas as Categorias</SelectItem>
+                              {categories.map(cat => (
+                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+              </div>
             </CardContent>
         </Card>
       </div>
