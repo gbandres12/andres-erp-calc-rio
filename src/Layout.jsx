@@ -5,43 +5,38 @@ import { createPageUrl } from "@/utils";
 import {
   Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
-  BarChart3, Settings, LogOut, Menu, X, ChevronDown,
-  Home, FileText, History, UserCircle, PackageCheck, ArrowDownToLine, ArrowUpFromLine, ArrowUpToLine, Bot, TrendingUp, ClipboardList, RepeatIcon
+  BarChart3, Settings, LogOut, ChevronDown, ChevronUp,
+  Home, FileText, History, UserCircle, PackageCheck,
+  ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
+  ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight
 } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
-  SidebarHeader, SidebarFooter, SidebarProvider, SidebarTrigger
+  Sidebar, SidebarContent, SidebarProvider, SidebarTrigger
 } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
 
 const navigationGroups = [
   {
-    title: "Principal",
-    items: [
-      { title: "Dashboard", url: "Dashboard", icon: Home },
-      { title: "Trocar Filial", url: "CompanySelector", icon: Building2 }
-    ]
-  },
-  {
     title: "Gestão de Materiais",
+    icon: Package,
     items: [
       { title: "Produtos", url: "Products", icon: Package },
       { title: "Almoxarifado", url: "Warehouse", icon: Warehouse },
-      { title: "Transferências", url: "Transfers", icon: TruckIcon },
+      { title: "Transferências", url: "Transfers", icon: ArrowLeftRight },
       { title: "Requisições", url: "Requisitions", icon: FileText },
       { title: "Pedidos de Compra", url: "PurchaseOrders", icon: ClipboardList }
     ]
   },
   {
     title: "Logística",
+    icon: TruckIcon,
     items: [
       { title: "Veículos", url: "Vehicles", icon: TruckIcon },
       { title: "Pesagens", url: "Weighing", icon: Scale },
@@ -50,6 +45,7 @@ const navigationGroups = [
   },
   {
     title: "Financeiro",
+    icon: CreditCard,
     items: [
       { title: "Contas", url: "FinancialAccounts", icon: CreditCard },
       { title: "Contas a Receber", url: "Receivables", icon: ArrowDownToLine },
@@ -62,6 +58,7 @@ const navigationGroups = [
   },
   {
     title: "Comercial",
+    icon: ShoppingCart,
     items: [
       { title: "Cotações com IA", url: "SupplierQuotes", icon: Bot },
       { title: "Previsão de Vendas", url: "SalesForecast", icon: TrendingUp },
@@ -73,6 +70,7 @@ const navigationGroups = [
   },
   {
     title: "Controles",
+    icon: ShieldCheck,
     items: [
       { title: "EPIs", url: "EPIs", icon: ShieldCheck },
       { title: "Ativos de TI", url: "ITAssets", icon: Monitor }
@@ -80,6 +78,7 @@ const navigationGroups = [
   },
   {
     title: "Gestão",
+    icon: BarChart3,
     items: [
       { title: "Relatórios", url: "Reports", icon: BarChart3 },
       { title: "Auditoria", url: "ActivityLogs", icon: History },
@@ -89,27 +88,27 @@ const navigationGroups = [
   }
 ];
 
+// Groups open by default
+const DEFAULT_OPEN = new Set(["Gestão de Materiais", "Logística", "Financeiro", "Comercial", "Controles", "Gestão"]);
+
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [openGroups, setOpenGroups] = useState(DEFAULT_OPEN);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Fetch user first to know permissions
   useEffect(() => {
     base44.auth.me().then(setUser).catch(console.error);
   }, []);
 
-  // Auto-refresh logic
   useEffect(() => {
     const intervalTime = parseInt(localStorage.getItem('refresh_interval') || '0');
     if (intervalTime > 0) {
-      const interval = setInterval(() => {
-        handleRefreshData();
-      }, intervalTime);
+      const interval = setInterval(() => handleRefreshData(), intervalTime);
       return () => clearInterval(interval);
     }
   }, []);
@@ -117,44 +116,40 @@ export default function Layout({ children, currentPageName }) {
   const handleRefreshData = async () => {
     setIsRefreshing(true);
     await queryClient.invalidateQueries();
-    setTimeout(() => setIsRefreshing(false), 1000); // Visual feedback
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  const filteredNavigation = React.useMemo(() => {
+  const toggleGroup = (title) => {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  };
+
+  const filteredNavigation = React.useMemo(() => { // eslint-disable-line
     if (!user) return navigationGroups;
-    
+
     if (user.custom_role === 'operator') {
       return navigationGroups.map(group => {
         if (group.title === "Financeiro") {
-          const financialAllowed = ['Contacts'];
-          const filteredItems = group.items.filter(item => financialAllowed.includes(item.url));
-          if (filteredItems.length === 0) return null;
-          return { ...group, items: filteredItems };
+          const items = group.items.filter(i => i.url === 'Contacts');
+          return items.length ? { ...group, items } : null;
         }
         if (group.title === "Comercial") {
           const allowed = ['Sales', 'SaleWithdrawals', 'Quotes', 'Contacts'];
-          const filteredItems = group.items.filter(item => allowed.includes(item.url));
-          if (filteredItems.length === 0) return null;
-          return { ...group, items: filteredItems };
+          const items = group.items.filter(i => allowed.includes(i.url));
+          return items.length ? { ...group, items } : null;
         }
-        
-        if (group.title === "Principal") {
-           return { ...group, items: group.items.filter(item => item.url === 'CompanySelector') };
-        }
-        
-        const filteredItems = group.items.filter(item => {
-          const forbidden = ['ActivityLogs', 'Settings', 'Users', 'Dashboard', 'Quotes', 'SupplierQuotes', 'SalesForecast', 'CRM'];
-          return !forbidden.includes(item.url);
-        });
-
-        if (filteredItems.length === 0) return null;
-        return { ...group, items: filteredItems };
+        const forbidden = ['ActivityLogs', 'Settings', 'Users', 'Dashboard', 'SupplierQuotes', 'SalesForecast', 'CRM'];
+        const items = group.items.filter(i => !forbidden.includes(i.url));
+        return items.length ? { ...group, items } : null;
       }).filter(Boolean);
     }
 
     if (user.custom_role === 'scale_operator') {
       const allowed = {
-        "Principal": ['CompanySelector'],
         "Gestão de Materiais": ['Products'],
         "Logística": ['Vehicles', 'Weighing'],
         "Comercial": ['Sales', 'SaleWithdrawals'],
@@ -162,9 +157,8 @@ export default function Layout({ children, currentPageName }) {
       return navigationGroups.map(group => {
         const allowedItems = allowed[group.title];
         if (!allowedItems) return null;
-        const filteredItems = group.items.filter(item => allowedItems.includes(item.url));
-        if (filteredItems.length === 0) return null;
-        return { ...group, items: filteredItems };
+        const items = group.items.filter(i => allowedItems.includes(i.url));
+        return items.length ? { ...group, items } : null;
       }).filter(Boolean);
     }
 
@@ -176,7 +170,6 @@ export default function Layout({ children, currentPageName }) {
     queryFn: async () => {
       if (!user) return [];
       const all = await base44.entities.Company.filter({ is_active: true });
-      // Filtrar empresas permitidas para operador
       if (user.custom_role === 'operator' && user.allowed_companies?.length > 0) {
         return all.filter(c => user.allowed_companies.includes(c.id));
       }
@@ -187,33 +180,22 @@ export default function Layout({ children, currentPageName }) {
   });
 
   useEffect(() => {
-    const checkCompany = async () => {
-      if (!user || companies.length === 0) return;
-
-      const savedCompanyId = localStorage.getItem('selectedCompanyId');
-      
-      // Se não tiver filial selecionada E não estiver na página de seleção, redirecionar
-      if (!savedCompanyId && currentPageName !== 'CompanySelector' && currentPageName !== 'Settings') {
-        navigate(createPageUrl('CompanySelector'));
-        return;
+    if (!user || companies.length === 0) return;
+    const savedCompanyId = localStorage.getItem('selectedCompanyId');
+    if (!savedCompanyId && currentPageName !== 'CompanySelector' && currentPageName !== 'Settings') {
+      navigate(createPageUrl('CompanySelector'));
+      return;
+    }
+    if (savedCompanyId) {
+      const company = companies.find(c => c.id === savedCompanyId);
+      if (company) {
+        setSelectedCompany(company);
+      } else {
+        localStorage.removeItem('selectedCompanyId');
+        localStorage.removeItem('selectedCompanyName');
+        if (currentPageName !== 'CompanySelector') navigate(createPageUrl('CompanySelector'));
       }
-      
-      // Carregar filial selecionada
-      if (savedCompanyId) {
-        const company = companies.find(c => c.id === savedCompanyId);
-        if (company) {
-          setSelectedCompany(company);
-        } else {
-          // Se a filial salva não é permitida ou não existe, limpar e redirecionar
-          localStorage.removeItem('selectedCompanyId');
-          localStorage.removeItem('selectedCompanyName');
-          if (currentPageName !== 'CompanySelector') {
-             navigate(createPageUrl('CompanySelector'));
-          }
-        }
-      }
-    };
-    checkCompany();
+    }
   }, [companies, currentPageName, user, navigate]);
 
   const handleCompanyChange = async (company) => {
@@ -221,8 +203,6 @@ export default function Layout({ children, currentPageName }) {
     setSelectedCompanyId(company.id);
     localStorage.setItem('selectedCompanyId', company.id);
     localStorage.setItem('selectedCompanyName', company.name);
-    
-    // Otimização: Em vez de reload, invalidar queries e navegar
     await queryClient.invalidateQueries();
     navigate(createPageUrl('Dashboard'));
     toast.success(`Filial alterada para ${company.name}`);
@@ -234,59 +214,51 @@ export default function Layout({ children, currentPageName }) {
     base44.auth.logout();
   };
 
-  // Se estiver na página de seleção de filial, não mostrar o layout
-  if (currentPageName === 'CompanySelector') {
-    return <>{children}</>;
-  }
+  if (currentPageName === 'CompanySelector') return <>{children}</>;
+  if (!selectedCompanyId && currentPageName !== 'Settings') return null;
 
-  // Se não tiver filial selecionada, não renderizar nada (vai redirecionar)
-  if (!selectedCompanyId && currentPageName !== 'Settings') {
-    return null;
-  }
+  const isActive = (url) => location.pathname === createPageUrl(url);
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-slate-100">
-        <Sidebar className="border-r border-slate-200 bg-white">
-          <SidebarHeader className="border-b border-slate-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg">
-                <Building2 className="w-6 h-6 text-white" />
+      <div className="min-h-screen flex w-full bg-slate-50">
+        {/* Sidebar */}
+        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 min-h-screen flex-shrink-0">
+          {/* Header */}
+          <div className="px-5 pt-6 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 bg-violet-600 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-white" />
               </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="font-bold text-slate-900 text-lg">Andres Tech</h2>
-                <p className="text-xs text-slate-500 truncate">Sistema de Gestão</p>
+              <div>
+                <h2 className="font-bold text-slate-900 text-base leading-tight">Andres Tech</h2>
+                <p className="text-xs text-slate-400">Sistema de Gestão</p>
               </div>
             </div>
 
-            <div className="mt-4 mb-2 px-1">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full gap-2 bg-purple-50 border-purple-200 hover:bg-purple-100 text-purple-700"
-                onClick={handleRefreshData}
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Atualizando...' : 'Atualizar Dados'}
-              </Button>
-            </div>
+            {/* Refresh button */}
+            <button
+              onClick={handleRefreshData}
+              disabled={isRefreshing}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-violet-500 text-violet-700 text-sm font-medium hover:bg-violet-50 transition-colors mb-4"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Atualizando...' : 'Atualizar Dados'}
+            </button>
 
-            {selectedCompany && (
+            {/* Company selector */}
+            <div>
+              <p className="text-xs text-slate-500 mb-1 font-medium">Filial</p>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full mt-3 justify-between">
-                    <span className="truncate">{selectedCompany.name}</span>
-                    <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
-                  </Button>
+                  <button className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                    <span className="truncate">{selectedCompany?.name || 'Selecione...'}</span>
+                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
-                  {companies.map((company) => (
-                    <DropdownMenuItem
-                      key={company.id}
-                      onClick={() => handleCompanyChange(company)}
-                      className={selectedCompanyId === company.id ? "bg-purple-50" : ""}
-                    >
+                  {companies.map(company => (
+                    <DropdownMenuItem key={company.id} onClick={() => handleCompanyChange(company)}>
                       <Building2 className="w-4 h-4 mr-2" />
                       {company.name}
                     </DropdownMenuItem>
@@ -300,82 +272,114 @@ export default function Layout({ children, currentPageName }) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-          </SidebarHeader>
+            </div>
 
-          <SidebarContent className="p-2">
-            {filteredNavigation.map((group) => (
-              <SidebarGroup key={group.title}>
-                <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
-                  {group.title}
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {group.items.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                          asChild
-                          className={`hover:bg-purple-50 hover:text-purple-700 transition-colors duration-200 rounded-lg mb-1 ${
-                            location.pathname === createPageUrl(item.url)
-                              ? 'bg-purple-50 text-purple-700'
-                              : ''
-                          }`}
-                        >
-                          <Link to={createPageUrl(item.url)} className="flex items-center gap-3 px-3 py-2">
-                            <item.icon className="w-4 h-4" />
-                            <span className="font-medium text-sm">{item.title}</span>
+            {/* Trocar Filial link */}
+            <Link
+              to={createPageUrl("CompanySelector")}
+              className="mt-2 flex items-center gap-2 px-1 py-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              Trocar Filial
+            </Link>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto py-3 px-3">
+            {filteredNavigation.map((group) => {
+              const isOpen = openGroups.has(group.title);
+              const GroupIcon = group.icon;
+              const hasActiveItem = group.items.some(i => isActive(i.url));
+
+              return (
+                <div key={group.title} className="mb-1">
+                  {/* Group header */}
+                  <button
+                    onClick={() => toggleGroup(group.title)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      hasActiveItem || isOpen
+                        ? 'bg-slate-100 text-slate-800'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <GroupIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <span className="flex-1 text-left">{group.title}</span>
+                    {isOpen
+                      ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                      : <ChevronDown className="w-4 h-4 text-slate-400" />
+                    }
+                  </button>
+
+                  {/* Group items */}
+                  {isOpen && (
+                    <div className="mt-0.5 ml-2">
+                      {group.items.map((item) => {
+                        const active = isActive(item.url);
+                        const Icon = item.icon;
+                        return (
+                          <Link
+                            key={item.title}
+                            to={createPageUrl(item.url)}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5 ${
+                              active
+                                ? 'bg-violet-50 text-violet-700 font-medium border-l-[3px] border-violet-600'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                            }`}
+                          >
+                            <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-violet-600' : 'text-slate-400'}`} />
+                            <span>{item.title}</span>
                           </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ))}
-          </SidebarContent>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
 
-          <SidebarFooter className="border-t border-slate-200 p-4">
-            {user && (
+          {/* Footer - User */}
+          {user && (
+            <div className="border-t border-slate-100 p-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-start px-2 h-auto py-2">
-                    <Avatar className="h-8 w-8 mr-3">
-                      <AvatarFallback className="bg-purple-100 text-purple-700 font-semibold">
+                  <button className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-violet-100 text-violet-700 text-sm font-semibold">
                         {user.full_name?.charAt(0) || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 text-left min-w-0">
-                      <p className="font-medium text-sm text-slate-900 truncate">
-                        {user.full_name || user.email}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate">{user.role}</p>
+                      <p className="text-sm font-medium text-slate-800 truncate">{user.full_name || user.email}</p>
+                      <p className="text-xs text-slate-400 truncate">{user.role}</p>
                     </div>
-                  </Button>
+                    <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuContent className="w-52" align="end">
                   <DropdownMenuItem asChild>
-                    <Link to={createPageUrl("Profile")} className="cursor-pointer">
+                    <Link to={createPageUrl("Profile")}>
                       <UserCircle className="w-4 h-4 mr-2" />
                       Meu Perfil
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sair
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-          </SidebarFooter>
-        </Sidebar>
-
-        <main className="flex-1 flex flex-col overflow-hidden">
-          <header className="bg-white border-b border-slate-200 px-6 py-4 md:hidden sticky top-0 z-10">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="hover:bg-slate-100 p-2 rounded-lg transition-colors duration-200" />
-              <h1 className="text-xl font-semibold text-slate-900">Andres Tech</h1>
             </div>
+          )}
+        </aside>
+
+        {/* Main content */}
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Mobile header */}
+          <header className="bg-white border-b border-slate-200 px-4 py-3 md:hidden flex items-center gap-3 sticky top-0 z-10">
+            <SidebarTrigger className="p-2 rounded-lg hover:bg-slate-100 transition-colors" />
+            <h1 className="text-lg font-semibold text-slate-900">Andres Tech</h1>
           </header>
 
           <div className="flex-1 overflow-auto">
