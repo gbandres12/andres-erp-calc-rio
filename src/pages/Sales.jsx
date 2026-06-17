@@ -183,8 +183,8 @@ export default function Sales() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data) => {
-      // Busca a maior referência sequencial existente para continuar a sequência
-      const allSales = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
+      // Busca TODAS as vendas do sistema para garantir sequência global sem colisão
+      const allSales = await base44.entities.Sale.list('-created_date', 500);
       let maxNum = 0;
       allSales.forEach(s => {
         const match = s.reference?.match(/^VENDA-(\d+)$/);

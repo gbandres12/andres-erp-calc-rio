@@ -381,8 +381,17 @@ async function executeAction(base44, ai, companies, accounts, session) {
             if (prod) { const sub = prod.sale_price * item.quantity; total += sub; items.push({ product_id: prod.id, product_name: prod.name, quantity: item.quantity, unit: prod.unit, unit_price: prod.sale_price, total: sub }); }
         }
         if (!items.length) return '❌ Nenhum produto válido identificado.';
+        // Busca todas as vendas para garantir sequência global
+        const allSalesForRef = await base44.asServiceRole.entities.Sale.list('-created_date', 500);
+        let maxRefNum = 0;
+        allSalesForRef.forEach(s => {
+            const m = s.reference?.match(/^VENDA-(\d+)$/);
+            if (m) { const n = parseInt(m[1], 10); if (n > maxRefNum) maxRefNum = n; }
+        });
+        const botRef = `VENDA-${String(maxRefNum + 1).padStart(6, '0')}`;
+
         const sale = await base44.asServiceRole.entities.Sale.create({
-            reference: `BOT-${Date.now().toString().slice(-6)}`,
+            reference: botRef,
             company_id: cid, client_id: client.id, client_name: client.name,
             seller_name: 'SalesBot', sale_date: today(),
             items, total, subtotal: total,
