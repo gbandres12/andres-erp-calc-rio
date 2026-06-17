@@ -40,7 +40,11 @@ export function ProductSelector({ products, value, onChange }) {
         <Command>
           <CommandInput placeholder="Buscar produto por nome ou código..." />
           <CommandList>
-            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+            <CommandEmpty>
+              {products.length === 0
+                ? "Nenhum produto cadastrado para esta filial. Acesse Produtos e cadastre antes de emitir uma venda."
+                : "Nenhum produto encontrado para este termo."}
+            </CommandEmpty>
             <CommandGroup>
               {products.map((product) => (
                 <CommandItem

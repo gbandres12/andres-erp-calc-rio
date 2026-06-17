@@ -105,7 +105,13 @@ export default function Sales() {
 
   const { data: products = [] } = useQuery({
     queryKey: ['products', selectedCompanyId],
-    queryFn: () => selectedCompanyId ? base44.entities.Product.filter({ is_active: true, company_id: selectedCompanyId }) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      // Busca todos os produtos da filial, incluindo os que não têm is_active definido
+      const all = await base44.entities.Product.filter({ company_id: selectedCompanyId });
+      // Filtra localmente: exclui apenas os que explicitamente têm is_active === false
+      return all.filter(p => p.is_active !== false);
+    },
     initialData: []
   });
 
@@ -813,6 +819,14 @@ export default function Sales() {
                 </TabsContent>
 
                 <TabsContent value="itens" className="space-y-4">
+                  {products.length === 0 && (
+                    <Alert className="bg-red-50 border-red-200">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-sm text-red-800">
+                        <strong>Nenhum produto encontrado para esta filial.</strong> Verifique se os produtos estão cadastrados em <em>Produtos</em> com a filial correta. Sem produtos, não é possível emitir vendas.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   {formData.items.map((item, index) => (
                     <Card key={index}>
                       <CardContent className="pt-6">
