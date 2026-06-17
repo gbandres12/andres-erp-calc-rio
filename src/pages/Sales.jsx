@@ -183,10 +183,18 @@ export default function Sales() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data) => {
-      // Referência única baseada em timestamp+random — sem race condition
-      const timestamp = Date.now().toString(36).toUpperCase();
-      const random = Math.random().toString(36).slice(2, 5).toUpperCase();
-      const newRef = `VENDA-${timestamp}-${random}`;
+      // Busca a maior referência sequencial existente para continuar a sequência
+      const allSales = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
+      let maxNum = 0;
+      allSales.forEach(s => {
+        const match = s.reference?.match(/^VENDA-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      });
+      const nextNum = String(maxNum + 1).padStart(6, '0');
+      const newRef = `VENDA-${nextNum}`;
 
       const subtotal = data.items.reduce((sum, item) => sum + item.total, 0);
       const total = subtotal - data.discount + data.shipping;
