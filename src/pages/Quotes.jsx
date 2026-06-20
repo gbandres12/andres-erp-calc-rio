@@ -87,10 +87,14 @@ export default function Quotes() {
 
   const createQuoteMutation = useMutation({
     mutationFn: async (data) => {
-      const lastQuote = await base44.entities.Quote.list('-reference', 1);
-      const lastRef = lastQuote[0]?.reference || 'ORC-00000';
-      const nextNumber = parseInt(lastRef.replace('ORC-', '')) + 1;
-      const newRef = `ORC-${String(nextNumber).padStart(5, '0')}`;
+      // Busca TODAS as quotes e extrai o maior número sequencial para evitar colisão
+      const allQuotes = await base44.entities.Quote.list('-created_date', 500);
+      let maxNum = 0;
+      allQuotes.forEach(q => {
+        const match = q.reference?.match(/^ORC-(\d+)$/);
+        if (match) { const n = parseInt(match[1], 10); if (n > maxNum) maxNum = n; }
+      });
+      const newRef = `ORC-${String(maxNum + 1).padStart(5, '0')}`;
 
       const subtotal = data.items.reduce((sum, item) => sum + item.total, 0);
       const total = subtotal - data.discount + data.shipping;
@@ -133,11 +137,14 @@ export default function Quotes() {
 
   const convertToSaleMutation = useMutation({
     mutationFn: async (quote) => {
-      // Criar venda a partir do orçamento
-      const lastSale = await base44.entities.Sale.list('-reference', 1);
-      const lastRef = lastSale[0]?.reference || 'VENDA-00000';
-      const nextNumber = parseInt(lastRef.replace('VENDA-', '')) + 1;
-      const newRef = `VENDA-${String(nextNumber).padStart(5, '0')}`;
+      // Busca TODAS as vendas e extrai o maior número sequencial para evitar colisão
+      const allSales = await base44.entities.Sale.list('-created_date', 500);
+      let maxNum = 0;
+      allSales.forEach(s => {
+        const match = s.reference?.match(/^VENDA-(\d+)$/);
+        if (match) { const n = parseInt(match[1], 10); if (n > maxNum) maxNum = n; }
+      });
+      const newRef = `VENDA-${String(maxNum + 1).padStart(6, '0')}`;
 
       const sale = await base44.entities.Sale.create({
         reference: newRef,
