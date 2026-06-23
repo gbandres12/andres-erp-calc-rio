@@ -1,0 +1,358 @@
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { toast } from "sonner";
+
+const PAYMENT_METHODS = [
+  { value: "01", label: "Dinheiro" },
+  { value: "02", label: "Cheque" },
+  { value: "03", label: "Cartão de Crédito" },
+  { value: "04", label: "Cartão de Débito" },
+  { value: "15", label: "Boleto Bancário" },
+  { value: "90", label: "Sem Pagamento" },
+  { value: "99", label: "Outros" },
+];
+
+const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "5102", unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
+
+export default function FiscalInvoiceForm() {
+  const companyId = localStorage.getItem("selectedCompanyId");
+  const navigate = useNavigate();
+  const urlParams = new URLSearchParams(window.location.search);
+  const saleId = urlParams.get("sale_id");
+
+  const [form, setForm] = useState({
+    company_id: companyId,
+    document_type: "nfe",
+    serie: "1",
+    status: "rascunho",
+    origin: saleId ? "from_sale" : "manual",
+    sale_id: saleId || null,
+    issue_date: new Date().toISOString().split("T")[0],
+    nature_operation: "Venda de produto",
+    payment_method: "99",
+    items: [{ ...emptyItem }],
+    subtotal: 0, discount_total: 0, shipping: 0, total: 0
+  });
+
+  const { data: configs = [] } = useQuery({
+    queryKey: ["fiscal_config", companyId],
+    queryFn: () => base44.entities.FiscalConfig.filter({ company_id: companyId }),
+    enabled: !!companyId
+  });
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["contacts_active", companyId],
+    queryFn: () => base44.entities.Contact.filter({ company_id: companyId }, "name", 100),
+    enabled: !!companyId
+  });
+
+  const config = configs[0];
+
+  useEffect(() => {
+    if (config) {
+      setForm(prev => ({
+        ...prev,
+        environment: config.environment,
+        serie: config.serie || "1",
+        document_type: config.document_type || "nfe"
+      }));
+    }
+  }, [config]);
+
+  // Se vier de uma venda, pré-carrega os dados
+  const { data: sale } = useQuery({
+    queryKey: ["sale_for_fiscal", saleId],
+    queryFn: () => base44.entities.Sale.get(saleId),
+    enabled: !!saleId
+  });
+
+  useEffect(() => {
+    if (sale) {
+      setForm(prev => ({
+        ...prev,
+        recipient_name: sale.client_name,
+        recipient_id: sale.client_id,
+        subtotal: sale.subtotal,
+        discount_total: sale.discount || 0,
+        shipping: sale.shipping || 0,
+        total: sale.total,
+        items: (sale.items || []).map((item, i) => ({
+          sequence: i + 1,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_code: "",
+          ncm: "",
+          cfop: "5102",
+          unit: item.unit || "TON",
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          discount: item.discount || 0,
+          total: item.total
+        }))
+      }));
+    }
+  }, [sale]);
+
+  const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const updateItem = (idx, field, value) => {
+    setForm(prev => {
+      const items = [...prev.items];
+      items[idx] = { ...items[idx], [field]: value };
+      // Recalcula total do item
+      if (["quantity", "unit_price", "discount"].includes(field)) {
+        const q = field === "quantity" ? parseFloat(value) || 0 : parseFloat(items[idx].quantity) || 0;
+        const p = field === "unit_price" ? parseFloat(value) || 0 : parseFloat(items[idx].unit_price) || 0;
+        const d = field === "discount" ? parseFloat(value) || 0 : parseFloat(items[idx].discount) || 0;
+        items[idx].total = q * p - d;
+      }
+      // Recalcula totais
+      const subtotal = items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+      const discount_total = items.reduce((s, i) => s + (parseFloat(i.discount) || 0), 0);
+      const total = subtotal + (parseFloat(prev.shipping) || 0);
+      return { ...prev, items, subtotal, discount_total, total };
+    });
+  };
+
+  const addItem = () => {
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, { ...emptyItem, sequence: prev.items.length + 1 }]
+    }));
+  };
+
+  const removeItem = (idx) => {
+    setForm(prev => {
+      const items = prev.items.filter((_, i) => i !== idx).map((item, i) => ({ ...item, sequence: i + 1 }));
+      const subtotal = items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+      return { ...prev, items, subtotal, total: subtotal + (parseFloat(prev.shipping) || 0) };
+    });
+  };
+
+  const handleContactSelect = (contactId) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (contact) {
+      setForm(prev => ({
+        ...prev,
+        recipient_id: contact.id,
+        recipient_name: contact.name,
+        recipient_cpf_cnpj: contact.cpf_cnpj || contact.document,
+        recipient_email: contact.email,
+        recipient_address: {
+          logradouro: contact.address || "",
+          numero: contact.number || "S/N",
+          bairro: contact.neighborhood || "",
+          municipio: contact.city || "",
+          uf: contact.state || "",
+          cep: contact.zip_code || ""
+        }
+      }));
+    }
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data) => {
+      // Gera referência interna
+      const allInvoices = await base44.entities.FiscalInvoice.filter({ company_id: companyId });
+      let maxNum = 0;
+      allInvoices.forEach(inv => {
+        const match = inv.reference?.match(/^NF-(\d+)$/);
+        if (match) { const n = parseInt(match[1], 10); if (n > maxNum) maxNum = n; }
+      });
+      const reference = `NF-${String(maxNum + 1).padStart(6, "0")}`;
+      const idempotency_key = `${companyId}-${data.document_type}-${data.serie}-${reference}`;
+      return base44.entities.FiscalInvoice.create({ ...data, reference, idempotency_key });
+    },
+    onSuccess: (inv) => {
+      toast.success("Nota criada como rascunho!");
+      navigate(`${createPageUrl("FiscalInvoiceDetail")}?id=${inv.id}`);
+    },
+    onError: (e) => toast.error(e.message)
+  });
+
+  const isValid = form.recipient_cpf_cnpj && form.items.length > 0 && form.total > 0;
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={createPageUrl("FiscalInvoices")}><ArrowLeft className="w-4 h-4" /></Link>
+        </Button>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Nova Nota Fiscal</h1>
+          <p className="text-slate-500 text-sm">Preencha os dados e salve como rascunho para emitir</p>
+        </div>
+      </div>
+
+      {!config && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-700">
+          ⚠️ Configure os dados fiscais da empresa em <Link to={createPageUrl("FiscalSettings")} className="underline font-medium">Configurações Fiscais</Link> antes de emitir notas.
+        </div>
+      )}
+
+      {/* Tipo e ambiente */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 grid md:grid-cols-3 gap-4">
+        <div className="space-y-1">
+          <Label>Tipo de Documento</Label>
+          <Select value={form.document_type} onValueChange={v => setField("document_type", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nfe">NF-e</SelectItem>
+              <SelectItem value="nfse">NFS-e</SelectItem>
+              <SelectItem value="nfce">NFC-e</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Série</Label>
+          <Input value={form.serie} onChange={e => setField("serie", e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Data de Emissão</Label>
+          <Input type="date" value={form.issue_date} onChange={e => setField("issue_date", e.target.value)} />
+        </div>
+        <div className="space-y-1 md:col-span-2">
+          <Label>Natureza da Operação</Label>
+          <Input value={form.nature_operation} onChange={e => setField("nature_operation", e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Forma de Pagamento</Label>
+          <Select value={form.payment_method} onValueChange={v => setField("payment_method", v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PAYMENT_METHODS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Destinatário */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <h3 className="font-semibold text-slate-800">Destinatário</h3>
+        <div className="space-y-1">
+          <Label>Selecionar Cliente Cadastrado</Label>
+          <Select onValueChange={handleContactSelect}>
+            <SelectTrigger><SelectValue placeholder="Selecione ou preencha manualmente abaixo..." /></SelectTrigger>
+            <SelectContent>
+              {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label>Nome / Razão Social *</Label>
+            <Input value={form.recipient_name || ""} onChange={e => setField("recipient_name", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>CPF / CNPJ *</Label>
+            <Input value={form.recipient_cpf_cnpj || ""} onChange={e => setField("recipient_cpf_cnpj", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Email</Label>
+            <Input type="email" value={form.recipient_email || ""} onChange={e => setField("recipient_email", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>IE Destinatário</Label>
+            <Input value={form.recipient_ie || ""} onChange={e => setField("recipient_ie", e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Itens */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800">Itens</h3>
+          <Button variant="outline" size="sm" onClick={addItem}><Plus className="w-4 h-4 mr-1" /> Adicionar</Button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium w-8">#</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-40">Descrição</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium w-24">NCM</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CFOP</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium w-16">Un.</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Qtd</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">Unit.</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Desc.</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">Total</th>
+                <th className="w-8"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {form.items.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="px-3 py-2 text-slate-400">{item.sequence}</td>
+                  <td className="px-3 py-2"><Input value={item.product_name} onChange={e => updateItem(idx, "product_name", e.target.value)} className="h-7 text-xs" /></td>
+                  <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-7 text-xs" placeholder="00000000" /></td>
+                  <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-7 text-xs" /></td>
+                  <td className="px-3 py-2"><Input value={item.unit} onChange={e => updateItem(idx, "unit", e.target.value)} className="h-7 text-xs" /></td>
+                  <td className="px-3 py-2"><Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} className="h-7 text-xs text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" value={item.unit_price} onChange={e => updateItem(idx, "unit_price", e.target.value)} className="h-7 text-xs text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" value={item.discount} onChange={e => updateItem(idx, "discount", e.target.value)} className="h-7 text-xs text-right" /></td>
+                  <td className="px-3 py-2 text-right font-medium text-slate-700">
+                    {item.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </td>
+                  <td className="px-3 py-2">
+                    {form.items.length > 1 && (
+                      <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-100 px-5 py-4 flex justify-end">
+          <div className="space-y-1 text-sm w-56">
+            <div className="flex justify-between text-slate-500">
+              <span>Subtotal:</span>
+              <span>{form.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-500">
+              <span>Frete (R$):</span>
+              <Input type="number" value={form.shipping} onChange={e => {
+                const shipping = parseFloat(e.target.value) || 0;
+                setForm(prev => ({ ...prev, shipping, total: prev.subtotal + shipping }));
+              }} className="h-6 w-24 text-right text-xs" />
+            </div>
+            <div className="flex justify-between font-bold text-slate-800 text-base border-t pt-2">
+              <span>Total:</span>
+              <span>{form.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Observações */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-2">
+        <Label>Observações (informações adicionais na nota)</Label>
+        <Textarea value={form.notes || ""} onChange={e => setField("notes", e.target.value)} rows={3} />
+      </div>
+
+      <div className="flex gap-3">
+        <Button variant="outline" asChild className="flex-1">
+          <Link to={createPageUrl("FiscalInvoices")}>Cancelar</Link>
+        </Button>
+        <Button
+          onClick={() => saveMutation.mutate(form)}
+          disabled={saveMutation.isPending || !isValid}
+          className="flex-1 bg-violet-600 hover:bg-violet-700"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          {saveMutation.isPending ? "Salvando..." : "Salvar como Rascunho"}
+        </Button>
+      </div>
+    </div>
+  );
+}

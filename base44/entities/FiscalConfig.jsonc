@@ -1,0 +1,167 @@
+{
+  "name": "FiscalConfig",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa (1:1)"
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "homologacao",
+        "producao"
+      ],
+      "default": "homologacao",
+      "description": "Ambiente SEFAZ"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "nfe",
+        "nfse",
+        "nfce"
+      ],
+      "default": "nfe",
+      "description": "Tipo padr\u00e3o de documento"
+    },
+    "serie": {
+      "type": "string",
+      "default": "1",
+      "description": "S\u00e9rie da nota"
+    },
+    "next_number": {
+      "type": "number",
+      "default": 1,
+      "description": "Pr\u00f3ximo n\u00famero de nota"
+    },
+    "api_token": {
+      "type": "string",
+      "description": "Token da API Focus NFe (armazenar criptografado)"
+    },
+    "api_company_id": {
+      "type": "string",
+      "description": "CNPJ ou ID da empresa no Focus NFe"
+    },
+    "cnpj": {
+      "type": "string",
+      "description": "CNPJ emitente"
+    },
+    "razao_social": {
+      "type": "string",
+      "description": "Raz\u00e3o social emitente"
+    },
+    "nome_fantasia": {
+      "type": "string",
+      "description": "Nome fantasia"
+    },
+    "inscricao_estadual": {
+      "type": "string",
+      "description": "Inscri\u00e7\u00e3o estadual"
+    },
+    "inscricao_municipal": {
+      "type": "string",
+      "description": "Inscri\u00e7\u00e3o municipal (NFS-e)"
+    },
+    "regime_tributario": {
+      "type": "string",
+      "enum": [
+        "simples_nacional",
+        "lucro_presumido",
+        "lucro_real"
+      ],
+      "default": "simples_nacional"
+    },
+    "crt": {
+      "type": "number",
+      "enum": [
+        1,
+        2,
+        3
+      ],
+      "default": 1,
+      "description": "C\u00f3digo Regime Tribut\u00e1rio: 1=Simples, 2=Simples Excesso, 3=Normal"
+    },
+    "logradouro": {
+      "type": "string"
+    },
+    "numero": {
+      "type": "string"
+    },
+    "complemento": {
+      "type": "string"
+    },
+    "bairro": {
+      "type": "string"
+    },
+    "municipio": {
+      "type": "string"
+    },
+    "uf": {
+      "type": "string"
+    },
+    "cep": {
+      "type": "string"
+    },
+    "telefone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "last_test_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltimo teste de conex\u00e3o"
+    },
+    "last_test_status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "erro",
+        "nao_testado"
+      ],
+      "default": "nao_testado"
+    }
+  },
+  "required": [
+    "company_id",
+    "cnpj",
+    "razao_social"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

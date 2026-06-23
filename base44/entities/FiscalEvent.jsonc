@@ -1,0 +1,105 @@
+{
+  "name": "FiscalEvent",
+  "type": "object",
+  "properties": {
+    "invoice_id": {
+      "type": "string",
+      "description": "ID da nota fiscal"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "emissao",
+        "cancelamento",
+        "inutilizacao",
+        "consulta_status",
+        "webhook_recebido",
+        "download_xml",
+        "download_pdf",
+        "validacao"
+      ],
+      "description": "Tipo do evento"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "sucesso",
+        "erro",
+        "pendente"
+      ]
+    },
+    "request_summary": {
+      "type": "string",
+      "description": "Resumo do que foi enviado (sem dados sens\u00edveis)"
+    },
+    "response_summary": {
+      "type": "string",
+      "description": "Resumo da resposta"
+    },
+    "http_status": {
+      "type": "number"
+    },
+    "duration_ms": {
+      "type": "number"
+    },
+    "error_code": {
+      "type": "string"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "triggered_by": {
+      "type": "string",
+      "description": "user_id ou 'system'"
+    }
+  },
+  "required": [
+    "invoice_id",
+    "company_id",
+    "event_type",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

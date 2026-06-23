@@ -1,0 +1,326 @@
+{
+  "name": "FiscalInvoice",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "string",
+      "description": "Refer\u00eancia interna (NF-000001)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "nfe",
+        "nfse",
+        "nfce"
+      ],
+      "default": "nfe"
+    },
+    "serie": {
+      "type": "string",
+      "default": "1"
+    },
+    "number": {
+      "type": "number",
+      "description": "N\u00famero da nota"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "rascunho",
+        "validando",
+        "pendente_envio",
+        "enviada",
+        "processando",
+        "autorizada",
+        "rejeitada",
+        "erro_integracao",
+        "cancelada",
+        "inutilizada"
+      ],
+      "default": "rascunho"
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "homologacao",
+        "producao"
+      ],
+      "default": "homologacao"
+    },
+    "issue_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de emiss\u00e3o"
+    },
+    "nature_operation": {
+      "type": "string",
+      "description": "Natureza da opera\u00e7\u00e3o"
+    },
+    "recipient_id": {
+      "type": "string",
+      "description": "ID do contato/cliente"
+    },
+    "recipient_name": {
+      "type": "string"
+    },
+    "recipient_cpf_cnpj": {
+      "type": "string"
+    },
+    "recipient_email": {
+      "type": "string"
+    },
+    "recipient_ie": {
+      "type": "string",
+      "description": "Inscri\u00e7\u00e3o estadual destinat\u00e1rio"
+    },
+    "recipient_address": {
+      "type": "object",
+      "description": "Endere\u00e7o destinat\u00e1rio completo"
+    },
+    "items": {
+      "type": "array",
+      "description": "Itens da nota fiscal",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "number"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "ncm": {
+            "type": "string",
+            "description": "C\u00f3digo NCM 8 d\u00edgitos"
+          },
+          "cfop": {
+            "type": "string",
+            "description": "CFOP 4 d\u00edgitos"
+          },
+          "cst": {
+            "type": "string",
+            "description": "CST ou CSOSN"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number",
+            "default": 0
+          },
+          "total": {
+            "type": "number"
+          },
+          "icms_cst": {
+            "type": "string"
+          },
+          "icms_base": {
+            "type": "number",
+            "default": 0
+          },
+          "icms_aliquota": {
+            "type": "number",
+            "default": 0
+          },
+          "icms_valor": {
+            "type": "number",
+            "default": 0
+          },
+          "pis_cst": {
+            "type": "string"
+          },
+          "pis_aliquota": {
+            "type": "number",
+            "default": 0
+          },
+          "pis_valor": {
+            "type": "number",
+            "default": 0
+          },
+          "cofins_cst": {
+            "type": "string"
+          },
+          "cofins_aliquota": {
+            "type": "number",
+            "default": 0
+          },
+          "cofins_valor": {
+            "type": "number",
+            "default": 0
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_total": {
+      "type": "number",
+      "default": 0
+    },
+    "shipping": {
+      "type": "number",
+      "default": 0
+    },
+    "total": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_total": {
+      "type": "number",
+      "default": 0
+    },
+    "pis_total": {
+      "type": "number",
+      "default": 0
+    },
+    "cofins_total": {
+      "type": "number",
+      "default": 0
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "15",
+        "90",
+        "99"
+      ],
+      "description": "01=Dinheiro, 02=Cheque, 03=Cart\u00e3o Cr\u00e9dito, 04=Cart\u00e3o D\u00e9bito, 05=Cr\u00e9dito Loja, 15=Boleto, 90=Sem Pagamento, 99=Outros"
+    },
+    "sale_id": {
+      "type": "string",
+      "description": "ID da venda de origem"
+    },
+    "origin": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "from_sale",
+        "from_quote"
+      ],
+      "default": "manual"
+    },
+    "api_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia usada no Focus NFe (referencia_externa)"
+    },
+    "api_status": {
+      "type": "string",
+      "description": "Status retornado pela API Focus NFe"
+    },
+    "api_protocol": {
+      "type": "string",
+      "description": "Protocolo de autoriza\u00e7\u00e3o SEFAZ"
+    },
+    "api_access_key": {
+      "type": "string",
+      "description": "Chave de acesso 44 d\u00edgitos"
+    },
+    "xml_url": {
+      "type": "string",
+      "description": "URL do XML autorizado"
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL do DANFE/PDF"
+    },
+    "cancel_reason": {
+      "type": "string"
+    },
+    "cancel_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "error_code": {
+      "type": "string"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0
+    },
+    "last_status_check": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Chave \u00fanica para evitar duplicidade"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "reference",
+    "company_id",
+    "document_type",
+    "recipient_cpf_cnpj",
+    "items",
+    "total"
+  ],
+  "rls": {
+    "create": {
+      "data.company_id": {
+        "$in": "{{user.data.allowed_companies}}"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

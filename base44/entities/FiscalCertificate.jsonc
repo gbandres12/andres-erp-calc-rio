@@ -1,0 +1,82 @@
+{
+  "name": "FiscalCertificate",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "a1",
+        "a3"
+      ],
+      "default": "a1"
+    },
+    "serial_number": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string",
+      "description": "Entidade emissora (ex: AC SAFEWEB)"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Titular do certificado"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "vencido",
+        "revogado"
+      ],
+      "default": "ativo"
+    },
+    "stored_at_provider": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se o arquivo foi enviado ao Focus NFe"
+    },
+    "provider_cert_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "valid_until"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
