@@ -193,23 +193,16 @@ CATEGORIAS:
 RESPONDA APENAS JSON (sem texto fora do JSON):
 { "action": "...", "reply": "...", "target_company": "", "query": {}, "transaction": {}, "payment": {}, "contact": {}, "search_term": "" }`;
 
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt,
-        response_json_schema: {
-            type: 'object',
-            properties: {
-                action: { type: 'string' },
-                reply: { type: 'string' },
-                target_company: { type: 'string' },
-                query: { type: 'object', additionalProperties: true },
-                transaction: { type: 'object', additionalProperties: true },
-                payment: { type: 'object', additionalProperties: true },
-                contact: { type: 'object', additionalProperties: true },
-                search_term: { type: 'string' }
-            },
-            required: ['action', 'reply']
-        }
-    });
+    const raw = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt });
+    // parse JSON from text response
+    let result;
+    try {
+        const jsonMatch = (typeof raw === 'string' ? raw : JSON.stringify(raw)).match(/\{[\s\S]*\}/);
+        result = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch {
+        result = null;
+    }
+    if (!result?.action) result = { action: 'reply', reply: typeof raw === 'string' ? raw : 'Como posso ajudar?' };
     console.log(`[classify] action=${result?.action} company=${result?.query?.company_name||result?.target_company||'-'} all=${result?.query?.all_companies||false}`);
     return result;
 }
@@ -648,7 +641,7 @@ Deno.serve(async (req) => {
         if (!ai?.action) ai = { action: 'reply', reply: 'Não entendi. Pode reformular?' };
         console.log(`[v14] action=${ai.action} all=${ai.query?.all_companies||false} comp=${ai.query?.company_name||ai.target_company||'-'}`);
     } catch (e) {
-        console.error('[LLM]', e.message);
+        console.error('[LLM ERROR FULL]', e.message, JSON.stringify(e));
         await sendTelegram(chat_id, '😵 Erro na IA. Tente novamente.');
         await base44.asServiceRole.entities.TelegramMessageQueue.delete(queueId).catch(()=>{});
         return Response.json({ status: 'llm_error' });
