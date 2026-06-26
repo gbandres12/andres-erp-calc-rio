@@ -30,7 +30,7 @@ export async function salesWebhook(req) {
             // Evitar duplicidade simples
             const exists = await base44.asServiceRole.entities.SalesTelegramQueue.filter({ message_id: messageId });
             if (exists.length === 0) {
-                await base44.asServiceRole.entities.SalesTelegramQueue.create({
+                const record = await base44.asServiceRole.entities.SalesTelegramQueue.create({
                     chat_id: chatId,
                     user_text: text || "[Audio/Midia]",
                     username: username,
@@ -39,9 +39,15 @@ export async function salesWebhook(req) {
                     voice_file_id: voiceFileId
                 });
 
-                // Disparar processamento assíncrono (AWAIT é necessário em Serverless para não matar o processo)
+                // Passa todos os dados necessários para o processamento
                 await base44.asServiceRole.functions.invoke("processSalesQueue", { 
-                    data: { chat_id: chatId, message_id: messageId } 
+                    data: { 
+                        id: record.id,
+                        chat_id: chatId, 
+                        user_text: text || "[Audio/Midia]",
+                        media_type: mediaType,
+                        voice_file_id: voiceFileId
+                    } 
                 });
             }
         }
