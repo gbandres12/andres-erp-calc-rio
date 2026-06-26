@@ -255,6 +255,9 @@ async function executeAction(base44, ai, companies, accounts, session) {
         const range = { start: normalizedDate, end: normalizedDate };
         const fmtReportDate = normalizedDate.split('-').reverse().join('/');
 
+        // Usar paid_amount || amount (idêntico ao DailyFinancialReport da página)
+        const txVal = (t) => t.paid_amount || t.amount || 0;
+
         let report = `📋 *Relatório Diário — ${fmtReportDate}*\n`;
         if (targets.length > 1) report += `_(${targets.length} filiais)_\n`;
         report += '\n';
@@ -263,50 +266,62 @@ async function executeAction(base44, ai, companies, accounts, session) {
         let totalGeralSaidas = 0;
 
         for (const comp of targets) {
-            const [entradas, saidas, pendDesp, pendRec] = await Promise.all([
-                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pago' }, '-payment_date', 200),
-                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pago' }, '-payment_date', 200),
+            // Buscar todas as transações pagas da filial (sem limite de 200, busca em lotes de 500)
+            const [allPagas, pendDesp, pendRec] = await Promise.all([
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, status: 'pago' }, '-payment_date', 500),
                 base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pendente' }, 'due_date', 50),
                 base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pendente' }, 'due_date', 50),
             ]);
 
-            const entradasDia = filterByDateRange(entradas, 'payment_date', range);
-            const saidasDia   = filterByDateRange(saidas,   'payment_date', range);
-            const totalE = entradasDia.reduce((s,t)=>s+t.amount,0);
-            const totalS = saidasDia.reduce((s,t)=>s+t.amount,0);
+            // Filtrar pelo dia selecionado — igual à página: usa payment_date OU due_date
+            const pagasDia = allPagas.filter(t => {
+                const d = t.payment_date || t.due_date;
+                return d && d.slice(0, 10) === normalizedDate;
+            });
+
+            const entradasDia = pagasDia.filter(t => t.type === 'receita').sort((a,b) => a.description.localeCompare(b.description, 'pt-BR'));
+            const saidasDia   = pagasDia.filter(t => t.type === 'despesa').sort((a,b) => a.description.localeCompare(b.description, 'pt-BR'));
+
+            const totalE = entradasDia.reduce((s,t) => s + txVal(t), 0);
+            const totalS = saidasDia.reduce((s,t) => s + txVal(t), 0);
             const resultado = totalE - totalS;
-            const saldoCaixa = accounts.filter(a=>a.company_id===comp.id).reduce((s,a)=>s+(a.current_balance||0),0);
-            const vencendoHoje = [...pendDesp,...pendRec].filter(t=>t.due_date===today());
+
+            // Saldo: mesmo cálculo da página (saldo_final - entradas_dia + saidas_dia = saldo_inicial)
+            const saldoFinal = accounts.filter(a => a.company_id === comp.id).reduce((s,a) => s + (a.current_balance||0), 0);
+            const saldoInicial = saldoFinal - totalE + totalS;
+
+            const vencendoHoje = [...pendDesp,...pendRec].filter(t => t.due_date === normalizedDate);
 
             totalGeralEntradas += totalE;
             totalGeralSaidas   += totalS;
 
             report += `🏢 *${comp.name}*\n`;
+            report += `🏦 Saldo Inicial: *${brl(saldoInicial)}* → Final: *${brl(saldoFinal)}*\n\n`;
 
             if (entradasDia.length > 0) {
                 report += `📥 *Entradas (${entradasDia.length}) — ${brl(totalE)}*\n`;
-                entradasDia.slice(0,5).forEach(t => {
-                    report += `  ✅ ${t.description} | ${brl(t.amount)}${t.contact_name?' | '+t.contact_name:''}\n`;
+                entradasDia.forEach(t => {
+                    report += `  ✅ ${t.description} | ${t.category||'—'} | *${brl(txVal(t))}*\n`;
                 });
-                if (entradasDia.length > 5) report += `  _(+${entradasDia.length-5} mais)_\n`;
             } else {
                 report += `📥 Entradas: nenhuma\n`;
             }
 
+            report += '\n';
+
             if (saidasDia.length > 0) {
                 report += `📤 *Saídas (${saidasDia.length}) — ${brl(totalS)}*\n`;
-                saidasDia.slice(0,5).forEach(t => {
-                    report += `  ✅ ${t.description} | ${brl(t.amount)}${t.contact_name?' | '+t.contact_name:''}\n`;
+                saidasDia.forEach(t => {
+                    report += `  📤 ${t.description} | ${t.category||'—'} | *${brl(txVal(t))}*\n`;
                 });
-                if (saidasDia.length > 5) report += `  _(+${saidasDia.length-5} mais)_\n`;
             } else {
                 report += `📤 Saídas: nenhuma\n`;
             }
 
-            report += `📊 Resultado: ${resultado>=0?'🟢':'🔴'} *${brl(resultado)}* | Caixa: *${brl(saldoCaixa)}*\n`;
+            report += `\n📊 Resultado do dia: ${resultado>=0?'🟢':'🔴'} *${brl(resultado)}*\n`;
 
             if (vencendoHoje.length > 0) {
-                report += `⏰ Vence hoje: ${vencendoHoje.slice(0,3).map(t=>`${t.description} (${brl(t.amount)})`).join(', ')}\n`;
+                report += `⏰ Vence hoje: ${vencendoHoje.slice(0,3).map(t=>`${t.description} (${brl(txVal(t))})`).join(', ')}\n`;
             }
             report += '\n';
         }
