@@ -159,23 +159,15 @@ MAPEAMENTO:
 RESPONDA APENAS JSON:
 { "action": "...", "reply": "...", "target_company": "", "query": {}, "transaction": {}, "client": {}, "sale": {}, "search_term": "" }`;
 
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt,
-        response_json_schema: {
-            type: 'object',
-            properties: {
-                action: { type: 'string' },
-                reply: { type: 'string' },
-                target_company: { type: 'string' },
-                query: { type: 'object', additionalProperties: true },
-                transaction: { type: 'object', additionalProperties: true },
-                client: { type: 'object', additionalProperties: true },
-                sale: { type: 'object', additionalProperties: true },
-                search_term: { type: 'string' }
-            },
-            required: ['action', 'reply']
-        }
-    });
+    const raw = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt });
+    let result;
+    try {
+        const jsonMatch = (typeof raw === 'string' ? raw : JSON.stringify(raw)).match(/\{[\s\S]*\}/);
+        result = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch {
+        result = null;
+    }
+    if (!result?.action) result = { action: 'reply', reply: typeof raw === 'string' ? raw : 'Como posso ajudar?' };
     console.log(`[classify] action=${result?.action}`);
     return result;
 }
