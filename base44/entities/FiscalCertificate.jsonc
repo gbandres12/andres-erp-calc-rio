@@ -13,6 +13,18 @@
       ],
       "default": "a1"
     },
+    "file_uri": {
+      "type": "string",
+      "description": "URI do arquivo .pfx/.p12 no storage privado (UploadPrivateFile)"
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Nome original do arquivo"
+    },
+    "password_hint": {
+      "type": "string",
+      "description": "Dica da senha (NUNCA armazenar a senha em texto plano)"
+    },
     "serial_number": {
       "type": "string"
     },
@@ -37,17 +49,15 @@
       "enum": [
         "ativo",
         "vencido",
-        "revogado"
+        "revogado",
+        "pendente_validacao"
       ],
-      "default": "ativo"
+      "default": "pendente_validacao"
     },
-    "stored_at_provider": {
-      "type": "boolean",
-      "default": false,
-      "description": "Se o arquivo foi enviado ao Focus NFe"
-    },
-    "provider_cert_id": {
-      "type": "string"
+    "upload_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora do upload"
     },
     "notes": {
       "type": "string"
