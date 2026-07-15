@@ -4,6 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 
 // Endpoints SEFAZ por UF e ambiente
 // Fonte: https://www.nfe.fazenda.gov.br/portal/webService.aspx
+// IMPORTANTE: PA usa o mesmo endpoint para homologação e produção, diferenciado por tpAmb no payload
 const SEFAZ_ENDPOINTS: Record<string, Record<string, string>> = {
   homologacao: {
     AM: 'https://homnfe.sefaz.am.gov.br/nfeweb/services/NfeStatusServico4',
@@ -13,6 +14,7 @@ const SEFAZ_ENDPOINTS: Record<string, Record<string, string>> = {
     MG: 'https://hnfe.fazenda.mg.gov.br/nfe2/services/NFeStatusServico4',
     MS: 'https://hom.nfe.ms.gov.br/ws/NFeStatusServico4',
     MT: 'https://homologacao.sefaz.mt.gov.br/nfews/v2/services/NfeStatusServico4',
+    // PA: endpoint único para homologação e produção — tpAmb=2 seleciona homologação
     PA: 'https://www.sefa.pa.gov.br/nfe/services/NFeStatusServico4',
     PE: 'https://nfehomolog.sefaz.pe.gov.br/nfe-service/NFeStatusServico4',
     PR: 'https://homologacao.nfe.pr.gov.br/nfe/NFeStatusServico4',
@@ -43,20 +45,33 @@ const SEFAZ_ENDPOINTS: Record<string, Record<string, string>> = {
   }
 };
 
-// Estados que usam SVRS em produção
+// Estados que delegam ao SVRS (não têm endpoint próprio)
 const SVRS_STATES = ['AC','AL','AP','DF','ES','PB','PI','RJ','RN','RO','RR','SC','SE','TO'];
-// Estados que usam SVAN
-const SVAN_STATES = ['MA','PA'];
+// Estados que delegam ao SVAN
+// NOTA: PA foi removido — tem endpoint próprio mapeado acima
+const SVAN_STATES = ['MA'];
 
 function getEndpoint(uf: string, environment: string): string {
   const env = SEFAZ_ENDPOINTS[environment] || SEFAZ_ENDPOINTS.homologacao;
+  // Prioridade 1: endpoint próprio mapeado
   if (env[uf]) return env[uf];
+  // Prioridade 2: estados SVRS
   if (SVRS_STATES.includes(uf)) return env['SVRS'];
+  // Prioridade 3: estados SVAN
   if (SVAN_STATES.includes(uf)) return env['SVAN'];
-  return env['SVRS']; // fallback
+  // Fallback: SVRS nacional
+  return env['SVRS'];
 }
 
-// Código IBGE do município (cMunFG) — usar 9999999 para testes
+// Fallback endpoint: quando o endpoint direto falha, tenta o SVRS nacional
+function getFallbackEndpoint(uf: string, environment: string): string | null {
+  const env = SEFAZ_ENDPOINTS[environment] || SEFAZ_ENDPOINTS.homologacao;
+  // Se já é SVRS ou SVAN, sem fallback adicional
+  if (SVRS_STATES.includes(uf) || SVAN_STATES.includes(uf)) return null;
+  // Para estados com endpoint próprio que falhou, fallback para SVRS
+  return env['SVRS'];
+}
+
 function buildStatusSOAP(cUF: string, tpAmb: string): string {
   const cUFMap: Record<string, string> = {
     AC:'12',AL:'27',AM:'13',AP:'16',BA:'29',CE:'23',DF:'53',ES:'32',GO:'52',
@@ -64,7 +79,7 @@ function buildStatusSOAP(cUF: string, tpAmb: string): string {
     RJ:'33',RN:'24',RO:'11',RR:'14',RS:'43',SC:'42',SE:'28',SP:'35',TO:'17'
   };
   const cUFNum = cUFMap[cUF] || '35';
-  
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -87,6 +102,27 @@ function buildStatusSOAP(cUF: string, tpAmb: string): string {
 </soap12:Envelope>`;
 }
 
+async function callSefaz(endpoint: string, soapBody: string, timeoutMs: number): Promise<{ ok: boolean; text?: string; status?: number; error?: string }> {
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+        // SOAPAction vazia é aceita pela maioria dos endpoints SEFAZ com SOAP 1.2
+        'SOAPAction': '""',
+        // User-Agent compatível com sistemas NF-e
+        'User-Agent': 'NFeClient/4.0',
+      },
+      body: soapBody,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const text = await response.text();
+    return { ok: true, text, status: response.status };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
@@ -106,39 +142,55 @@ Deno.serve(async (req) => {
     const uf = config.uf.toUpperCase();
     const environment = config.environment || 'homologacao';
     const tpAmb = environment === 'producao' ? '1' : '2';
-    const endpoint = getEndpoint(uf, environment);
-
+    const primaryEndpoint = getEndpoint(uf, environment);
     const soapBody = buildStatusSOAP(uf, tpAmb);
 
     const startTime = Date.now();
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/soap+xml; charset=utf-8',
-          'SOAPAction': 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeStatusServico4/nfeStatusServicoNF',
-        },
-        body: soapBody,
-        signal: AbortSignal.timeout(20000),
-      });
-    } catch (fetchErr) {
+
+    // Nota sobre mTLS:
+    // O Deno fetch nativo não suporta certificado cliente (mTLS) diretamente.
+    // Para o NfeStatusServico (consulta de status), a maioria dos SEFAZ aceita sem mTLS.
+    // O PA usa o mesmo endpoint para homolog/produção — o tpAmb no payload faz a diferença.
+    // Para emissão real de NF-e (assinatura XML), será necessária uma biblioteca como node-forge.
+
+    // Tentativa 1: endpoint primário (30s timeout — SEFAZ-PA pode ser lento)
+    let result = await callSefaz(primaryEndpoint, soapBody, 30000);
+    let usedEndpoint = primaryEndpoint;
+    let usedFallback = false;
+
+    // Tentativa 2: fallback para SVRS nacional se o endpoint primário falhou
+    if (!result.ok) {
+      const fallbackEndpoint = getFallbackEndpoint(uf, environment);
+      if (fallbackEndpoint && fallbackEndpoint !== primaryEndpoint) {
+        usedFallback = true;
+        usedEndpoint = fallbackEndpoint;
+        result = await callSefaz(fallbackEndpoint, soapBody, 30000);
+      }
+    }
+
+    const duration = Date.now() - startTime;
+
+    if (!result.ok) {
       await base44.asServiceRole.entities.FiscalConfig.update(config.id, {
         last_test_at: new Date().toISOString(),
         last_test_status: 'erro'
       });
       return Response.json({
         success: false,
-        error: `Falha ao conectar com SEFAZ: ${fetchErr.message}`,
-        endpoint,
+        error: `Falha ao conectar com SEFAZ${usedFallback ? ' (tentativa primária e fallback SVRS)' : ''}: ${result.error}`,
+        endpoint: usedEndpoint,
+        primary_endpoint: primaryEndpoint,
         environment,
-        uf
+        uf,
+        duration_ms: duration,
+        hint: uf === 'PA'
+          ? 'O SEFAZ-PA pode exigir mTLS (certificado cliente) para responder. Verifique se o certificado A1 está carregado. Para homologação, o tpAmb=2 já está correto no payload.'
+          : 'Verifique se o certificado A1 está carregado e se a UF está correta.'
       });
     }
 
-    const duration = Date.now() - startTime;
-    const responseText = await response.text();
-    const httpStatus = response.status;
+    const responseText = result.text || '';
+    const httpStatus = result.status || 0;
 
     // Extrair cStat e xMotivo do XML de resposta
     const cStatMatch = responseText.match(/<cStat>(\d+)<\/cStat>/);
@@ -148,8 +200,9 @@ Deno.serve(async (req) => {
 
     // cStat 107 = Serviço em Operação, 108 = Serviço Paralisado Temporariamente
     const isOperational = cStat === '107';
-    const testStatus = (httpStatus >= 200 && httpStatus < 300 && cStat) ? 
-      (isOperational ? 'ok' : 'erro') : 'erro';
+    const testStatus = (httpStatus >= 200 && httpStatus < 300 && cStat)
+      ? (isOperational ? 'ok' : 'erro')
+      : 'erro';
 
     await base44.asServiceRole.entities.FiscalConfig.update(config.id, {
       last_test_at: new Date().toISOString(),
@@ -161,14 +214,18 @@ Deno.serve(async (req) => {
       http_status: httpStatus,
       cStat,
       xMotivo,
-      endpoint,
+      endpoint: usedEndpoint,
+      primary_endpoint: primaryEndpoint,
+      used_fallback: usedFallback,
       environment,
       uf,
       duration_ms: duration,
       is_operational: isOperational,
       message: isOperational
         ? `✅ SEFAZ ${uf} em operação (cStat: ${cStat} - ${xMotivo})`
-        : `⚠️ SEFAZ respondeu mas não está em operação normal (cStat: ${cStat} - ${xMotivo || 'sem motivo'})`
+        : cStat
+          ? `⚠️ SEFAZ respondeu mas status: ${cStat} - ${xMotivo || 'sem motivo'}`
+          : `⚠️ SEFAZ respondeu (HTTP ${httpStatus}) mas sem cStat no XML`
     });
 
   } catch (error) {
