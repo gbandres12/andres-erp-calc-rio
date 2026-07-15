@@ -11,6 +11,8 @@ import { formatDate } from "@/components/utils/formatters";
 export default function CertificateUpload({ companyId, certificate }) {
   const [file, setFile] = useState(null);
   const [password, setPassword] = useState("");
+  const [validUntil, setValidUntil] = useState("");
+  const [issuer, setIssuer] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [uploading, setUploading] = useState(false);
   const queryClient = useQueryClient();
@@ -29,6 +31,7 @@ export default function CertificateUpload({ companyId, certificate }) {
   const handleUpload = async () => {
     if (!file) return toast.error("Selecione o arquivo do certificado (.pfx ou .p12)");
     if (!password) return toast.error("Informe a senha do certificado");
+    if (!validUntil) return toast.error("Informe a data de vencimento do certificado");
     if (file.size > 5 * 1024 * 1024) return toast.error("Arquivo muito grande (máx 5MB)");
 
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -38,39 +41,33 @@ export default function CertificateUpload({ companyId, certificate }) {
 
     setUploading(true);
     try {
-      // Upload para storage privado
+      // Faz upload do arquivo para storage privado
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
-
-      // Calcular validade baseada no metadata do form (usuário informa)
-      const existingCert = certificate;
 
       const certData = {
         company_id: companyId,
         type: "a1",
         file_uri,
         file_name: file.name,
+        valid_until: validUntil,
+        issuer: issuer || undefined,
         upload_date: new Date().toISOString(),
         status: "pendente_validacao",
         notes: `Senha configurada em ${new Date().toLocaleDateString('pt-BR')}`
       };
 
-      if (existingCert?.id) {
-        await base44.entities.FiscalCertificate.update(existingCert.id, certData);
+      if (certificate?.id) {
+        await base44.entities.FiscalCertificate.update(certificate.id, certData);
         toast.success("Certificado atualizado com sucesso!");
       } else {
         await base44.entities.FiscalCertificate.create(certData);
         toast.success("Certificado enviado com sucesso!");
       }
 
-      // Salvar a senha como secret via variável de ambiente nomeada por empresa
-      // (orientação para o usuário — a senha não é salva em banco)
-      toast.info(
-        `⚠️ Importante: salve a senha do certificado nas variáveis de ambiente do sistema com o nome CERT_PASSWORD_${companyId.slice(-8).toUpperCase()}`,
-        { duration: 8000 }
-      );
-
       setFile(null);
       setPassword("");
+      setValidUntil("");
+      setIssuer("");
       queryClient.invalidateQueries(["fiscal_cert", companyId]);
     } catch (e) {
       toast.error("Erro ao enviar certificado: " + e.message);
@@ -95,9 +92,7 @@ export default function CertificateUpload({ companyId, certificate }) {
             }
             <div className="flex-1">
               <p className="font-semibold text-slate-800">Certificado A1 Carregado</p>
-              <p className="text-sm text-slate-600 mt-0.5">
-                📄 {certificate.file_name || "certificado.pfx"}
-              </p>
+              <p className="text-sm text-slate-600 mt-0.5">📄 {certificate.file_name || "certificado.pfx"}</p>
               {certificate.subject && (
                 <p className="text-xs text-slate-500 mt-0.5">Titular: {certificate.subject}</p>
               )}
@@ -133,7 +128,7 @@ export default function CertificateUpload({ companyId, certificate }) {
         </div>
       )}
 
-      {/* Upload de novo certificado */}
+      {/* Formulário de upload */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
         <h4 className="font-semibold text-slate-800 flex items-center gap-2">
           <Upload className="w-4 h-4 text-violet-600" />
@@ -141,28 +136,25 @@ export default function CertificateUpload({ companyId, certificate }) {
         </h4>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
-          <strong>🔒 Segurança:</strong> O arquivo é enviado para storage privado criptografado.
-          A senha <strong>não é armazenada</strong> no banco de dados — você precisará configurá-la
-          como variável de ambiente do sistema.
+          <strong>🔒 Segurança:</strong> O arquivo é armazenado em storage privado criptografado.
+          A senha <strong>não é salva</strong> — use-a apenas para verificar o arquivo.
         </div>
 
+        {/* Arquivo */}
         <div className="space-y-1">
           <Label>Arquivo do Certificado (.pfx ou .p12) *</Label>
-          <div className="flex gap-2">
-            <Input
-              type="file"
-              accept=".pfx,.p12"
-              onChange={e => setFile(e.target.files?.[0] || null)}
-              className="flex-1 cursor-pointer"
-            />
-          </div>
+          <Input
+            type="file"
+            accept=".pfx,.p12"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            className="cursor-pointer"
+          />
           {file && (
-            <p className="text-xs text-green-600">
-              ✅ {file.name} ({(file.size / 1024).toFixed(0)} KB)
-            </p>
+            <p className="text-xs text-green-600">✅ {file.name} ({(file.size / 1024).toFixed(0)} KB)</p>
           )}
         </div>
 
+        {/* Senha */}
         <div className="space-y-1">
           <Label>Senha do Certificado *</Label>
           <div className="relative">
@@ -181,41 +173,37 @@ export default function CertificateUpload({ companyId, certificate }) {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-xs text-slate-400">
-            A senha é usada apenas para validar o arquivo. Guarde-a separadamente.
-          </p>
         </div>
 
-        {/* Campos de metadata manual */}
+        {/* Metadata */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label>Válido até *</Label>
             <Input
               type="date"
-              onChange={e => {
-                // Apenas referência visual — será atualizado após validação real
-              }}
+              value={validUntil}
+              onChange={e => setValidUntil(e.target.value)}
             />
-            <p className="text-xs text-slate-400">Data de vencimento do certificado</p>
           </div>
           <div className="space-y-1">
             <Label>Entidade Emissora</Label>
             <Input
               placeholder="Ex: AC SAFEWEB"
-              onChange={e => {}}
+              value={issuer}
+              onChange={e => setIssuer(e.target.value)}
             />
           </div>
         </div>
 
         <Button
           onClick={handleUpload}
-          disabled={!file || !password || uploading}
+          disabled={!file || !password || !validUntil || uploading}
           className="w-full bg-violet-600 hover:bg-violet-700"
         >
           {uploading ? (
             <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
           ) : (
-            <><Upload className="w-4 h-4 mr-2" /> Enviar Certificado com Segurança</>
+            <><Upload className="w-4 h-4 mr-2" /> Enviar Certificado</>
           )}
         </Button>
       </div>
