@@ -46,9 +46,8 @@ const SEFAZ_ENDPOINTS: Record<string, Record<string, string>> = {
 };
 
 // Estados que delegam ao SVRS (não têm endpoint próprio)
-const SVRS_STATES = ['AC','AL','AP','DF','ES','PB','PI','RJ','RN','RO','RR','SC','SE','TO'];
+const SVRS_STATES = ['AC','AL','AP','DF','ES','PA','PB','PI','RJ','RN','RO','RR','SC','SE','TO'];
 // Estados que delegam ao SVAN
-// NOTA: PA foi removido — tem endpoint próprio mapeado acima
 const SVAN_STATES = ['MA'];
 
 function getEndpoint(uf: string, environment: string): string {
@@ -72,10 +71,6 @@ function getFallbackEndpoint(uf: string, environment: string): string | null {
   return env['SVRS'];
 }
 
-// Alguns estados usam SOAP 1.1 (text/xml) — PA é um deles
-// SOAP 1.2 usa application/soap+xml; SOAP 1.1 usa text/xml + SOAPAction header
-const SOAP11_STATES = ['PA', 'MT', 'MS', 'GO'];
-
 function buildStatusSOAP(cUF: string, tpAmb: string): string {
   const cUFMap: Record<string, string> = {
     AC:'12',AL:'27',AM:'13',AP:'16',BA:'29',CE:'23',DF:'53',ES:'32',GO:'52',
@@ -83,33 +78,8 @@ function buildStatusSOAP(cUF: string, tpAmb: string): string {
     RJ:'33',RN:'24',RO:'11',RR:'14',RS:'43',SC:'42',SE:'28',SP:'35',TO:'17'
   };
   const cUFNum = cUFMap[cUF] || '35';
-  const useSoap11 = SOAP11_STATES.includes(cUF);
 
-  if (useSoap11) {
-    // Envelope SOAP 1.1
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soapenv:Header>
-    <nfeCabecMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeStatusServico4">
-      <cUF>${cUFNum}</cUF>
-      <versaoDados>4.00</versaoDados>
-    </nfeCabecMsg>
-  </soapenv:Header>
-  <soapenv:Body>
-    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeStatusServico4">
-      <consStatServ xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-        <tpAmb>${tpAmb}</tpAmb>
-        <cUF>${cUFNum}</cUF>
-        <xServ>STATUS</xServ>
-      </consStatServ>
-    </nfeDadosMsg>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-  }
-
-  // Envelope SOAP 1.2 (padrão para a maioria dos estados)
+  // SOAP 1.2 — padrão nacional (SVRS, SVAN e todos os estados)
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -132,24 +102,14 @@ function buildStatusSOAP(cUF: string, tpAmb: string): string {
 </soap12:Envelope>`;
 }
 
-async function callSefaz(endpoint: string, soapBody: string, timeoutMs: number, useSoap11: boolean): Promise<{ ok: boolean; text?: string; status?: number; error?: string }> {
+async function callSefaz(endpoint: string, soapBody: string, timeoutMs: number): Promise<{ ok: boolean; text?: string; status?: number; error?: string }> {
   try {
-    const headers: Record<string, string> = useSoap11
-      ? {
-          // SOAP 1.1: text/xml + SOAPAction obrigatório (pode ser string vazia)
-          'Content-Type': 'text/xml; charset=utf-8',
-          'SOAPAction': '"http://www.portalfiscal.inf.br/nfe/wsdl/NFeStatusServico4/nfeStatusServicoNF"',
-          'User-Agent': 'NFeClient/4.0',
-        }
-      : {
-          // SOAP 1.2: application/soap+xml, sem SOAPAction separado
-          'Content-Type': 'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeStatusServico4/nfeStatusServicoNF"',
-          'User-Agent': 'NFeClient/4.0',
-        };
-
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+        'User-Agent': 'NFeClient/4.0',
+      },
       body: soapBody,
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -182,11 +142,10 @@ Deno.serve(async (req) => {
     const primaryEndpoint = getEndpoint(uf, environment);
     const soapBody = buildStatusSOAP(uf, tpAmb);
 
-    const useSoap11 = SOAP11_STATES.includes(uf);
     const startTime = Date.now();
 
-    // Tentativa 1: endpoint primário (30s timeout — SEFAZ-PA pode ser lento)
-    let result = await callSefaz(primaryEndpoint, soapBody, 30000, useSoap11);
+    // Tentativa 1: endpoint primário
+    let result = await callSefaz(primaryEndpoint, soapBody, 30000);
     let usedEndpoint = primaryEndpoint;
     let usedFallback = false;
 
@@ -196,8 +155,7 @@ Deno.serve(async (req) => {
       if (fallbackEndpoint && fallbackEndpoint !== primaryEndpoint) {
         usedFallback = true;
         usedEndpoint = fallbackEndpoint;
-        // SVRS sempre usa SOAP 1.2
-        result = await callSefaz(fallbackEndpoint, soapBody, 30000, false);
+        result = await callSefaz(fallbackEndpoint, soapBody, 30000);
       }
     }
 
