@@ -14,8 +14,6 @@ const SEFAZ_ENDPOINTS: Record<string, Record<string, string>> = {
     MG: 'https://hnfe.fazenda.mg.gov.br/nfe2/services/NFeStatusServico4',
     MS: 'https://hom.nfe.ms.gov.br/ws/NFeStatusServico4',
     MT: 'https://homologacao.sefaz.mt.gov.br/nfews/v2/services/NfeStatusServico4',
-    // PA: endpoint único para homologação e produção — tpAmb=2 seleciona homologação
-    PA: 'https://www.sefa.pa.gov.br/nfe/services/NFeStatusServico4',
     PE: 'https://nfehomolog.sefaz.pe.gov.br/nfe-service/NFeStatusServico4',
     PR: 'https://homologacao.nfe.pr.gov.br/nfe/NFeStatusServico4',
     RS: 'https://nfe-homologacao.sefazrs.rs.gov.br/ws/NfeStatusServico/NfeStatusServico4.asmx',
@@ -33,7 +31,6 @@ const SEFAZ_ENDPOINTS: Record<string, Record<string, string>> = {
     MG: 'https://nfe.fazenda.mg.gov.br/nfe2/services/NFeStatusServico4',
     MS: 'https://nfe.ms.gov.br/ws/NFeStatusServico4',
     MT: 'https://nfe.sefaz.mt.gov.br/nfews/v2/services/NfeStatusServico4',
-    PA: 'https://www.sefa.pa.gov.br/nfe/services/NFeStatusServico4',
     PE: 'https://nfe.sefaz.pe.gov.br/nfe-service/NFeStatusServico4',
     PR: 'https://nfe.pr.gov.br/nfe/NFeStatusServico4',
     RS: 'https://nfe.sefazrs.rs.gov.br/ws/NfeStatusServico/NfeStatusServico4.asmx',
