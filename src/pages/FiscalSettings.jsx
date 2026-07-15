@@ -59,8 +59,12 @@ export default function FiscalSettings() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      if (config?.id) return base44.entities.FiscalConfig.update(config.id, data);
-      return base44.entities.FiscalConfig.create(data);
+      // Garante campos obrigatórios mínimos ao criar
+      const payload = { ...data };
+      if (!payload.cnpj) payload.cnpj = '00.000.000/0001-00';
+      if (!payload.razao_social) payload.razao_social = 'A preencher';
+      if (config?.id) return base44.entities.FiscalConfig.update(config.id, payload);
+      return base44.entities.FiscalConfig.create(payload);
     },
     onSuccess: () => {
       toast.success("Configurações fiscais salvas!");
@@ -76,12 +80,14 @@ export default function FiscalSettings() {
     setForm(prev => ({ ...prev, regime_tributario: value, crt }));
   };
 
+  const [confirmProducao, setConfirmProducao] = useState(false);
+
   const handleEnvironmentChange = (value) => {
-    if (value === 'producao') {
-      if (!window.confirm("⚠️ Tem certeza que deseja mudar para PRODUÇÃO?\n\nNF-e emitidas em produção têm validade fiscal real e geram obrigações tributárias. Confirme apenas se já testou em homologação.")) {
-        return;
-      }
+    if (value === 'producao' && !confirmProducao) {
+      setConfirmProducao(true);
+      return;
     }
+    setConfirmProducao(false);
     handleChange("environment", value);
   };
 
@@ -280,7 +286,7 @@ export default function FiscalSettings() {
 
             <div className="grid md:grid-cols-2 gap-4">
               <div
-                onClick={() => handleEnvironmentChange("homologacao")}
+                onClick={() => { setConfirmProducao(false); handleChange("environment", "homologacao"); }}
                 className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
                   form.environment === 'homologacao'
                     ? 'border-yellow-400 bg-yellow-50'
@@ -303,7 +309,7 @@ export default function FiscalSettings() {
                 className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
                   form.environment === 'producao'
                     ? 'border-red-400 bg-red-50'
-                    : 'border-slate-200 hover:border-red-300'
+                    : confirmProducao ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-red-300'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -318,9 +324,25 @@ export default function FiscalSettings() {
               </div>
             </div>
 
+            {/* Confirmação inline para produção */}
+            {confirmProducao && (
+              <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-sm font-semibold text-red-800">⚠️ Confirmar mudança para Produção?</p>
+                <p className="text-sm text-red-700">NF-e emitidas em produção têm validade fiscal real. Confirme apenas se já testou em homologação.</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => { handleChange("environment", "producao"); setConfirmProducao(false); }} className="bg-red-600 hover:bg-red-700 text-white">
+                    Sim, mudar para Produção
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmProducao(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <Button
               onClick={() => saveMutation.mutate(form)}
-              disabled={saveMutation.isPending}
+              disabled={saveMutation.isPending || confirmProducao}
               className="w-full bg-violet-600 hover:bg-violet-700"
             >
               <Save className="w-4 h-4 mr-2" />
