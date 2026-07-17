@@ -151,8 +151,16 @@ function buildNotaAsPayload(invoice, config) {
       tipoPagamento: invoice.payment_method || '99',
       valor: Number(invoice.total)
     }],
-    infCpl: invoice.notes || undefined
+    infCpl: sanitizeFiscalText(invoice.notes)
   };
+}
+
+function sanitizeFiscalText(value) {
+  const sanitized = String(value || '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return sanitized || undefined;
 }
 
 function extractError(data, status) {
