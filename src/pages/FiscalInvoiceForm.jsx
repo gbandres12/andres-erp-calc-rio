@@ -363,7 +363,7 @@ export default function FiscalInvoiceForm() {
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CST</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">IBS (%)</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">CBS (%)</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium w-16">Un.</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium w-24">Un.</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Qtd</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">Unit.</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Desc.</th>
@@ -387,7 +387,17 @@ export default function FiscalInvoiceForm() {
                   <td className="px-3 py-2"><Input value={item.cst || ""} onChange={e => updateItem(idx, "cst", e.target.value)} className="h-7 text-xs" placeholder="00 ou 102" /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
-                  <td className="px-3 py-2"><Input value={item.unit} onChange={e => updateItem(idx, "unit", e.target.value)} className="h-7 text-xs" /></td>
+                  <td className="px-3 py-2">
+                    <Select value={item.unit || "TON"} onValueChange={value => updateItem(idx, "unit", value)}>
+                      <SelectTrigger className="h-7 min-w-24 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="TON">TON</SelectItem>
+                        <SelectItem value="KG">KG</SelectItem>
+                        <SelectItem value="UN">UN</SelectItem>
+                        <SelectItem value="M3">M³</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
                   <td className="px-3 py-2"><Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" value={item.unit_price} onChange={e => updateItem(idx, "unit_price", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" value={item.discount} onChange={e => updateItem(idx, "discount", e.target.value)} className="h-7 text-xs text-right" /></td>
