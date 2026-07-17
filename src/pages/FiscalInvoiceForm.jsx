@@ -21,7 +21,7 @@ const PAYMENT_METHODS = [
   { value: "99", label: "Outros" },
 ];
 
-const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "5102", unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
+const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "5102", cst: "", ibs_aliquota: 0, cbs_aliquota: 0, unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
 
 export default function FiscalInvoiceForm() {
   const companyId = localStorage.getItem("selectedCompanyId");
@@ -106,6 +106,9 @@ export default function FiscalInvoiceForm() {
           product_code: "",
           ncm: "",
           cfop: "5102",
+          cst: "",
+          ibs_aliquota: 0,
+          cbs_aliquota: 0,
           unit: item.unit || "TON",
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -327,6 +330,9 @@ export default function FiscalInvoiceForm() {
                 <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-40">Descrição</th>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-24">NCM</th>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CFOP</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CST</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">IBS (%)</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">CBS (%)</th>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-16">Un.</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Qtd</th>
                 <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">Unit.</th>
@@ -342,6 +348,9 @@ export default function FiscalInvoiceForm() {
                   <td className="px-3 py-2"><Input value={item.product_name} onChange={e => updateItem(idx, "product_name", e.target.value)} className="h-7 text-xs" /></td>
                   <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-7 text-xs" placeholder="00000000" /></td>
                   <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-7 text-xs" /></td>
+                  <td className="px-3 py-2"><Input value={item.cst || ""} onChange={e => updateItem(idx, "cst", e.target.value)} className="h-7 text-xs" placeholder="00 ou 102" /></td>
+                  <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input value={item.unit} onChange={e => updateItem(idx, "unit", e.target.value)} className="h-7 text-xs" /></td>
                   <td className="px-3 py-2"><Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" value={item.unit_price} onChange={e => updateItem(idx, "unit_price", e.target.value)} className="h-7 text-xs text-right" /></td>

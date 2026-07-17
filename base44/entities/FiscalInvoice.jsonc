@@ -111,6 +111,16 @@
             "type": "string",
             "description": "CST ou CSOSN"
           },
+          "ibs_aliquota": {
+            "type": "number",
+            "default": 0,
+            "description": "Al\u00edquota de IBS (%)"
+          },
+          "cbs_aliquota": {
+            "type": "number",
+            "default": 0,
+            "description": "Al\u00edquota de CBS (%)"
+          },
           "unit": {
             "type": "string"
           },
