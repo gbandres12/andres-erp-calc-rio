@@ -21,7 +21,28 @@ const PAYMENT_METHODS = [
   { value: "99", label: "Outros" },
 ];
 
-const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "5102", cst: "", ibs_aliquota: 0, cbs_aliquota: 0, unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
+const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "", cst: "", csosn: "", unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
+
+const fiscalSnapshot = (product, config, recipientUf) => {
+  if (!product) return {};
+  const internal = !recipientUf || !config?.uf || recipientUf === config.uf;
+  return {
+    product_id: product.id, product_name: product.fiscal_description || product.name, product_code: product.code || "",
+    ncm: product.ncm || "", cest: product.cest || "", cfop: (internal ? product.cfop_internal : product.cfop_interstate) || product.cfop || "",
+    tax_classification: product.tax_classification || "", cst: config?.crt === 1 ? "" : product.icms_cst || "",
+    csosn: config?.crt === 1 ? product.icms_csosn || "" : "", unit: product.unit || "UN",
+    icms_cst: product.icms_cst || "", icms_csosn: product.icms_csosn || "", icms_base: product.icms_base || 0,
+    icms_aliquota: product.icms_aliquota ?? 0, icms_aliquota_configurada: !!product.icms_aliquota_configurada, icms_valor: product.icms_valor || 0,
+    pis_cst: product.pis_cst || "", pis_base: product.pis_base || 0, pis_aliquota: product.pis_aliquota ?? 0,
+    pis_aliquota_configurada: !!product.pis_aliquota_configurada, pis_valor: product.pis_valor || 0,
+    cofins_cst: product.cofins_cst || "", cofins_base: product.cofins_base || 0, cofins_aliquota: product.cofins_aliquota ?? 0,
+    cofins_aliquota_configurada: !!product.cofins_aliquota_configurada, cofins_valor: product.cofins_valor || 0,
+    ibs_cbs_cst: product.ibs_cbs_cst || "", classificacao_tributaria: product.classificacao_tributaria || "",
+    ibs_aliquota: product.ibs_aliquota ?? 0, ibs_aliquota_configurada: !!product.ibs_aliquota_configurada,
+    cbs_aliquota: product.cbs_aliquota ?? 0, cbs_aliquota_configurada: !!product.cbs_aliquota_configurada,
+    accountant_approved: !!product.accountant_approved, fiscal_review_date: product.fiscal_review_date || ""
+  };
+};
 
 export default function FiscalInvoiceForm() {
   const companyId = localStorage.getItem("selectedCompanyId");
@@ -108,25 +129,15 @@ export default function FiscalInvoiceForm() {
         items: (sale.items || []).map((item, i) => {
           const product = products.find(p => p.id === item.product_id);
           return {
-            sequence: i + 1,
-            product_id: item.product_id,
-            product_name: item.product_name,
-            product_code: product?.code || "",
-            ncm: product?.ncm || "",
-            cfop: product?.cfop || "5102",
-            cst: product?.icms_cst || "",
-            ibs_aliquota: product?.ibs_aliquota || 0,
-            cbs_aliquota: product?.cbs_aliquota || 0,
-            unit: item.unit || product?.unit || "TON",
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            discount: item.discount || 0,
-            total: item.total
+            sequence: i + 1, ...fiscalSnapshot(product, config, prev.recipient_address?.uf),
+            product_id: item.product_id, product_name: product?.fiscal_description || item.product_name,
+            unit: item.unit || product?.unit || "TON", quantity: item.quantity, unit_price: item.unit_price,
+            discount: item.discount || 0, total: item.total
           };
         })
       }));
     }
-  }, [sale, products]);
+  }, [sale, products, config]);
 
   const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -156,15 +167,7 @@ export default function FiscalInvoiceForm() {
       const items = [...prev.items];
       items[idx] = {
         ...items[idx],
-        product_id: product.id,
-        product_name: product.name,
-        product_code: product.code || "",
-        ncm: product.ncm || "",
-        cfop: product.cfop || "5102",
-        cst: product.icms_cst || "",
-        ibs_aliquota: product.ibs_aliquota || 0,
-        cbs_aliquota: product.cbs_aliquota || 0,
-        unit: product.unit || items[idx].unit
+        ...fiscalSnapshot(product, config, prev.recipient_address?.uf)
       };
       return { ...prev, items };
     });
@@ -380,11 +383,11 @@ export default function FiscalInvoiceForm() {
                       <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Selecionar produto" /></SelectTrigger>
                       <SelectContent>{products.map(product => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Input value={item.product_name} onChange={e => updateItem(idx, "product_name", e.target.value)} className="h-7 text-xs" />
+                    <Input value={item.product_name} readOnly className="h-7 text-xs bg-slate-50" />
                   </td>
                   <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-7 text-xs" placeholder="00000000" /></td>
                   <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-7 text-xs" /></td>
-                  <td className="px-3 py-2"><Input value={item.cst || ""} onChange={e => updateItem(idx, "cst", e.target.value)} className="h-7 text-xs" placeholder="00 ou 102" /></td>
+                  <td className="px-3 py-2"><Input value={(config?.crt === 1 ? item.csosn : item.cst) || ""} readOnly className="h-7 text-xs bg-slate-50" placeholder={config?.crt === 1 ? "CSOSN" : "CST"} /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2">

@@ -4,19 +4,22 @@
   "properties": {
     "code": {
       "type": "string",
-      "description": "C\u00f3digo \u00fanico do produto (PROD000001)"
+      "description": "C\u00f3digo \u00fanico do produto"
     },
     "name": {
       "type": "string",
-      "description": "Nome do produto"
+      "description": "Nome comercial"
     },
     "description": {
       "type": "string",
-      "description": "Descri\u00e7\u00e3o detalhada"
+      "description": "Descri\u00e7\u00e3o comercial"
+    },
+    "fiscal_description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o fiscal usada na NF-e/NFC-e"
     },
     "category": {
-      "type": "string",
-      "description": "Categoria do produto"
+      "type": "string"
     },
     "material_type": {
       "type": "string",
@@ -26,8 +29,7 @@
         "mercadoria",
         "insumo"
       ],
-      "default": "mercadoria",
-      "description": "Tipo do material"
+      "default": "mercadoria"
     },
     "condition": {
       "type": "string",
@@ -36,12 +38,10 @@
         "usado",
         "recondicionado"
       ],
-      "default": "novo",
-      "description": "Condi\u00e7\u00e3o do produto"
+      "default": "novo"
     },
     "size": {
-      "type": "string",
-      "description": "Tamanho"
+      "type": "string"
     },
     "unit": {
       "type": "string",
@@ -54,51 +54,50 @@
         "M2",
         "M3"
       ],
-      "default": "UN",
-      "description": "Unidade de medida"
+      "default": "UN"
     },
     "cost_price": {
-      "type": "number",
-      "description": "Pre\u00e7o de custo"
+      "type": "number"
     },
     "sale_price": {
-      "type": "number",
-      "description": "Pre\u00e7o de venda"
+      "type": "number"
     },
     "profit_margin": {
-      "type": "number",
-      "description": "Margem de lucro (%)"
+      "type": "number"
     },
     "min_stock": {
       "type": "number",
-      "default": 0,
-      "description": "Estoque m\u00ednimo"
+      "default": 0
     },
     "max_stock": {
       "type": "number",
-      "default": 0,
-      "description": "Estoque m\u00e1ximo"
+      "default": 0
     },
     "current_stock": {
       "type": "number",
-      "default": 0,
-      "description": "Estoque atual calculado"
+      "default": 0
     },
     "image_url": {
-      "type": "string",
-      "description": "URL da imagem do produto"
+      "type": "string"
     },
     "ncm": {
       "type": "string",
       "description": "NCM com 8 d\u00edgitos"
     },
     "cest": {
-      "type": "string",
-      "description": "CEST, quando aplic\u00e1vel"
+      "type": "string"
     },
     "cfop": {
       "type": "string",
-      "description": "CFOP padr\u00e3o da opera\u00e7\u00e3o"
+      "description": "CFOP legado"
+    },
+    "cfop_internal": {
+      "type": "string",
+      "description": "CFOP para opera\u00e7\u00e3o interna"
+    },
+    "cfop_interstate": {
+      "type": "string",
+      "description": "CFOP para opera\u00e7\u00e3o interestadual"
     },
     "origem_mercadoria": {
       "type": "string",
@@ -113,66 +112,181 @@
         "7",
         "8"
       ],
-      "default": "0",
-      "description": "C\u00f3digo de origem da mercadoria"
+      "default": "0"
+    },
+    "tax_classification": {
+      "type": "string",
+      "enum": [
+        "tributada_integralmente",
+        "isenta",
+        "nao_tributada",
+        "diferida",
+        "suspensa",
+        "icms_cobrado_anteriormente",
+        "substituicao_tributaria",
+        "outra"
+      ]
     },
     "icms_cst": {
       "type": "string",
-      "description": "CST do ICMS para CRT 2 ou 3"
+      "description": "CST para CRT 2 ou 3"
+    },
+    "icms_csosn": {
+      "type": "string",
+      "description": "CSOSN para CRT 1"
     },
     "icms_aliquota": {
       "type": "number",
-      "default": 0,
-      "description": "Al\u00edquota de ICMS (%)"
+      "default": 0
+    },
+    "icms_aliquota_configurada": {
+      "type": "boolean",
+      "default": false
+    },
+    "icms_modalidade_base": {
+      "type": "string"
+    },
+    "icms_reducao_base": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_base": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_valor": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_desonerado": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_motivo_desoneracao": {
+      "type": "string"
+    },
+    "fcp_aliquota": {
+      "type": "number",
+      "default": 0
     },
     "pis_cst": {
-      "type": "string",
-      "description": "CST do PIS"
+      "type": "string"
     },
     "pis_aliquota": {
       "type": "number",
-      "default": 0,
-      "description": "Al\u00edquota de PIS (%)"
+      "default": 0
+    },
+    "pis_aliquota_configurada": {
+      "type": "boolean",
+      "default": false
+    },
+    "pis_base": {
+      "type": "number",
+      "default": 0
+    },
+    "pis_valor": {
+      "type": "number",
+      "default": 0
     },
     "cofins_cst": {
-      "type": "string",
-      "description": "CST da COFINS"
+      "type": "string"
     },
     "cofins_aliquota": {
       "type": "number",
-      "default": 0,
-      "description": "Al\u00edquota de COFINS (%)"
+      "default": 0
+    },
+    "cofins_aliquota_configurada": {
+      "type": "boolean",
+      "default": false
+    },
+    "cofins_base": {
+      "type": "number",
+      "default": 0
+    },
+    "cofins_valor": {
+      "type": "number",
+      "default": 0
+    },
+    "ipi_aplicavel": {
+      "type": "boolean",
+      "default": false
+    },
+    "ipi_cst": {
+      "type": "string"
+    },
+    "ipi_aliquota": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_st_aplicavel": {
+      "type": "boolean",
+      "default": false
+    },
+    "icms_st_base": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_st_aliquota": {
+      "type": "number",
+      "default": 0
+    },
+    "icms_st_valor": {
+      "type": "number",
+      "default": 0
+    },
+    "mva": {
+      "type": "number",
+      "default": 0
     },
     "ibs_cbs_cst": {
-      "type": "string",
-      "description": "CST do IBS/CBS"
+      "type": "string"
     },
     "classificacao_tributaria": {
       "type": "string",
-      "description": "C\u00f3digo de classifica\u00e7\u00e3o tribut\u00e1ria do IBS/CBS (cClassTrib)"
+      "description": "cClassTrib IBS/CBS"
     },
     "ibs_aliquota": {
       "type": "number",
-      "default": 0,
-      "description": "Al\u00edquota de IBS (%)"
+      "default": 0
+    },
+    "ibs_aliquota_configurada": {
+      "type": "boolean",
+      "default": false
     },
     "cbs_aliquota": {
       "type": "number",
-      "default": 0,
-      "description": "Al\u00edquota de CBS (%)"
+      "default": 0
+    },
+    "cbs_aliquota_configurada": {
+      "type": "boolean",
+      "default": false
     },
     "beneficio_fiscal": {
+      "type": "string"
+    },
+    "retencoes": {
+      "type": "string"
+    },
+    "fundamento_legal": {
+      "type": "string"
+    },
+    "observacao_fiscal": {
+      "type": "string"
+    },
+    "accountant_approved": {
+      "type": "boolean",
+      "default": false
+    },
+    "fiscal_review_date": {
       "type": "string",
-      "description": "C\u00f3digo de benef\u00edcio fiscal, quando aplic\u00e1vel"
+      "format": "date"
     },
     "company_id": {
-      "type": "string",
-      "description": "ID da empresa/filial"
+      "type": "string"
     },
     "is_active": {
       "type": "boolean",
-      "default": true,
-      "description": "Produto ativo"
+      "default": true
     }
   },
   "required": [

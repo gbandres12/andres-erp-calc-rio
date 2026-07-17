@@ -3,12 +3,10 @@
   "type": "object",
   "properties": {
     "reference": {
-      "type": "string",
-      "description": "Refer\u00eancia interna (NF-000001)"
+      "type": "string"
     },
     "company_id": {
-      "type": "string",
-      "description": "ID da empresa"
+      "type": "string"
     },
     "document_type": {
       "type": "string",
@@ -24,8 +22,7 @@
       "default": "1"
     },
     "number": {
-      "type": "number",
-      "description": "N\u00famero da nota"
+      "type": "number"
     },
     "status": {
       "type": "string",
@@ -53,16 +50,13 @@
     },
     "issue_date": {
       "type": "string",
-      "format": "date",
-      "description": "Data de emiss\u00e3o"
+      "format": "date"
     },
     "nature_operation": {
-      "type": "string",
-      "description": "Natureza da opera\u00e7\u00e3o"
+      "type": "string"
     },
     "recipient_id": {
-      "type": "string",
-      "description": "ID do contato/cliente"
+      "type": "string"
     },
     "recipient_name": {
       "type": "string"
@@ -74,16 +68,13 @@
       "type": "string"
     },
     "recipient_ie": {
-      "type": "string",
-      "description": "Inscri\u00e7\u00e3o estadual destinat\u00e1rio"
+      "type": "string"
     },
     "recipient_address": {
-      "type": "object",
-      "description": "Endere\u00e7o destinat\u00e1rio completo"
+      "type": "object"
     },
     "items": {
       "type": "array",
-      "description": "Itens da nota fiscal",
       "items": {
         "type": "object",
         "properties": {
@@ -100,26 +91,22 @@
             "type": "string"
           },
           "ncm": {
-            "type": "string",
-            "description": "C\u00f3digo NCM 8 d\u00edgitos"
+            "type": "string"
+          },
+          "cest": {
+            "type": "string"
           },
           "cfop": {
-            "type": "string",
-            "description": "CFOP 4 d\u00edgitos"
+            "type": "string"
+          },
+          "tax_classification": {
+            "type": "string"
           },
           "cst": {
-            "type": "string",
-            "description": "CST ou CSOSN"
+            "type": "string"
           },
-          "ibs_aliquota": {
-            "type": "number",
-            "default": 0,
-            "description": "Al\u00edquota de IBS (%)"
-          },
-          "cbs_aliquota": {
-            "type": "number",
-            "default": 0,
-            "description": "Al\u00edquota de CBS (%)"
+          "csosn": {
+            "type": "string"
           },
           "unit": {
             "type": "string"
@@ -140,6 +127,9 @@
           "icms_cst": {
             "type": "string"
           },
+          "icms_csosn": {
+            "type": "string"
+          },
           "icms_base": {
             "type": "number",
             "default": 0
@@ -148,6 +138,10 @@
             "type": "number",
             "default": 0
           },
+          "icms_aliquota_configurada": {
+            "type": "boolean",
+            "default": false
+          },
           "icms_valor": {
             "type": "number",
             "default": 0
@@ -155,9 +149,17 @@
           "pis_cst": {
             "type": "string"
           },
+          "pis_base": {
+            "type": "number",
+            "default": 0
+          },
           "pis_aliquota": {
             "type": "number",
             "default": 0
+          },
+          "pis_aliquota_configurada": {
+            "type": "boolean",
+            "default": false
           },
           "pis_valor": {
             "type": "number",
@@ -166,13 +168,51 @@
           "cofins_cst": {
             "type": "string"
           },
+          "cofins_base": {
+            "type": "number",
+            "default": 0
+          },
           "cofins_aliquota": {
             "type": "number",
             "default": 0
           },
+          "cofins_aliquota_configurada": {
+            "type": "boolean",
+            "default": false
+          },
           "cofins_valor": {
             "type": "number",
             "default": 0
+          },
+          "ibs_cbs_cst": {
+            "type": "string"
+          },
+          "classificacao_tributaria": {
+            "type": "string"
+          },
+          "ibs_aliquota": {
+            "type": "number",
+            "default": 0
+          },
+          "ibs_aliquota_configurada": {
+            "type": "boolean",
+            "default": false
+          },
+          "cbs_aliquota": {
+            "type": "number",
+            "default": 0
+          },
+          "cbs_aliquota_configurada": {
+            "type": "boolean",
+            "default": false
+          },
+          "accountant_approved": {
+            "type": "boolean",
+            "default": false
+          },
+          "fiscal_review_date": {
+            "type": "string",
+            "format": "date"
           }
         }
       }
@@ -214,14 +254,14 @@
         "04",
         "05",
         "15",
+        "17",
+        "18",
         "90",
         "99"
-      ],
-      "description": "01=Dinheiro, 02=Cheque, 03=Cart\u00e3o Cr\u00e9dito, 04=Cart\u00e3o D\u00e9bito, 05=Cr\u00e9dito Loja, 15=Boleto, 90=Sem Pagamento, 99=Outros"
+      ]
     },
     "sale_id": {
-      "type": "string",
-      "description": "ID da venda de origem"
+      "type": "string"
     },
     "origin": {
       "type": "string",
@@ -233,28 +273,22 @@
       "default": "manual"
     },
     "api_reference": {
-      "type": "string",
-      "description": "ID da nota na NotaAs"
+      "type": "string"
     },
     "api_status": {
-      "type": "string",
-      "description": "Status retornado pela API NotaAs"
+      "type": "string"
     },
     "api_protocol": {
-      "type": "string",
-      "description": "Protocolo de autoriza\u00e7\u00e3o SEFAZ"
+      "type": "string"
     },
     "api_access_key": {
-      "type": "string",
-      "description": "Chave de acesso 44 d\u00edgitos"
+      "type": "string"
     },
     "xml_url": {
-      "type": "string",
-      "description": "URL do XML autorizado"
+      "type": "string"
     },
     "pdf_url": {
-      "type": "string",
-      "description": "URL do DANFE/PDF"
+      "type": "string"
     },
     "cancel_reason": {
       "type": "string"
@@ -278,8 +312,7 @@
       "format": "date-time"
     },
     "idempotency_key": {
-      "type": "string",
-      "description": "Chave \u00fanica para evitar duplicidade"
+      "type": "string"
     },
     "notes": {
       "type": "string"

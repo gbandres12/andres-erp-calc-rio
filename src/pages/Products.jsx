@@ -14,6 +14,18 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ProductFiscalFields from "@/components/products/ProductFiscalFields";
 
+const INITIAL_PRODUCT = {
+  name: "", description: "", fiscal_description: "", category: "", condition: "novo", size: "", unit: "UN",
+  cost_price: 0, sale_price: 0, profit_margin: 0, min_stock: 0, max_stock: 0, ncm: "", cest: "",
+  cfop: "", cfop_internal: "", cfop_interstate: "", origem_mercadoria: "0", tax_classification: "",
+  icms_cst: "", icms_csosn: "", icms_aliquota: "", icms_aliquota_configurada: false,
+  pis_cst: "", pis_aliquota: "", pis_aliquota_configurada: false,
+  cofins_cst: "", cofins_aliquota: "", cofins_aliquota_configurada: false,
+  ibs_cbs_cst: "", classificacao_tributaria: "", ibs_aliquota: "", ibs_aliquota_configurada: false,
+  cbs_aliquota: "", cbs_aliquota_configurada: false, fundamento_legal: "", observacao_fiscal: "",
+  accountant_approved: false, fiscal_review_date: ""
+};
+
 export default function Products() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -23,34 +35,7 @@ export default function Products() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [importFile, setImportFile] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    category: "",
-    condition: "novo",
-    size: "",
-    unit: "UN",
-    cost_price: 0,
-    sale_price: 0,
-    profit_margin: 0,
-    min_stock: 0,
-    max_stock: 0,
-    ncm: "",
-    cest: "",
-    cfop: "5102",
-    origem_mercadoria: "0",
-    icms_cst: "",
-    icms_aliquota: 0,
-    pis_cst: "",
-    pis_aliquota: 0,
-    cofins_cst: "",
-    cofins_aliquota: 0,
-    ibs_cbs_cst: "",
-    classificacao_tributaria: "",
-    ibs_aliquota: 0,
-    cbs_aliquota: 0,
-    beneficio_fiscal: ""
-  });
+  const [formData, setFormData] = useState({ ...INITIAL_PRODUCT });
 
   // Query CORRIGIDA - SEM filtro por company_id
   const { data: products = [], isLoading, isFetching, refetch } = useQuery({
@@ -156,19 +141,7 @@ export default function Products() {
   });
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      description: "",
-      category: "",
-      condition: "novo",
-      size: "",
-      unit: "UN",
-      cost_price: 0,
-      sale_price: 0,
-      profit_margin: 0,
-      min_stock: 0,
-      max_stock: 0
-    });
+    setFormData({ ...INITIAL_PRODUCT });
     setEditingProduct(null);
   };
 
@@ -232,34 +205,7 @@ export default function Products() {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
-    setFormData({
-      name: product.name || "",
-      description: product.description || "",
-      category: product.category || "",
-      condition: product.condition || "novo",
-      size: product.size || "",
-      unit: product.unit || "UN",
-      cost_price: product.cost_price || 0,
-      sale_price: product.sale_price || 0,
-      profit_margin: product.profit_margin || 0,
-      min_stock: product.min_stock || 0,
-      max_stock: product.max_stock || 0,
-      ncm: product.ncm || "",
-      cest: product.cest || "",
-      cfop: product.cfop || "5102",
-      origem_mercadoria: product.origem_mercadoria || "0",
-      icms_cst: product.icms_cst || "",
-      icms_aliquota: product.icms_aliquota || 0,
-      pis_cst: product.pis_cst || "",
-      pis_aliquota: product.pis_aliquota || 0,
-      cofins_cst: product.cofins_cst || "",
-      cofins_aliquota: product.cofins_aliquota || 0,
-      ibs_cbs_cst: product.ibs_cbs_cst || "",
-      classificacao_tributaria: product.classificacao_tributaria || "",
-      ibs_aliquota: product.ibs_aliquota || 0,
-      cbs_aliquota: product.cbs_aliquota || 0,
-      beneficio_fiscal: product.beneficio_fiscal || ""
-    });
+    setFormData({ ...INITIAL_PRODUCT, ...product });
     setIsDialogOpen(true);
   };
 
