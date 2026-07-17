@@ -224,11 +224,11 @@
     },
     "api_reference": {
       "type": "string",
-      "description": "Refer\u00eancia usada no Focus NFe (referencia_externa)"
+      "description": "ID da nota na NotaAs"
     },
     "api_status": {
       "type": "string",
-      "description": "Status retornado pela API Focus NFe"
+      "description": "Status retornado pela API NotaAs"
     },
     "api_protocol": {
       "type": "string",
@@ -285,9 +285,18 @@
   ],
   "rls": {
     "create": {
-      "data.company_id": {
-        "$in": "{{user.data.allowed_companies}}"
-      }
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     },
     "read": {
       "$or": [
