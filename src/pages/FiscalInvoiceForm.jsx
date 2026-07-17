@@ -35,7 +35,7 @@ export default function FiscalInvoiceForm() {
     serie: "1",
     status: "rascunho",
     origin: saleId ? "from_sale" : "manual",
-    sale_id: saleId || null,
+    ...(saleId ? { sale_id: saleId } : {}),
     issue_date: new Date().toISOString().split("T")[0],
     nature_operation: "Venda de produto",
     payment_method: "99",
