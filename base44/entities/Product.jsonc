@@ -27,7 +27,7 @@
         "insumo"
       ],
       "default": "mercadoria",
-      "description": "Tipo do material (Bruto=Pedra, Processado=P\u00f3, etc)"
+      "description": "Tipo do material"
     },
     "condition": {
       "type": "string",
@@ -87,6 +87,83 @@
     "image_url": {
       "type": "string",
       "description": "URL da imagem do produto"
+    },
+    "ncm": {
+      "type": "string",
+      "description": "NCM com 8 d\u00edgitos"
+    },
+    "cest": {
+      "type": "string",
+      "description": "CEST, quando aplic\u00e1vel"
+    },
+    "cfop": {
+      "type": "string",
+      "description": "CFOP padr\u00e3o da opera\u00e7\u00e3o"
+    },
+    "origem_mercadoria": {
+      "type": "string",
+      "enum": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "default": "0",
+      "description": "C\u00f3digo de origem da mercadoria"
+    },
+    "icms_cst": {
+      "type": "string",
+      "description": "CST do ICMS para CRT 2 ou 3"
+    },
+    "icms_aliquota": {
+      "type": "number",
+      "default": 0,
+      "description": "Al\u00edquota de ICMS (%)"
+    },
+    "pis_cst": {
+      "type": "string",
+      "description": "CST do PIS"
+    },
+    "pis_aliquota": {
+      "type": "number",
+      "default": 0,
+      "description": "Al\u00edquota de PIS (%)"
+    },
+    "cofins_cst": {
+      "type": "string",
+      "description": "CST da COFINS"
+    },
+    "cofins_aliquota": {
+      "type": "number",
+      "default": 0,
+      "description": "Al\u00edquota de COFINS (%)"
+    },
+    "ibs_cbs_cst": {
+      "type": "string",
+      "description": "CST do IBS/CBS"
+    },
+    "classificacao_tributaria": {
+      "type": "string",
+      "description": "C\u00f3digo de classifica\u00e7\u00e3o tribut\u00e1ria do IBS/CBS (cClassTrib)"
+    },
+    "ibs_aliquota": {
+      "type": "number",
+      "default": 0,
+      "description": "Al\u00edquota de IBS (%)"
+    },
+    "cbs_aliquota": {
+      "type": "number",
+      "default": 0,
+      "description": "Al\u00edquota de CBS (%)"
+    },
+    "beneficio_fiscal": {
+      "type": "string",
+      "description": "C\u00f3digo de benef\u00edcio fiscal, quando aplic\u00e1vel"
     },
     "company_id": {
       "type": "string",

@@ -12,6 +12,7 @@ import { Package, Plus, Search, Edit, Trash2, Building2, Loader2, Upload, Downlo
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import ProductFiscalFields from "@/components/products/ProductFiscalFields";
 
 export default function Products() {
   const queryClient = useQueryClient();
@@ -33,7 +34,22 @@ export default function Products() {
     sale_price: 0,
     profit_margin: 0,
     min_stock: 0,
-    max_stock: 0
+    max_stock: 0,
+    ncm: "",
+    cest: "",
+    cfop: "5102",
+    origem_mercadoria: "0",
+    icms_cst: "",
+    icms_aliquota: 0,
+    pis_cst: "",
+    pis_aliquota: 0,
+    cofins_cst: "",
+    cofins_aliquota: 0,
+    ibs_cbs_cst: "",
+    classificacao_tributaria: "",
+    ibs_aliquota: 0,
+    cbs_aliquota: 0,
+    beneficio_fiscal: ""
   });
 
   // Query CORRIGIDA - SEM filtro por company_id
@@ -227,7 +243,22 @@ export default function Products() {
       sale_price: product.sale_price || 0,
       profit_margin: product.profit_margin || 0,
       min_stock: product.min_stock || 0,
-      max_stock: product.max_stock || 0
+      max_stock: product.max_stock || 0,
+      ncm: product.ncm || "",
+      cest: product.cest || "",
+      cfop: product.cfop || "5102",
+      origem_mercadoria: product.origem_mercadoria || "0",
+      icms_cst: product.icms_cst || "",
+      icms_aliquota: product.icms_aliquota || 0,
+      pis_cst: product.pis_cst || "",
+      pis_aliquota: product.pis_aliquota || 0,
+      cofins_cst: product.cofins_cst || "",
+      cofins_aliquota: product.cofins_aliquota || 0,
+      ibs_cbs_cst: product.ibs_cbs_cst || "",
+      classificacao_tributaria: product.classificacao_tributaria || "",
+      ibs_aliquota: product.ibs_aliquota || 0,
+      cbs_aliquota: product.cbs_aliquota || 0,
+      beneficio_fiscal: product.beneficio_fiscal || ""
     });
     setIsDialogOpen(true);
   };
@@ -697,6 +728,10 @@ export default function Products() {
                     />
                   </div>
                 </div>
+                <ProductFiscalFields
+                  value={formData}
+                  onChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
+                />
                 <div className="flex justify-end gap-3 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
