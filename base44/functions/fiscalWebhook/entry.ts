@@ -5,10 +5,27 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.text();
+    let payload;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      return Response.json({ error: 'Payload inválido' }, { status: 400 });
+    }
+
+    const event = payload.event || req.headers.get('X-Notaas-Event');
+    const data = payload.data || {};
+    const supportedEvents = ['nfe.issued', 'nfe.error', 'nfe.cancelled'];
+    if (!supportedEvents.includes(event)) {
+      return Response.json({ ok: true, note: 'Teste recebido' });
+    }
+
     const secret = Deno.env.get('NOTAAS_WEBHOOK_SECRET');
     const signature = req.headers.get('X-Notaas-Signature')?.trim().toLowerCase();
 
-    if (!secret || !signature) {
+    if (!secret) {
+      return Response.json({ error: 'Segredo do webhook indisponível' }, { status: 500 });
+    }
+    if (!signature) {
       return Response.json({ error: 'Assinatura ausente' }, { status: 401 });
     }
 
@@ -21,7 +38,7 @@ Deno.serve(async (req) => {
       ['sign']
     );
     const signed = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-    const expected = Array.from(new Uint8Array(signed))
+    const expected = 'sha256=' + Array.from(new Uint8Array(signed))
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('');
 
@@ -32,20 +49,6 @@ Deno.serve(async (req) => {
     }
     if (difference !== 0) {
       return Response.json({ error: 'Assinatura inválida' }, { status: 401 });
-    }
-
-    let payload;
-    try {
-      payload = JSON.parse(body);
-    } catch {
-      return Response.json({ error: 'Payload inválido' }, { status: 400 });
-    }
-
-    const event = payload.event || req.headers.get('X-Notaas-Event');
-    const data = payload.data || {};
-    const supportedEvents = ['nfe.issued', 'nfe.error', 'nfe.cancelled'];
-    if (!supportedEvents.includes(event)) {
-      return Response.json({ ok: true, note: 'Evento ignorado' });
     }
 
     const invoiceId = data.invoiceId;
