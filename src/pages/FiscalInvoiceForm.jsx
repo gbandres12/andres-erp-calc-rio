@@ -56,6 +56,12 @@ export default function FiscalInvoiceForm() {
     enabled: !!companyId
   });
 
+  const { data: products = [] } = useQuery({
+    queryKey: ["fiscal_products", companyId],
+    queryFn: () => base44.entities.Product.filter({ company_id: companyId, is_active: true }, "name", 200),
+    enabled: !!companyId
+  });
+
   const config = configs[0];
 
   const { data: existingInvoice } = useQuery({
@@ -99,25 +105,28 @@ export default function FiscalInvoiceForm() {
         discount_total: sale.discount || 0,
         shipping: sale.shipping || 0,
         total: sale.total,
-        items: (sale.items || []).map((item, i) => ({
-          sequence: i + 1,
-          product_id: item.product_id,
-          product_name: item.product_name,
-          product_code: "",
-          ncm: "",
-          cfop: "5102",
-          cst: "",
-          ibs_aliquota: 0,
-          cbs_aliquota: 0,
-          unit: item.unit || "TON",
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          discount: item.discount || 0,
-          total: item.total
-        }))
+        items: (sale.items || []).map((item, i) => {
+          const product = products.find(p => p.id === item.product_id);
+          return {
+            sequence: i + 1,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            product_code: product?.code || "",
+            ncm: product?.ncm || "",
+            cfop: product?.cfop || "5102",
+            cst: product?.icms_cst || "",
+            ibs_aliquota: product?.ibs_aliquota || 0,
+            cbs_aliquota: product?.cbs_aliquota || 0,
+            unit: item.unit || product?.unit || "TON",
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount: item.discount || 0,
+            total: item.total
+          };
+        })
       }));
     }
-  }, [sale]);
+  }, [sale, products]);
 
   const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -137,6 +146,27 @@ export default function FiscalInvoiceForm() {
       const discount_total = items.reduce((s, i) => s + (parseFloat(i.discount) || 0), 0);
       const total = subtotal + (parseFloat(prev.shipping) || 0);
       return { ...prev, items, subtotal, discount_total, total };
+    });
+  };
+
+  const selectProduct = (idx, productId) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    setForm(prev => {
+      const items = [...prev.items];
+      items[idx] = {
+        ...items[idx],
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.code || "",
+        ncm: product.ncm || "",
+        cfop: product.cfop || "5102",
+        cst: product.icms_cst || "",
+        ibs_aliquota: product.ibs_aliquota || 0,
+        cbs_aliquota: product.cbs_aliquota || 0,
+        unit: product.unit || items[idx].unit
+      };
+      return { ...prev, items };
     });
   };
 
@@ -327,7 +357,7 @@ export default function FiscalInvoiceForm() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-8">#</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-40">Descrição</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-56">Produto / Descrição</th>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-24">NCM</th>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CFOP</th>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CST</th>
@@ -345,7 +375,13 @@ export default function FiscalInvoiceForm() {
               {form.items.map((item, idx) => (
                 <tr key={idx}>
                   <td className="px-3 py-2 text-slate-400">{item.sequence}</td>
-                  <td className="px-3 py-2"><Input value={item.product_name} onChange={e => updateItem(idx, "product_name", e.target.value)} className="h-7 text-xs" /></td>
+                  <td className="px-3 py-2 space-y-1">
+                    <Select value={item.product_id || ""} onValueChange={value => selectProduct(idx, value)}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Selecionar produto" /></SelectTrigger>
+                      <SelectContent>{products.map(product => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input value={item.product_name} onChange={e => updateItem(idx, "product_name", e.target.value)} className="h-7 text-xs" />
+                  </td>
                   <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-7 text-xs" placeholder="00000000" /></td>
                   <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-7 text-xs" /></td>
                   <td className="px-3 py-2"><Input value={item.cst || ""} onChange={e => updateItem(idx, "cst", e.target.value)} className="h-7 text-xs" placeholder="00 ou 102" /></td>

@@ -17,8 +17,8 @@ export default function ProductFiscalFields({ value, onChange }) {
   const update = (field, raw, type) => onChange(field, type === "number" ? (raw === "" ? "" : Number(raw)) : raw);
   return (
     <section className="border-t border-slate-200 pt-4">
-      <h3 className="font-semibold text-slate-800 mb-1">Dados fiscais</h3>
-      <p className="text-xs text-slate-500 mb-4">Preencha conforme a orientação da contabilidade.</p>
+      <h3 className="font-semibold text-slate-800 mb-1">Tributação padrão do produto</h3>
+      <p className="text-xs text-slate-500 mb-4">CST e alíquotas cadastrados aqui serão preenchidos automaticamente no emissor fiscal.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {fields.map(([field, label, placeholder, type]) => (
           <div key={field} className="space-y-2">
