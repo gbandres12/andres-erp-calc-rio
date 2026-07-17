@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
     if (validationError) return Response.json({ error: validationError }, { status: 400 });
 
     const payload = buildNotaAsPayload(invoice, config);
+    const payloadSummary = summarizePayload(payload);
     const startTime = Date.now();
     let apiResponse;
     let apiData;
@@ -49,14 +50,14 @@ Deno.serve(async (req) => {
         apiData = { message: responseText || `HTTP ${apiResponse.status}` };
       }
     } catch (fetchError) {
-      await recordFailure(base44, invoice, invoiceId, user.id, fetchError.message, Date.now() - startTime);
+      await recordFailure(base44, invoice, invoiceId, user.id, fetchError.message, Date.now() - startTime, 502, {}, payloadSummary);
       return Response.json({ error: 'Erro de comunicação com a NotaAs', details: fetchError.message }, { status: 502 });
     }
 
     const duration = Date.now() - startTime;
     if (!apiResponse.ok) {
       const errorMessage = extractError(apiData, apiResponse.status);
-      await recordFailure(base44, invoice, invoiceId, user.id, errorMessage, duration, apiResponse.status, apiData);
+      await recordFailure(base44, invoice, invoiceId, user.id, errorMessage, duration, apiResponse.status, apiData, payloadSummary);
       return Response.json({ error: errorMessage }, { status: apiResponse.status });
     }
 
@@ -80,6 +81,7 @@ Deno.serve(async (req) => {
       event_type: 'emissao',
       status: 'sucesso',
       http_status: apiResponse.status,
+      request_summary: JSON.stringify(payloadSummary),
       response_summary: JSON.stringify(apiData).slice(0, 500),
       duration_ms: duration,
       triggered_by: user.id
@@ -98,8 +100,16 @@ function validateInvoice(invoice) {
   if (!address.logradouro || !address.bairro || !address.municipio || !address.uf || !address.cep) {
     return 'Complete o endereço do destinatário: logradouro, bairro, município, UF e CEP';
   }
-  if (!address.codigoMunicipio) return 'Informe o código IBGE do município do destinatário';
+  if (!/^\d{7}$/.test(String(address.codigoMunicipio || ''))) return 'Informe o código IBGE de 7 dígitos do município do destinatário';
   if (!invoice.items?.length) return 'Adicione pelo menos um item à nota';
+  for (const [index, item] of invoice.items.entries()) {
+    if (!item.product_name) return `Informe a descrição do produto no item ${index + 1}`;
+    if (!/^\d{8}$/.test(String(item.ncm || '').replace(/\D/g, ''))) return `Informe um NCM de 8 dígitos no item ${index + 1}`;
+    if (!/^\d{4}$/.test(String(item.cfop || '').replace(/\D/g, ''))) return `Informe um CFOP de 4 dígitos no item ${index + 1}`;
+    if (!(Number(item.quantity) > 0)) return `A quantidade do item ${index + 1} deve ser maior que zero`;
+    if (!(Number(item.unit_price) > 0)) return `O valor unitário do item ${index + 1} deve ser maior que zero`;
+  }
+  if (!(Number(invoice.total) > 0)) return 'O valor total da nota deve ser maior que zero';
   return null;
 }
 
@@ -119,7 +129,12 @@ function buildNotaAsPayload(invoice, config) {
     }
   };
   dest[document.length === 14 ? 'cnpj' : 'cpf'] = document;
-  if (invoice.recipient_ie) dest.ie = invoice.recipient_ie;
+  if (invoice.recipient_ie) {
+    dest.ie = invoice.recipient_ie;
+    dest.indicadorIE = 1;
+  } else {
+    dest.indicadorIE = 9;
+  }
   if (invoice.recipient_email) dest.email = invoice.recipient_email;
 
   return {
@@ -133,18 +148,25 @@ function buildNotaAsPayload(invoice, config) {
     dest,
     items: invoice.items.map((item, index) => {
       const fiscalCode = item.icms_cst || item.cst;
+      const quantidade = Number(item.quantity);
+      const valorUnitario = Number(item.unit_price);
+      const totalInformado = Number(item.total);
+      const valorTotal = totalInformado > 0 ? totalInformado : Number((quantidade * valorUnitario).toFixed(2));
       const mapped = {
         codigo: item.product_code || `PRD${String(index + 1).padStart(3, '0')}`,
         descricao: item.product_name,
         ncm: String(item.ncm || '').replace(/\D/g, ''),
-        cfop: item.cfop || '5102',
+        cfop: String(item.cfop || '5102').replace(/\D/g, ''),
         unidade: item.unit || 'UN',
-        quantidade: Number(item.quantity),
-        valorUnitario: Number(item.unit_price),
-        valorTotal: Number(item.total),
+        quantidade,
+        valorUnitario,
+        valorTotal,
         desconto: Number(item.discount || 0)
       };
       if (fiscalCode) mapped[fiscalCode.length === 3 ? 'csosn' : 'cst'] = fiscalCode;
+      if (Number(item.icms_aliquota) > 0) mapped.aliquotaIcms = Number(item.icms_aliquota);
+      if (Number(item.pis_aliquota) > 0) mapped.aliquotaPis = Number(item.pis_aliquota);
+      if (Number(item.cofins_aliquota) > 0) mapped.aliquotaCofins = Number(item.cofins_aliquota);
       return mapped;
     }),
     pagamentos: [{
@@ -152,6 +174,18 @@ function buildNotaAsPayload(invoice, config) {
       valor: Number(invoice.total)
     }],
     infCpl: sanitizeFiscalText(invoice.notes)
+  };
+}
+
+function summarizePayload(payload) {
+  return {
+    modelo: payload.modelo,
+    naturezaOperacao: payload.naturezaOperacao,
+    destinatarioInformado: Boolean(payload.dest?.nome && (payload.dest?.cpf || payload.dest?.cnpj)),
+    quantidadeItens: payload.items.length,
+    produtos: payload.items.map((item) => item.descricao),
+    valorProdutos: Number(payload.items.reduce((sum, item) => sum + item.valorTotal, 0).toFixed(2)),
+    valorPagamento: Number(payload.pagamentos.reduce((sum, item) => sum + item.valor, 0).toFixed(2))
   };
 }
 
@@ -171,7 +205,7 @@ function extractError(data, status) {
   return `A NotaAs recusou a emissão (HTTP ${status})`;
 }
 
-async function recordFailure(base44, invoice, invoiceId, userId, message, duration, httpStatus = 502, apiData = {}) {
+async function recordFailure(base44, invoice, invoiceId, userId, message, duration, httpStatus = 502, apiData = {}, payloadSummary = {}) {
   await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, {
     status: 'erro_integracao',
     error_message: message,
@@ -184,6 +218,7 @@ async function recordFailure(base44, invoice, invoiceId, userId, message, durati
     event_type: 'emissao',
     status: 'erro',
     http_status: httpStatus,
+    request_summary: JSON.stringify(payloadSummary),
     response_summary: JSON.stringify(apiData).slice(0, 500),
     duration_ms: duration,
     error_message: message,
