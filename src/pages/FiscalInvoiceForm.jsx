@@ -28,6 +28,7 @@ export default function FiscalInvoiceForm() {
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const saleId = urlParams.get("sale_id");
+  const invoiceId = urlParams.get("id");
 
   const [form, setForm] = useState({
     company_id: companyId,
@@ -57,8 +58,21 @@ export default function FiscalInvoiceForm() {
 
   const config = configs[0];
 
+  const { data: existingInvoice } = useQuery({
+    queryKey: ["fiscal_invoice_edit", invoiceId],
+    queryFn: () => base44.entities.FiscalInvoice.get(invoiceId),
+    enabled: !!invoiceId
+  });
+
   useEffect(() => {
-    if (config) {
+    if (existingInvoice) {
+      const { id, created_date, updated_date, created_by_id, ...draft } = existingInvoice;
+      setForm(draft);
+    }
+  }, [existingInvoice]);
+
+  useEffect(() => {
+    if (config && !invoiceId) {
       setForm(prev => ({
         ...prev,
         environment: config.environment,
@@ -161,6 +175,8 @@ export default function FiscalInvoiceForm() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
+      if (invoiceId) return base44.entities.FiscalInvoice.update(invoiceId, data);
+
       // Gera referência interna
       const allInvoices = await base44.entities.FiscalInvoice.filter({ company_id: companyId });
       let maxNum = 0;
@@ -173,8 +189,8 @@ export default function FiscalInvoiceForm() {
       return base44.entities.FiscalInvoice.create({ ...data, reference, idempotency_key });
     },
     onSuccess: (inv) => {
-      toast.success("Nota criada como rascunho!");
-      navigate(`${createPageUrl("FiscalInvoiceDetail")}?id=${inv.id}`);
+      toast.success(invoiceId ? "Rascunho atualizado!" : "Nota criada como rascunho!");
+      navigate(`${createPageUrl("FiscalInvoiceDetail")}?id=${inv.id || invoiceId}`);
     },
     onError: (e) => toast.error(e.message)
   });
@@ -188,7 +204,7 @@ export default function FiscalInvoiceForm() {
           <Link to={createPageUrl("FiscalInvoices")}><ArrowLeft className="w-4 h-4" /></Link>
         </Button>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Nova Nota Fiscal</h1>
+          <h1 className="text-xl font-bold text-slate-900">{invoiceId ? "Editar Nota Fiscal" : "Nova Nota Fiscal"}</h1>
           <p className="text-slate-500 text-sm">Preencha os dados e salve como rascunho para emitir</p>
         </div>
       </div>
@@ -263,6 +279,36 @@ export default function FiscalInvoiceForm() {
           <div className="space-y-1">
             <Label>IE Destinatário</Label>
             <Input value={form.recipient_ie || ""} onChange={e => setField("recipient_ie", e.target.value)} />
+          </div>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="space-y-1 md:col-span-2">
+            <Label>Logradouro *</Label>
+            <Input value={form.recipient_address?.logradouro || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), logradouro: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Número</Label>
+            <Input value={form.recipient_address?.numero || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), numero: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Bairro *</Label>
+            <Input value={form.recipient_address?.bairro || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), bairro: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Município *</Label>
+            <Input value={form.recipient_address?.municipio || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), municipio: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Código IBGE *</Label>
+            <Input inputMode="numeric" value={form.recipient_address?.codigoMunicipio || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), codigoMunicipio: e.target.value.replace(/\D/g, "") })} placeholder="7 dígitos" />
+          </div>
+          <div className="space-y-1">
+            <Label>UF *</Label>
+            <Input maxLength={2} value={form.recipient_address?.uf || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), uf: e.target.value.toUpperCase() })} />
+          </div>
+          <div className="space-y-1">
+            <Label>CEP *</Label>
+            <Input value={form.recipient_address?.cep || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), cep: e.target.value })} />
           </div>
         </div>
       </div>

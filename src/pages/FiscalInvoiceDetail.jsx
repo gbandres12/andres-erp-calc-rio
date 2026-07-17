@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, XCircle, Download, ExternalLink, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { ArrowLeft, RefreshCw, XCircle, Download, ExternalLink, CheckCircle, AlertCircle, Clock, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/components/utils/formatters";
@@ -52,7 +52,7 @@ export default function FiscalInvoiceDetail() {
       queryClient.invalidateQueries(["fiscal_invoice", invoiceId]);
       queryClient.invalidateQueries(["fiscal_events", invoiceId]);
     },
-    onError: (e) => toast.error(e.message)
+    onError: (e) => toast.error(e.response?.data?.error || e.message || "Erro ao emitir nota")
   });
 
   const checkStatusMutation = useMutation({
@@ -112,6 +112,11 @@ export default function FiscalInvoiceDetail() {
 
       {/* Ações */}
       <div className="flex flex-wrap gap-2">
+        {["rascunho","pendente_envio","rejeitada","erro_integracao"].includes(invoice.status) && (
+          <Button variant="outline" asChild>
+            <Link to={`${createPageUrl("FiscalInvoiceForm")}?id=${invoice.id}`}><Pencil className="w-4 h-4 mr-1" /> Editar</Link>
+          </Button>
+        )}
         {["rascunho","pendente_envio","rejeitada","erro_integracao"].includes(invoice.status) && (
           <Button onClick={() => emitMutation.mutate()} disabled={emitMutation.isPending} className="bg-violet-600 hover:bg-violet-700">
             {emitMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : null}
