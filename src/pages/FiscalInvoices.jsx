@@ -25,6 +25,12 @@ const STATUS_CONFIG = {
 
 const DOC_TYPES = { nfe: "NF-e", nfse: "NFS-e", nfce: "NFC-e" };
 
+const STATUS_GROUPS = {
+  aprovada: ["autorizada"],
+  pendente: ["validando", "pendente_envio", "enviada", "processando"],
+  cancelada: ["cancelada", "inutilizada"]
+};
+
 export default function FiscalInvoices() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -32,27 +38,25 @@ export default function FiscalInvoices() {
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ["fiscal_invoices", companyId, filterStatus],
-    queryFn: async () => {
-      const filter = { company_id: companyId };
-      if (filterStatus !== "all") filter.status = filterStatus;
-      return base44.entities.FiscalInvoice.filter(filter, "-created_date", 100);
-    },
+    queryKey: ["fiscal_invoices", companyId],
+    queryFn: () => base44.entities.FiscalInvoice.filter({ company_id: companyId }, "-created_date", 100),
     enabled: !!companyId
   });
 
-  const filtered = invoices.filter(inv =>
-    !search ||
-    inv.reference?.toLowerCase().includes(search.toLowerCase()) ||
-    inv.recipient_name?.toLowerCase().includes(search.toLowerCase()) ||
-    inv.api_access_key?.includes(search)
-  );
+  const filtered = invoices.filter(inv => {
+    const matchesStatus = filterStatus === "all" || STATUS_GROUPS[filterStatus]?.includes(inv.status);
+    const matchesSearch = !search ||
+      inv.reference?.toLowerCase().includes(search.toLowerCase()) ||
+      inv.recipient_name?.toLowerCase().includes(search.toLowerCase()) ||
+      inv.api_access_key?.includes(search);
+    return matchesStatus && matchesSearch;
+  });
 
   const stats = {
     total: invoices.length,
-    autorizadas: invoices.filter(i => i.status === "autorizada").length,
-    pendentes: invoices.filter(i => ["enviada", "processando", "pendente_envio"].includes(i.status)).length,
-    erros: invoices.filter(i => ["rejeitada", "erro_integracao"].includes(i.status)).length,
+    aprovadas: invoices.filter(i => STATUS_GROUPS.aprovada.includes(i.status)).length,
+    pendentes: invoices.filter(i => STATUS_GROUPS.pendente.includes(i.status)).length,
+    canceladas: invoices.filter(i => STATUS_GROUPS.cancelada.includes(i.status)).length,
   };
 
   return (
@@ -61,7 +65,7 @@ export default function FiscalInvoices() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Notas Fiscais</h1>
-          <p className="text-slate-500 text-sm mt-1">Emissão e acompanhamento via Focus NFe</p>
+          <p className="text-slate-500 text-sm mt-1">Controle de emissão por status</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries(["fiscal_invoices"])}>
@@ -79,9 +83,9 @@ export default function FiscalInvoices() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total", value: stats.total, color: "text-slate-700" },
-          { label: "Autorizadas", value: stats.autorizadas, color: "text-green-600" },
-          { label: "Em Andamento", value: stats.pendentes, color: "text-blue-600" },
-          { label: "Com Erro", value: stats.erros, color: "text-red-600" },
+          { label: "Aprovadas", value: stats.aprovadas, color: "text-green-600" },
+          { label: "Pendentes", value: stats.pendentes, color: "text-amber-600" },
+          { label: "Canceladas", value: stats.canceladas, color: "text-slate-600" },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-4">
             <p className="text-xs text-slate-500">{s.label}</p>
@@ -101,16 +105,16 @@ export default function FiscalInvoices() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v.label}</SelectItem>
-            ))}
+            <SelectItem value="all">Todas as notas</SelectItem>
+            <SelectItem value="aprovada">Aprovadas</SelectItem>
+            <SelectItem value="pendente">Pendentes</SelectItem>
+            <SelectItem value="cancelada">Canceladas</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-40 text-slate-400">
             <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Carregando...
