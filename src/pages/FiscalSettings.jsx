@@ -61,8 +61,7 @@ export default function FiscalSettings() {
     mutationFn: async (data) => {
       // Garante campos obrigatórios mínimos ao criar
       const payload = { ...data };
-      if (!payload.cnpj) payload.cnpj = '00.000.000/0001-00';
-      if (!payload.razao_social) payload.razao_social = 'A preencher';
+      if (!payload.cnpj || !payload.razao_social) throw new Error("Preencha CNPJ e Razão Social reais antes de salvar");
       if (config?.id) return base44.entities.FiscalConfig.update(config.id, payload);
       return base44.entities.FiscalConfig.create(payload);
     },
@@ -251,7 +250,11 @@ export default function FiscalSettings() {
               <Field label="Próximo Número">
                 <Input type="number" value={form.next_number || 1} onChange={e => handleChange("next_number", Number(e.target.value))} />
               </Field>
+              <Field label="Segredo da Chave NotaAs desta empresa">
+                <Input placeholder="NOTAAS_PROJECT_KEY" value={form.notaas_secret_name || ""} onChange={e => handleChange("notaas_secret_name", e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))} />
+              </Field>
             </div>
+            <p className="text-xs text-slate-500">Cada empresa deve ter sua própria chave NotaAs (CNPJ próprio na plataforma). Deixe vazio para usar a chave padrão NOTAAS_PROJECT_KEY (CBA Santarém). Para as demais filiais, cadastre um segredo próprio (ex: NOTAAS_PROJECT_KEY_FILIAL2) e informe o nome aqui.</p>
           </div>
 
           <Button

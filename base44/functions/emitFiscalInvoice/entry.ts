@@ -14,12 +14,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: `Nota não pode ser emitida com status: ${invoice.status}` }, { status: 400 });
     }
 
-    const apiKey = Deno.env.get('NOTAAS_PROJECT_KEY');
-    if (!apiKey) return Response.json({ error: 'Chave NotaAs não configurada' }, { status: 500 });
     const configs = await base44.asServiceRole.entities.FiscalConfig.filter({ company_id: invoice.company_id });
     const config = configs[0];
     const configError = validateConfig(config, invoice);
     if (configError) return Response.json({ error: configError }, { status: 400 });
+    const secretName = config.notaas_secret_name || 'NOTAAS_PROJECT_KEY';
+    const apiKey = Deno.env.get(secretName);
+    if (!apiKey) return Response.json({ error: `Chave NotaAs desta empresa não configurada (segredo ${secretName})` }, { status: 500 });
     const invoiceError = validateInvoice(invoice);
     if (invoiceError) return Response.json({ error: invoiceError }, { status: 400 });
 
@@ -102,7 +103,10 @@ function validateConfig(config, invoice) {
   if (!config) return 'Configuração fiscal não encontrada';
   if (!config.cnpj || !config.razao_social || !config.inscricao_estadual) return 'Complete CNPJ, razão social e Inscrição Estadual';
   if (![1, 2, 3].includes(Number(config.crt))) return 'CRT inválido';
-  if (config.regime_tributario === 'lucro_real' && Number(config.crt) !== 3) return 'Lucro Real deve usar CRT 3';
+  if (config.regime_tributario === 'simples_nacional' && Number(config.crt) === 3) return 'Simples Nacional deve usar CRT 1 ou 2';
+  if (['lucro_real', 'lucro_presumido'].includes(config.regime_tributario) && Number(config.crt) !== 3) {
+    return `${config.regime_tributario === 'lucro_real' ? 'Lucro Real' : 'Lucro Presumido'} deve usar CRT 3 (Regime Normal)`;
+  }
   if (!['homologacao', 'producao'].includes(config.environment)) return 'Ambiente fiscal inválido';
   if (invoice.environment !== config.environment) return 'Ambiente da nota diferente do ambiente fiscal ativo';
   if (!config.serie || String(invoice.serie) !== String(config.serie)) return 'Série diferente da configuração fiscal';

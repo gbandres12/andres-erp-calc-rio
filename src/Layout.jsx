@@ -8,7 +8,7 @@ import {
   BarChart3, Settings, LogOut, ChevronDown, ChevronUp,
   Home, FileText, History, UserCircle, PackageCheck,
   ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
-  ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight, Receipt
+  ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight, Receipt, Upload
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarProvider, SidebarTrigger
@@ -73,6 +73,7 @@ const navigationGroups = [
     icon: Receipt,
     items: [
       { title: "Notas Fiscais", url: "FiscalInvoices", icon: Receipt },
+      { title: "Importar Emissor Antigo", url: "FiscalImport", icon: Upload },
       { title: "Config. Fiscal", url: "FiscalSettings", icon: Settings }
     ]
   },

@@ -259,7 +259,6 @@ export default function FiscalInvoiceForm() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="nfe">NF-e</SelectItem>
-              <SelectItem value="nfse">NFS-e</SelectItem>
               <SelectItem value="nfce">NFC-e</SelectItem>
             </SelectContent>
           </Select>
@@ -405,7 +404,7 @@ export default function FiscalInvoiceForm() {
                   <td className="px-3 py-2"><Input type="number" value={item.unit_price} onChange={e => updateItem(idx, "unit_price", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" value={item.discount} onChange={e => updateItem(idx, "discount", e.target.value)} className="h-7 text-xs text-right" /></td>
                   <td className="px-3 py-2 text-right font-medium text-slate-700">
-                    {item.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    {(Number(item.total) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </td>
                   <td className="px-3 py-2">
                     {form.items.length > 1 && (
@@ -421,7 +420,7 @@ export default function FiscalInvoiceForm() {
           <div className="space-y-1 text-sm w-56">
             <div className="flex justify-between text-slate-500">
               <span>Subtotal:</span>
-              <span>{form.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+              <span>{(Number(form.subtotal) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
             </div>
             <div className="flex justify-between items-center text-slate-500">
               <span>Frete (R$):</span>
@@ -432,7 +431,7 @@ export default function FiscalInvoiceForm() {
             </div>
             <div className="flex justify-between font-bold text-slate-800 text-base border-t pt-2">
               <span>Total:</span>
-              <span>{form.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+              <span>{(Number(form.total) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import FiscalInvoices from './pages/FiscalInvoices';
 import FiscalInvoiceDetail from './pages/FiscalInvoiceDetail';
 import FiscalInvoiceForm from './pages/FiscalInvoiceForm';
 import FiscalSettings from './pages/FiscalSettings';
+import FiscalImport from './pages/FiscalImport';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
@@ -69,6 +70,7 @@ const AuthenticatedApp = () => {
       <Route path="/FiscalInvoiceDetail" element={<LayoutWrapper currentPageName="FiscalInvoiceDetail"><FiscalInvoiceDetail /></LayoutWrapper>} />
       <Route path="/FiscalInvoiceForm" element={<LayoutWrapper currentPageName="FiscalInvoiceForm"><FiscalInvoiceForm /></LayoutWrapper>} />
       <Route path="/FiscalSettings" element={<LayoutWrapper currentPageName="FiscalSettings"><FiscalSettings /></LayoutWrapper>} />
+      <Route path="/FiscalImport" element={<LayoutWrapper currentPageName="FiscalImport"><FiscalImport /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
