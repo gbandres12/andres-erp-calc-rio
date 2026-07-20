@@ -14,15 +14,20 @@ Deno.serve(async (req) => {
       return Response.json({ error: `Nota não pode ser emitida com status: ${invoice.status}` }, { status: 400 });
     }
 
+    const reject = async (message) => {
+      await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, { error_message: message, error_code: 'VALIDACAO' });
+      return Response.json({ error: message }, { status: 400 });
+    };
+
     const configs = await base44.asServiceRole.entities.FiscalConfig.filter({ company_id: invoice.company_id });
     const config = configs[0];
     const configError = validateConfig(config, invoice);
-    if (configError) return Response.json({ error: configError }, { status: 400 });
+    if (configError) return await reject(configError);
     const secretName = config.notaas_secret_name || 'NOTAAS_PROJECT_KEY';
     const apiKey = Deno.env.get(secretName);
     if (!apiKey) return Response.json({ error: `Chave NotaAs desta empresa não configurada (segredo ${secretName})` }, { status: 500 });
     const invoiceError = validateInvoice(invoice);
-    if (invoiceError) return Response.json({ error: invoiceError }, { status: 400 });
+    if (invoiceError) return await reject(invoiceError);
 
     const products = await Promise.all(invoice.items.map(async (item) => item.product_id
       ? await base44.asServiceRole.entities.Product.get(item.product_id)
@@ -30,14 +35,14 @@ Deno.serve(async (req) => {
     const items = [];
     for (let index = 0; index < invoice.items.length; index += 1) {
       const error = validateProduct(products[index], config, invoice, index);
-      if (error) return Response.json({ error }, { status: 400 });
+      if (error) return await reject(error);
       items.push(snapshotItem(invoice.items[index], products[index], config, invoice));
     }
 
     const auditedInvoice = { ...invoice, items };
     const payload = buildPayload(auditedInvoice, config);
     const summary = summarize(payload, auditedInvoice, config);
-    await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, { items, status: 'validando' });
+    await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, { items, status: 'validando', error_message: '', error_code: '' });
 
     const started = Date.now();
     let response;
