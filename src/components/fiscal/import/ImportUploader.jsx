@@ -18,12 +18,10 @@ export default function ImportUploader({ title, description, jsonSchema, columns
     setDone(0);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: { type: "object", properties: { registros: { type: "array", items: jsonSchema } } }
-      });
+      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({ file_url, json_schema: jsonSchema });
       if (result.status !== "success") throw new Error(result.details || "Falha ao ler o arquivo");
-      const extracted = Array.isArray(result.output) ? result.output : result.output?.registros || [];
+      const raw = Array.isArray(result.output) ? result.output : [result.output].filter(Boolean);
+      const extracted = raw.filter(r => r && Object.values(r).some(v => v !== null && v !== undefined && v !== ""));
       if (!extracted.length) throw new Error("Nenhum registro reconhecido no arquivo");
       setRows(extracted);
       toast.success(`${extracted.length} registros lidos do arquivo`);

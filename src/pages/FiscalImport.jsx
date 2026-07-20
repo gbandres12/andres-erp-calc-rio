@@ -36,6 +36,12 @@ const invoiceSchema = {
 
 const UNITS = ["UN", "KG", "TON", "L", "M", "M2", "M3"];
 
+// Normaliza datas DD/MM/AAAA (emissor antigo) para AAAA-MM-DD
+const toISODate = (s) => {
+  const m = String(s || "").match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s || "").slice(0, 10);
+};
+
 export default function FiscalImport() {
   const companyId = localStorage.getItem("selectedCompanyId");
   const companyName = localStorage.getItem("selectedCompanyName") || "";
@@ -128,7 +134,7 @@ export default function FiscalImport() {
               company_id: companyId, document_type: "nfe",
               serie: String(row.serie || "1"), number: Number(String(row.numero).replace(/\D/g, "")) || undefined,
               status: "autorizada", environment: "producao", origin: "manual",
-              issue_date: row.data_emissao || "",
+              issue_date: toISODate(row.data_emissao),
               recipient_name: row.destinatario_nome || "",
               recipient_cpf_cnpj: String(row.destinatario_cpf_cnpj),
               api_access_key: String(row.chave_acesso || "").replace(/\D/g, ""),
