@@ -235,7 +235,7 @@ export default function FiscalInvoiceForm() {
   const isValid = form.recipient_cpf_cnpj && form.items.length > 0 && form.total > 0;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
           <Link to={createPageUrl("FiscalInvoices")}><ArrowLeft className="w-4 h-4" /></Link>
@@ -355,17 +355,17 @@ export default function FiscalInvoiceForm() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="text-left px-3 py-2 text-slate-500 font-medium w-8">#</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-56">Produto / Descrição</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium w-24">NCM</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CFOP</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium w-20">CST</th>
-                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">IBS (%)</th>
-                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">CBS (%)</th>
-                <th className="text-left px-3 py-2 text-slate-500 font-medium w-24">Un.</th>
-                <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Qtd</th>
-                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">Unit.</th>
-                <th className="text-right px-3 py-2 text-slate-500 font-medium w-20">Desc.</th>
-                <th className="text-right px-3 py-2 text-slate-500 font-medium w-24">Total</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-64">Produto / Descrição</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-28">NCM</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-24">CFOP</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-24">CST</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium min-w-24">IBS (%)</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium min-w-24">CBS (%)</th>
+                <th className="text-left px-3 py-2 text-slate-500 font-medium min-w-28">Un.</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium min-w-24">Qtd</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium min-w-28">Unit.</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium min-w-24">Desc.</th>
+                <th className="text-right px-3 py-2 text-slate-500 font-medium min-w-28">Total</th>
                 <th className="w-8"></th>
               </tr>
             </thead>
@@ -375,19 +375,19 @@ export default function FiscalInvoiceForm() {
                   <td className="px-3 py-2 text-slate-400">{item.sequence}</td>
                   <td className="px-3 py-2 space-y-1">
                     <Select value={item.product_id || ""} onValueChange={value => selectProduct(idx, value)}>
-                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Selecionar produto" /></SelectTrigger>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecionar produto" /></SelectTrigger>
                       <SelectContent>{products.map(product => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Input value={item.product_name} readOnly className="h-7 text-xs bg-slate-50" />
+                    <Input value={item.product_name} readOnly className="h-9 text-sm bg-slate-50" />
                   </td>
-                  <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-7 text-xs" placeholder="00000000" /></td>
-                  <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-7 text-xs" /></td>
-                  <td className="px-3 py-2"><Input value={(config?.crt === 1 ? item.csosn : item.cst) || ""} readOnly className="h-7 text-xs bg-slate-50" placeholder={config?.crt === 1 ? "CSOSN" : "CST"} /></td>
-                  <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
-                  <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-7 text-xs text-right" /></td>
+                  <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-9 text-sm" placeholder="00000000" /></td>
+                  <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-9 text-sm" /></td>
+                  <td className="px-3 py-2"><Input value={(config?.crt === 1 ? item.csosn : item.cst) || ""} readOnly className="h-9 text-sm bg-slate-50" placeholder={config?.crt === 1 ? "CSOSN" : "CST"} /></td>
+                  <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-9 text-sm text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-9 text-sm text-right" /></td>
                   <td className="px-3 py-2">
                     <Select value={item.unit || "TON"} onValueChange={value => updateItem(idx, "unit", value)}>
-                      <SelectTrigger className="h-7 min-w-24 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-9 min-w-28 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="TON">TON</SelectItem>
                         <SelectItem value="KG">KG</SelectItem>
@@ -396,9 +396,9 @@ export default function FiscalInvoiceForm() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-3 py-2"><Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} className="h-7 text-xs text-right" /></td>
-                  <td className="px-3 py-2"><Input type="number" value={item.unit_price} onChange={e => updateItem(idx, "unit_price", e.target.value)} className="h-7 text-xs text-right" /></td>
-                  <td className="px-3 py-2"><Input type="number" value={item.discount} onChange={e => updateItem(idx, "discount", e.target.value)} className="h-7 text-xs text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} className="h-9 text-sm text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" value={item.unit_price} onChange={e => updateItem(idx, "unit_price", e.target.value)} className="h-9 text-sm text-right" /></td>
+                  <td className="px-3 py-2"><Input type="number" value={item.discount} onChange={e => updateItem(idx, "discount", e.target.value)} className="h-9 text-sm text-right" /></td>
                   <td className="px-3 py-2 text-right font-medium text-slate-700">
                     {(Number(item.total) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </td>
@@ -413,7 +413,7 @@ export default function FiscalInvoiceForm() {
           </table>
         </div>
         <div className="border-t border-slate-100 px-5 py-4 flex justify-end">
-          <div className="space-y-1 text-sm w-56">
+          <div className="space-y-1 text-sm w-72">
             <div className="flex justify-between text-slate-500">
               <span>Subtotal:</span>
               <span>{(Number(form.subtotal) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
