@@ -94,12 +94,23 @@ export default function FiscalInvoiceForm() {
     enabled: !!invoiceId
   });
 
+  const refreshedRef = React.useRef(false);
   useEffect(() => {
-    if (existingInvoice) {
-      const { id, created_date, updated_date, created_by_id, ...draft } = existingInvoice;
-      setForm(draft);
+    if (!existingInvoice) return;
+    const { id, created_date, updated_date, created_by_id, ...draft } = existingInvoice;
+    // Atualiza os dados fiscais dos itens com o cadastro atual dos produtos
+    if (products.length > 0 && !refreshedRef.current) {
+      refreshedRef.current = true;
+      draft.items = (draft.items || []).map(item => {
+        const product = products.find(p => p.id === item.product_id);
+        if (!product) return item;
+        return { ...item, ...fiscalSnapshot(product, config, draft.recipient_address?.uf) };
+      });
+    } else if (refreshedRef.current) {
+      return; // já carregado e atualizado; não sobrescrever edições do usuário
     }
-  }, [existingInvoice]);
+    setForm(draft);
+  }, [existingInvoice, products, config]);
 
   useEffect(() => {
     if (config && !invoiceId) {
