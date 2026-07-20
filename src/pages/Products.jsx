@@ -128,6 +128,10 @@ export default function Products() {
       setIsDialogOpen(false);
       resetForm();
       toast.success("Produto atualizado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("❌ Erro ao atualizar produto:", error);
+      toast.error("Erro ao atualizar: " + (error.response?.data?.detail || error.message));
     }
   });
 
@@ -194,12 +198,39 @@ export default function Products() {
     }));
   };
 
+  const NUMBER_FIELDS = [
+    "cost_price", "sale_price", "profit_margin", "min_stock", "max_stock", "current_stock",
+    "icms_aliquota", "pis_aliquota", "cofins_aliquota", "ibs_aliquota", "cbs_aliquota",
+    "icms_reducao_base", "icms_base", "icms_valor", "icms_desonerado", "fcp_aliquota",
+    "pis_base", "pis_valor", "cofins_base", "cofins_valor", "ipi_aliquota",
+    "icms_st_base", "icms_st_aliquota", "icms_st_valor", "mva"
+  ];
+
+  const sanitizeProduct = (data) => {
+    const clean = { ...data };
+    // Remove campos internos do registro que não podem ser regravados
+    delete clean.id;
+    delete clean.created_date;
+    delete clean.updated_date;
+    delete clean.created_by_id;
+    delete clean.created_by;
+    // Campos numéricos vazios viram 0
+    NUMBER_FIELDS.forEach((field) => {
+      if (clean[field] === "" || clean[field] === null || clean[field] === undefined) clean[field] = 0;
+      else clean[field] = Number(clean[field]) || 0;
+    });
+    // Data vazia não pode ser enviada como ""
+    if (!clean.fiscal_review_date) delete clean.fiscal_review_date;
+    return clean;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    const data = sanitizeProduct(formData);
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, data: formData });
+      updateMutation.mutate({ id: editingProduct.id, data });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(data);
     }
   };
 
