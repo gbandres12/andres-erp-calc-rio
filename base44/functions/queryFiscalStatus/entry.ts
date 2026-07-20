@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     if (!apiKey) return Response.json({ error: `Chave NotaAs desta empresa não configurada (segredo ${secretName})` }, { status: 500 });
 
     const startTime = Date.now();
-    const response = await fetch(`https://platform.notaas.com.br/api/v1/nfe/invoices/${invoice.api_reference}`, {
+    const response = await fetch(`https://platform.notaas.com.br/api/v1/nfe/invoices/${invoice.api_reference}/status`, {
       headers: { 'x-api-key': apiKey },
       signal: AbortSignal.timeout(15000)
     });
@@ -36,14 +36,14 @@ Deno.serve(async (req) => {
 
     if (response.ok) {
       const status = String(data.status || '').toLowerCase();
+      if (data.chaveAcesso) updateData.api_access_key = data.chaveAcesso;
+      if (data.nProt) updateData.api_protocol = data.nProt;
+      if (data.nNf) updateData.number = Number(data.nNf);
+      if (data.serie) updateData.serie = String(data.serie);
+      if (data.xmlUrl) updateData.xml_url = data.xmlUrl;
+      if (data.pdfUrl || data.danfeUrl) updateData.pdf_url = data.pdfUrl || data.danfeUrl;
       if (status === 'issued' || status === 'authorized') {
         newStatus = 'autorizada';
-        if (data.chaveAcesso) updateData.api_access_key = data.chaveAcesso;
-        if (data.nProt) updateData.api_protocol = data.nProt;
-        if (data.nNf) updateData.number = Number(data.nNf);
-        if (data.serie) updateData.serie = String(data.serie);
-        if (data.xmlUrl) updateData.xml_url = data.xmlUrl;
-        if (data.danfeUrl) updateData.pdf_url = data.danfeUrl;
       } else if (status.includes('cancel')) {
         newStatus = 'cancelada';
       } else if (status === 'rejected') {
