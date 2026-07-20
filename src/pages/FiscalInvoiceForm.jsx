@@ -10,6 +10,7 @@ import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
+import ContactCombobox from "@/components/fiscal/ContactCombobox";
 
 const PAYMENT_METHODS = [
   { value: "01", label: "Dinheiro" },
@@ -73,7 +74,7 @@ export default function FiscalInvoiceForm() {
 
   const { data: contacts = [] } = useQuery({
     queryKey: ["contacts_active", companyId],
-    queryFn: () => base44.entities.Contact.filter({ company_id: companyId }, "name", 100),
+    queryFn: () => base44.entities.Contact.filter({ company_id: companyId }, "name", 2000),
     enabled: !!companyId
   });
 
@@ -290,13 +291,8 @@ export default function FiscalInvoiceForm() {
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
         <h3 className="font-semibold text-slate-800">Destinatário</h3>
         <div className="space-y-1">
-          <Label>Selecionar Cliente Cadastrado</Label>
-          <Select onValueChange={handleContactSelect}>
-            <SelectTrigger><SelectValue placeholder="Selecione ou preencha manualmente abaixo..." /></SelectTrigger>
-            <SelectContent>
-              {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <Label>Selecionar Cliente Cadastrado ({contacts.length} disponíveis)</Label>
+          <ContactCombobox contacts={contacts} value={form.recipient_id} onSelect={handleContactSelect} />
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-1">
