@@ -73,6 +73,86 @@
     "recipient_address": {
       "type": "object"
     },
+    "transporte": {
+      "type": "object",
+      "description": "Dados de transporte da NF-e",
+      "properties": {
+        "modalidade_frete": {
+          "type": "string",
+          "enum": [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "9"
+          ],
+          "default": "9",
+          "description": "0=CIF, 1=FOB, 2=Terceiros, 3=Pr\u00f3prio remetente, 4=Pr\u00f3prio destinat\u00e1rio, 9=Sem frete"
+        },
+        "transportadora": {
+          "type": "object",
+          "properties": {
+            "cpf_cnpj": {
+              "type": "string"
+            },
+            "nome": {
+              "type": "string"
+            },
+            "ie": {
+              "type": "string"
+            },
+            "endereco": {
+              "type": "string"
+            },
+            "cidade": {
+              "type": "string"
+            },
+            "uf": {
+              "type": "string"
+            }
+          }
+        },
+        "veiculo": {
+          "type": "object",
+          "properties": {
+            "placa": {
+              "type": "string"
+            },
+            "uf": {
+              "type": "string"
+            },
+            "rntc": {
+              "type": "string",
+              "description": "C\u00f3digo ANTT"
+            }
+          }
+        },
+        "volume": {
+          "type": "object",
+          "properties": {
+            "quantidade": {
+              "type": "number"
+            },
+            "especie": {
+              "type": "string"
+            },
+            "marca": {
+              "type": "string"
+            },
+            "numeracao": {
+              "type": "string"
+            },
+            "peso_bruto": {
+              "type": "number"
+            },
+            "peso_liquido": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
     "items": {
       "type": "array",
       "items": {

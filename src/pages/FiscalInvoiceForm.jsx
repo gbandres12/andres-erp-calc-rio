@@ -11,6 +11,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
 import ContactCombobox from "@/components/fiscal/ContactCombobox";
+import TransportSection from "@/components/fiscal/TransportSection";
 
 const PAYMENT_METHODS = [
   { value: "01", label: "Dinheiro" },
@@ -432,6 +433,9 @@ export default function FiscalInvoiceForm() {
           </div>
         </div>
       </div>
+
+      {/* Transportador / Volumes */}
+      <TransportSection value={form.transporte} onChange={t => setField("transporte", t)} />
 
       {/* Observações */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-2">

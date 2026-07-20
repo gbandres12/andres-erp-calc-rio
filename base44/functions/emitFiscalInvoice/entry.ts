@@ -258,8 +258,43 @@ function buildPayload(invoice, config) {
       return mapped;
     }),
     pagamentos: [{ tipoPagamento: invoice.payment_method, valor: Number(invoice.total) }],
-    infCpl: sanitize(invoice.notes)
+    infCpl: sanitize(invoice.notes),
+    transporte: buildTransporte(invoice.transporte)
   };
+}
+
+function buildTransporte(t) {
+  const out = { modalidadeFrete: ['0', '1', '2', '3', '4', '9'].includes(String(t?.modalidade_frete)) ? Number(t.modalidade_frete) : 9 };
+  const tr = t?.transportadora || {};
+  const doc = String(tr.cpf_cnpj || '').replace(/\D/g, '');
+  if (out.modalidadeFrete !== 9 && (tr.nome || doc)) {
+    out.transportadora = {};
+    if (doc.length === 14) out.transportadora.cnpj = doc;
+    else if (doc.length === 11) out.transportadora.cpf = doc;
+    if (tr.nome) out.transportadora.nome = tr.nome;
+    if (tr.ie) out.transportadora.ie = tr.ie;
+    if (tr.endereco) out.transportadora.endereco = tr.endereco;
+    if (tr.cidade) out.transportadora.cidade = tr.cidade;
+    if (tr.uf) out.transportadora.uf = tr.uf;
+  }
+  const v = t?.veiculo || {};
+  if (out.modalidadeFrete !== 9 && v.placa) {
+    out.veiculo = { placa: String(v.placa).toUpperCase().replace(/[^A-Z0-9]/g, '') };
+    if (v.uf) out.veiculo.uf = v.uf;
+    if (v.rntc) out.veiculo.rntc = v.rntc;
+  }
+  const vol = t?.volume || {};
+  if (Number(vol.quantidade) > 0 || vol.especie || Number(vol.peso_bruto) > 0) {
+    const volume = {};
+    if (Number(vol.quantidade) > 0) volume.quantidade = Number(vol.quantidade);
+    if (vol.especie) volume.especie = vol.especie;
+    if (vol.marca) volume.marca = vol.marca;
+    if (vol.numeracao) volume.numeracao = vol.numeracao;
+    if (Number(vol.peso_liquido) > 0) volume.pesoLiquido = Number(vol.peso_liquido);
+    if (Number(vol.peso_bruto) > 0) volume.pesoBruto = Number(vol.peso_bruto);
+    out.volumes = [volume];
+  }
+  return out;
 }
 
 function summarize(payload, invoice, config) {
