@@ -12,6 +12,7 @@ import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
 import ContactCombobox from "@/components/fiscal/ContactCombobox";
 import TransportSection from "@/components/fiscal/TransportSection";
+import { fetchIbgeCode } from "@/components/fiscal/ibge";
 
 const PAYMENT_METHODS = [
   { value: "01", label: "Dinheiro" },
@@ -106,10 +107,29 @@ export default function FiscalInvoiceForm() {
         ...prev,
         environment: config.environment,
         serie: config.serie || "1",
-        document_type: config.document_type || "nfe"
+        document_type: config.document_type || "nfe",
+        notes: prev.notes || config.default_notes || ""
       }));
     }
   }, [config]);
+
+  // Preenche o código IBGE automaticamente a partir do município + UF
+  const municipio = form.recipient_address?.municipio;
+  const recipientUf = form.recipient_address?.uf;
+  const codigoMunicipio = form.recipient_address?.codigoMunicipio;
+  useEffect(() => {
+    if (!municipio || !recipientUf || recipientUf.length !== 2 || codigoMunicipio) return;
+    const timer = setTimeout(async () => {
+      const code = await fetchIbgeCode(municipio, recipientUf);
+      if (!code) return;
+      setForm(prev => {
+        const addr = prev.recipient_address || {};
+        if (addr.codigoMunicipio || addr.municipio !== municipio) return prev;
+        return { ...prev, recipient_address: { ...addr, codigoMunicipio: code } };
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [municipio, recipientUf, codigoMunicipio]);
 
   // Se vier de uma venda, pré-carrega os dados
   const { data: sale } = useQuery({

@@ -39,6 +39,10 @@
       "type": "string",
       "description": "Nome do segredo com a chave NotaAs desta empresa (ex: NOTAAS_PROJECT_KEY_CBA_STM). Vazio = NOTAAS_PROJECT_KEY"
     },
+    "default_notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es padr\u00e3o pr\u00e9-preenchidas em novas notas fiscais"
+    },
     "api_token": {
       "type": "string",
       "description": "LEGADO Focus NFe - n\u00e3o usar"

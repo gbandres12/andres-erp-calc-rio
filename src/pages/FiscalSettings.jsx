@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Save, Settings, Building2, ShieldCheck, Wifi, AlertTriangle, CheckCircle, Info } from "lucide-react";
@@ -254,6 +255,14 @@ export default function FiscalSettings() {
                 <Input placeholder="NOTAAS_PROJECT_KEY" value={form.notaas_secret_name || ""} onChange={e => handleChange("notaas_secret_name", e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))} />
               </Field>
             </div>
+            <Field label="Observações padrão da nota fiscal">
+              <Textarea
+                rows={3}
+                placeholder="Texto que aparecerá pré-preenchido nas observações de toda nova nota"
+                value={form.default_notes || ""}
+                onChange={e => handleChange("default_notes", e.target.value)}
+              />
+            </Field>
             <p className="text-xs text-slate-500">Cada empresa deve ter sua própria chave NotaAs (CNPJ próprio na plataforma). Deixe vazio para usar a chave padrão NOTAAS_PROJECT_KEY (CBA Santarém). Para as demais filiais, cadastre um segredo próprio (ex: NOTAAS_PROJECT_KEY_FILIAL2) e informe o nome aqui.</p>
           </div>
 
