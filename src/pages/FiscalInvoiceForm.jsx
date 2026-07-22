@@ -224,6 +224,21 @@ export default function FiscalInvoiceForm() {
   const handleContactSelect = (contactId) => {
     const contact = contacts.find(c => c.id === contactId);
     if (contact) {
+      // Contatos importados guardam "LOGRADOURO, NUMERO, BAIRRO" num campo só
+      let logradouro = contact.address || "";
+      let numero = contact.number || "";
+      let bairro = contact.neighborhood || "";
+      if ((!numero || !bairro) && logradouro.includes(",")) {
+        const parts = logradouro.split(",").map(p => p.trim()).filter(Boolean);
+        if (parts.length >= 3) {
+          if (!bairro) bairro = parts[parts.length - 1];
+          if (!numero) numero = parts[parts.length - 2];
+          logradouro = parts.slice(0, parts.length - 2).join(", ");
+        } else if (parts.length === 2) {
+          if (!numero) numero = parts[1];
+          logradouro = parts[0];
+        }
+      }
       setForm(prev => ({
         ...prev,
         recipient_id: contact.id,
@@ -231,9 +246,9 @@ export default function FiscalInvoiceForm() {
         recipient_cpf_cnpj: contact.cpf_cnpj || contact.document,
         recipient_email: contact.email,
         recipient_address: {
-          logradouro: contact.address || "",
-          numero: contact.number || "S/N",
-          bairro: contact.neighborhood || "",
+          logradouro,
+          numero: numero || "S/N",
+          bairro,
           municipio: contact.city || "",
           uf: contact.state || "",
           cep: contact.zip_code || ""
@@ -245,6 +260,13 @@ export default function FiscalInvoiceForm() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (invoiceId) return base44.entities.FiscalInvoice.update(invoiceId, data);
+
+      // Evita nota duplicada para a mesma venda
+      if (data.sale_id) {
+        const existing = await base44.entities.FiscalInvoice.filter({ sale_id: data.sale_id, company_id: companyId });
+        const active = existing.find(inv => !["cancelada", "inutilizada"].includes(inv.status));
+        if (active) throw new Error(`Já existe a nota ${active.reference} para esta venda (status: ${active.status}).`);
+      }
 
       // Gera referência interna
       const allInvoices = await base44.entities.FiscalInvoice.filter({ company_id: companyId });
