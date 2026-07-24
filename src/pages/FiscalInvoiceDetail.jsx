@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, XCircle, Download, ExternalLink, CheckCircle, AlertCircle, Clock, Pencil } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, RefreshCw, XCircle, Download, ExternalLink, CheckCircle, AlertCircle, Clock, Pencil, Copy } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/components/utils/formatters";
 import { emitFiscalInvoice } from "@/functions/emitFiscalInvoice";
@@ -30,6 +30,7 @@ export default function FiscalInvoiceDetail() {
   const invoiceId = urlParams.get("id");
   const [showCancel, setShowCancel] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["fiscal_invoice", invoiceId],
@@ -63,6 +64,29 @@ export default function FiscalInvoiceDetail() {
       queryClient.invalidateQueries(["fiscal_invoice", invoiceId]);
     },
     onError: (e) => toast.error(e.message)
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      const invoices = await base44.entities.FiscalInvoice.filter({ company_id: invoice.company_id });
+      const maxNumber = invoices.reduce((max, item) => Math.max(max, Number(item.reference?.match(/^NF-(\d+)$/)?.[1]) || 0), 0);
+      const reference = `NF-${String(maxNumber + 1).padStart(6, "0")}`;
+      const { id, created_date, updated_date, created_by_id, reference: _, number, status, api_reference, api_status, api_protocol, api_access_key, xml_url, pdf_url, cancel_reason, cancel_date, error_message, error_code, retry_count, last_status_check, idempotency_key, issue_date, ...draft } = invoice;
+      return base44.entities.FiscalInvoice.create({
+        ...draft,
+        reference,
+        status: "rascunho",
+        issue_date: new Date().toISOString().split("T")[0],
+        retry_count: 0,
+        idempotency_key: `${invoice.company_id}-${invoice.document_type}-${invoice.serie}-${reference}`
+      });
+    },
+    onSuccess: (draft) => {
+      toast.success("Rascunho duplicado. Revise antes de emitir.");
+      queryClient.invalidateQueries(["fiscal_invoices", invoice.company_id]);
+      navigate(`${createPageUrl("FiscalInvoiceForm")}?id=${draft.id}`);
+    },
+    onError: (e) => toast.error(e.message || "Não foi possível duplicar a nota")
   });
 
   const handleCancel = async (reason) => {
@@ -112,6 +136,10 @@ export default function FiscalInvoiceDetail() {
 
       {/* Ações */}
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => duplicateMutation.mutate()} disabled={duplicateMutation.isPending}>
+          {duplicateMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+          Duplicar Nota
+        </Button>
         {["rascunho","pendente_envio","rejeitada","erro_integracao"].includes(invoice.status) && (
           <Button variant="outline" asChild>
             <Link to={`${createPageUrl("FiscalInvoiceForm")}?id=${invoice.id}`}><Pencil className="w-4 h-4 mr-1" /> Editar</Link>
