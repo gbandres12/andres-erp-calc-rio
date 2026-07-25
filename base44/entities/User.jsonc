@@ -18,6 +18,15 @@
       ],
       "default": "admin",
       "description": "Perfil de acesso"
+    },
+    "dark_mode": {
+      "type": "boolean",
+      "default": false,
+      "description": "Prefer\u00eancia individual de tema escuro"
+    },
+    "settings": {
+      "type": "object",
+      "description": "Prefer\u00eancias individuais do usu\u00e1rio"
     }
   },
   "required": [

@@ -97,8 +97,8 @@ const navigationGroups = [
   }
 ];
 
-// Groups open by default
-const DEFAULT_OPEN = new Set(["Gestão de Materiais", "Logística", "Financeiro", "Comercial", "Fiscal", "Controles", "Gestão"]);
+// Groups start collapsed and expand when selected.
+const DEFAULT_OPEN = new Set();
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();

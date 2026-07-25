@@ -1026,7 +1026,7 @@ export default function Transactions() {
                 Novo Lançamento
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingTransaction ? "Editar" : "Novo"} Lançamento</DialogTitle>
             </DialogHeader>

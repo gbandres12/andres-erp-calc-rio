@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, RepeatIcon, ArrowDownCircle, ArrowUpCircle, PlayCircle, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/components/utils/formatters";
+import BoletoPaymentDialog from "@/components/recurrings/BoletoPaymentDialog";
 
 const FREQUENCY_LABELS = {
   diaria: "Diária",
@@ -185,9 +186,12 @@ export default function RecurringTransactions() {
           </h1>
           <p className="text-slate-500 mt-1">Gerencie despesas e receitas recorrentes</p>
         </div>
-        <Button onClick={openCreate} className="bg-purple-600 hover:bg-purple-700">
-          <Plus className="w-4 h-4 mr-2" /> Nova Recorrência
-        </Button>
+        <div className="flex gap-2">
+          <BoletoPaymentDialog companyId={selectedCompanyId} onCreated={() => queryClient.invalidateQueries(["transactions"])} />
+          <Button onClick={openCreate} className="bg-purple-600 hover:bg-purple-700">
+            <Plus className="w-4 h-4 mr-2" /> Nova Recorrência
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}

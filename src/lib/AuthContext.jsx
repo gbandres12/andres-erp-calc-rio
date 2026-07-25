@@ -92,6 +92,7 @@ export const AuthProvider = ({ children }) => {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
+      document.documentElement.classList.toggle('dark', Boolean(currentUser.dark_mode));
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);

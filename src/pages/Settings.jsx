@@ -29,7 +29,9 @@ export default function Settings() {
   const loadUser = async () => {
     try {
       const userData = await base44.auth.me();
+      const savedSettings = userData.settings || {};
       setUser(userData);
+      setSettings(current => ({ ...current, ...savedSettings, theme: userData.dark_mode ? "dark" : "light" }));
     } catch (error) {
       console.error("Error loading user:", error);
     }
@@ -37,7 +39,10 @@ export default function Settings() {
 
   const handleSaveSettings = async () => {
     try {
-      await base44.auth.updateMe({ settings });
+      const darkMode = settings.theme === "dark";
+      await base44.auth.updateMe({ settings, dark_mode: darkMode });
+      document.documentElement.classList.toggle("dark", darkMode);
+      setUser(current => ({ ...current, dark_mode: darkMode }));
       toast.success("Configurações salvas com sucesso!");
     } catch (error) {
       toast.error("Erro ao salvar configurações");
@@ -225,20 +230,20 @@ export default function Settings() {
                 <div className="grid grid-cols-2 gap-4">
                   <div 
                     className={`p-4 border-2 rounded-lg cursor-pointer ${settings.theme === 'light' ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}
-                    onClick={() => setSettings({...settings, theme: 'light'})}
+                    onClick={() => { setSettings({...settings, theme: 'light'}); document.documentElement.classList.remove('dark'); }}
                   >
                     <div className="w-full h-20 bg-white rounded mb-2 border"></div>
                     <p className="text-sm font-medium text-center">Claro</p>
                   </div>
                   <div 
                     className={`p-4 border-2 rounded-lg cursor-pointer ${settings.theme === 'dark' ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}
-                    onClick={() => setSettings({...settings, theme: 'dark'})}
+                    onClick={() => { setSettings({...settings, theme: 'dark'}); document.documentElement.classList.add('dark'); }}
                   >
                     <div className="w-full h-20 bg-slate-800 rounded mb-2 border"></div>
                     <p className="text-sm font-medium text-center">Escuro</p>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500">Tema escuro em breve disponível</p>
+                <p className="text-xs text-slate-500">A preferência é salva para este usuário.</p>
               </div>
               <Button onClick={handleSaveSettings}>
                 <Save className="w-4 h-4 mr-2" />
