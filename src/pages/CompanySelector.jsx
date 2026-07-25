@@ -156,19 +156,19 @@ export default function CompanySelector() {
               <Building2 className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-slate-900 mb-1">
-              Andres Tech <span className="text-slate-500 font-normal">ERP</span>
+              Andres Tech <span className="text-slate-600 font-normal">ERP</span>
             </h1>
-            <p className="text-sm text-slate-400 mb-6">Sistema de Gestão Empresarial</p>
+            <p className="text-sm text-slate-600 font-medium mb-6">Sistema de Gestão Empresarial</p>
 
             {/* User Info */}
             {user && (
-              <div className="inline-flex items-center gap-3 bg-white border border-slate-200 px-5 py-3 rounded-lg shadow-sm">
-                <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-slate-600" />
+              <div className="inline-flex items-center gap-3 bg-white border-2 border-slate-300 px-5 py-3 rounded-lg shadow-sm">
+                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-slate-700" />
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-slate-800 text-sm">{user.full_name || user.email}</p>
-                  <p className="text-xs text-slate-400">{user.email}</p>
+                  <p className="font-semibold text-slate-900 text-sm">{user.full_name || user.email}</p>
+                  <p className="text-xs text-slate-600">{user.email}</p>
                 </div>
                 <div className="flex items-center gap-1 ml-2">
                   <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 hover:text-slate-700 h-7 w-7 p-0">
@@ -189,7 +189,7 @@ export default function CompanySelector() {
             <div className="flex justify-end mb-5">
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={resetForm} variant="outline" size="sm" className="border-slate-300 text-slate-700">
+                  <Button onClick={resetForm} variant="outline" size="sm" className="border-2 border-slate-400 text-slate-800 font-semibold hover:bg-slate-50">
                     <Plus className="w-4 h-4 mr-2" />
                     Nova Filial
                   </Button>
@@ -245,13 +245,13 @@ export default function CompanySelector() {
 
           {/* Lista de Filiais */}
           {companies.length === 0 ? (
-            <Card className="border-slate-200">
+            <Card className="border-2 border-slate-300">
               <CardContent className="py-16 text-center">
-                <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Building2 className="w-7 h-7 text-slate-400" />
+                <div className="w-14 h-14 bg-slate-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="w-7 h-7 text-slate-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhuma filial cadastrada</h3>
-                <p className="text-sm text-slate-400 mb-6">Crie sua primeira filial para começar a usar o sistema</p>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">Nenhuma filial cadastrada</h3>
+                <p className="text-sm text-slate-600 mb-6">Crie sua primeira filial para começar a usar o sistema</p>
                 {user?.role === 'admin' && (
                   <Button onClick={() => setIsDialogOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-white">
                     <Plus className="w-4 h-4 mr-2" />
@@ -265,40 +265,46 @@ export default function CompanySelector() {
               {companies.map((company) => (
                 <Card
                   key={company.id}
-                  className="cursor-pointer border-slate-200 hover:border-slate-400 hover:shadow-md transition-all duration-200 bg-white"
+                  className={`cursor-pointer transition-all duration-200 bg-white border-2 ${
+                    selectedCompanyId === company.id
+                      ? 'border-violet-500 ring-2 ring-violet-200 shadow-md'
+                      : 'border-slate-300 hover:border-slate-500 hover:shadow-md'
+                  }`}
                   onClick={() => handleSelectCompany(company)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-slate-600" />
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          selectedCompanyId === company.id ? 'bg-violet-100' : 'bg-slate-200'
+                        }`}>
+                          <Building2 className={`w-5 h-5 ${selectedCompanyId === company.id ? 'text-violet-700' : 'text-slate-700'}`} />
                         </div>
                         <div>
-                          <CardTitle className="text-base font-semibold text-slate-900">{company.name}</CardTitle>
-                          <p className="text-xs text-slate-400 mt-0.5">{company.code}</p>
+                          <CardTitle className="text-base font-bold text-slate-900">{company.name}</CardTitle>
+                          <p className="text-xs text-slate-600 mt-0.5 font-medium">{company.code}</p>
                         </div>
                       </div>
                       {selectedCompanyId === company.id && (
-                        <div className="bg-green-100 p-1.5 rounded-full">
-                          <Check className="w-3.5 h-3.5 text-green-600" />
+                        <div className="bg-violet-600 p-1.5 rounded-full">
+                          <Check className="w-3.5 h-3.5 text-white" />
                         </div>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-1.5">
                     {company.cnpj && (
-                      <p className="text-xs text-slate-500"><span className="font-medium">CNPJ:</span> {company.cnpj}</p>
+                      <p className="text-xs text-slate-700"><span className="font-semibold">CNPJ:</span> {company.cnpj}</p>
                     )}
                     {company.city && company.state && (
-                      <p className="text-xs text-slate-500"><span className="font-medium">Local:</span> {company.city}, {company.state}</p>
+                      <p className="text-xs text-slate-700"><span className="font-semibold">Local:</span> {company.city}, {company.state}</p>
                     )}
                     {company.phone && (
-                      <p className="text-xs text-slate-500"><span className="font-medium">Tel:</span> {company.phone}</p>
+                      <p className="text-xs text-slate-700"><span className="font-semibold">Tel:</span> {company.phone}</p>
                     )}
                     <div className="pt-3 flex gap-2">
                       <Button
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-white h-8 text-sm"
+                        className="flex-1 bg-slate-900 hover:bg-slate-800 text-white h-8 text-sm font-semibold"
                         onClick={() => handleSelectCompany(company)}
                       >
                         Acessar
@@ -307,7 +313,7 @@ export default function CompanySelector() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-8 w-8 border-slate-200 text-slate-500 hover:text-slate-700"
+                          className="h-8 w-8 border-2 border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                           onClick={(e) => { e.stopPropagation(); handleEdit(company); }}
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -321,7 +327,7 @@ export default function CompanySelector() {
           )}
 
           <div className="text-center mt-10">
-            <p className="text-xs text-slate-400">© 2024 Andres Tech • Sistema de Gestão Empresarial</p>
+            <p className="text-xs text-slate-600 font-medium">© 2024 Andres Tech • Sistema de Gestão Empresarial</p>
           </div>
         </div>
       </div>
