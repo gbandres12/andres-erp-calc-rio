@@ -1,28 +1,33 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Sparkles, Loader2, Check } from "lucide-react";
 
-export default function CategorySuggestion({ description, type, transactions = [], onSuggest }) {
+export default function CategorySuggestion({ description, notes, type, transactions = [], onSuggest, currentCategory }) {
   const [loading, setLoading] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
   const debounceRef = useRef(null);
-  const lastDescRef = useRef('');
+  const lastKeyRef = useRef('');
 
   // Auto-suggest after 1.5s of inactivity when description changes
   useEffect(() => {
-    if (!description || description.length < 5 || description === lastDescRef.current) return;
+    if (!description || description.length < 5) {
+      setSuggestion(null);
+      return;
+    }
+    const key = `${description}||${notes || ''}`;
+    if (key === lastKeyRef.current) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       autoSuggest();
     }, 1500);
     return () => clearTimeout(debounceRef.current);
-  }, [description]);
+  }, [description, notes]);
 
   const autoSuggest = async () => {
     if (!description || description.length < 5) return;
-    lastDescRef.current = description;
+    lastKeyRef.current = `${description}||${notes || ''}`;
     setLoading(true);
+    setSuggestion(null);
     try {
       const history = transactions
         .filter(t => t.type === type && t.category && t.description)
@@ -32,10 +37,11 @@ export default function CategorySuggestion({ description, type, transactions = [
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um assistente de categorização financeira para uma empresa de mineração/calcário.
-Com base no histórico de lançamentos e na descrição fornecida, sugira a categoria mais adequada.
+Com base no histórico de lançamentos, na descrição e observações fornecidas, sugira a categoria mais adequada.
 
-TIPO: ${type === 'despesa' ? 'Despesa' : 'Receita'}
-DESCRIÇÃO ATUAL: "${description}"
+TIPO: ${type === 'despesa' ? 'Saída (Despesa)' : 'Entrada (Receita)'}
+DESCRIÇÃO: "${description}"
+OBSERVAÇÕES: "${notes || 'Nenhuma'}"
 
 HISTÓRICO DE CATEGORIZAÇÕES (descrição → categoria):
 ${history || 'Sem histórico disponível.'}
@@ -50,7 +56,7 @@ Exemplos válidos: Combustível, Folha de Pagamento, Venda de Calcário, Manuten
       });
 
       if (result?.category) {
-        onSuggest(result.category);
+        setSuggestion(result.category);
       }
     } catch {
       // Silent fail for auto-suggest
@@ -62,23 +68,37 @@ Exemplos válidos: Combustível, Folha de Pagamento, Venda de Calcário, Manuten
   if (!description || description.length < 5) return null;
 
   return (
-    <div className="flex items-center gap-1 mt-1">
+    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
       {loading ? (
-        <span className="flex items-center gap-1 text-xs text-slate-400">
+        <span className="flex items-center gap-1 text-xs text-slate-500">
           <Loader2 className="w-3 h-3 animate-spin" />
-          Sugerindo categoria...
+          IA está analisando descrição e observações...
         </span>
+      ) : suggestion ? (
+        suggestion === currentCategory ? (
+          <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+            <Check className="w-3 h-3" /> Categoria sugerida pela IA aplicada
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { onSuggest(suggestion); setSuggestion(null); }}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors font-medium border border-purple-200"
+          >
+            <Sparkles className="w-3 h-3" />
+            Sugerido: <strong>{suggestion}</strong>
+            <span className="text-purple-400">· clique para aplicar</span>
+          </button>
+        )
       ) : (
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-0"
           onClick={autoSuggest}
+          className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-0.5 rounded transition-colors"
         >
-          <Sparkles className="w-3 h-3 mr-1" />
+          <Sparkles className="w-3 h-3" />
           Sugerir categoria com IA
-        </Button>
+        </button>
       )}
     </div>
   );

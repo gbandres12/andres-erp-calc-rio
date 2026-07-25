@@ -790,7 +790,7 @@ export default function Transactions() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Lançamentos Financeiros</h1>
-          <p className="text-slate-500 mt-1">Receitas e despesas</p>
+          <p className="text-slate-500 mt-1">Entradas e saídas</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
@@ -867,19 +867,24 @@ export default function Transactions() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tipo *</Label>
-                    <Select
-                      required
-                      value={quickFormData.type}
-                      onValueChange={(value) => setQuickFormData({ ...quickFormData, type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="receita">💰 Receita</SelectItem>
-                        <SelectItem value="despesa">💸 Despesa</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setQuickFormData({ ...quickFormData, type: 'receita' })}
+                        className={cn("flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 font-semibold text-sm transition-all",
+                          quickFormData.type === 'receita' ? "border-green-500 bg-green-50 text-green-700" : "border-slate-200 text-slate-500 hover:border-slate-300")}
+                      >
+                        <TrendingUp className="w-4 h-4" /> Entrada
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickFormData({ ...quickFormData, type: 'despesa' })}
+                        className={cn("flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 font-semibold text-sm transition-all",
+                          quickFormData.type === 'despesa' ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500 hover:border-slate-300")}
+                      >
+                        <TrendingDown className="w-4 h-4" /> Saída
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Valor (R$) *</Label>
@@ -980,8 +985,8 @@ export default function Transactions() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="receita">Receita</SelectItem>
-                        <SelectItem value="despesa">Despesa</SelectItem>
+                        <SelectItem value="receita">Entrada</SelectItem>
+                        <SelectItem value="despesa">Saída</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1038,22 +1043,25 @@ export default function Transactions() {
                 </TabsList>
 
                 <TabsContent value="dados" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tipo *</Label>
-                      <Select
-                        required
-                        value={formData.type}
-                        onValueChange={(value) => setFormData({ ...formData, type: value })}
+                  <div className="space-y-2">
+                    <Label>Tipo *</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, type: 'receita' })}
+                        className={cn("flex items-center justify-center gap-2 py-3 rounded-lg border-2 font-semibold text-sm transition-all",
+                          formData.type === 'receita' ? "border-green-500 bg-green-50 text-green-700" : "border-slate-200 text-slate-500 hover:border-slate-300")}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="receita">💰 Receita</SelectItem>
-                          <SelectItem value="despesa">💸 Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <TrendingUp className="w-4 h-4" /> Entrada
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, type: 'despesa' })}
+                        className={cn("flex items-center justify-center gap-2 py-3 rounded-lg border-2 font-semibold text-sm transition-all",
+                          formData.type === 'despesa' ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-500 hover:border-slate-300")}
+                      >
+                        <TrendingDown className="w-4 h-4" /> Saída
+                      </button>
                     </div>
                   </div>
 
@@ -1138,8 +1146,10 @@ export default function Transactions() {
                     />
                     <CategorySuggestion
                       description={formData.description}
+                      notes={formData.notes}
                       type={formData.type}
                       transactions={transactions}
+                      currentCategory={formData.category}
                       onSuggest={(cat) => {
                         setFormData(prev => ({ ...prev, category: cat }));
                       }}
@@ -1148,7 +1158,7 @@ export default function Transactions() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 flex flex-col">
-                      <Label>{formData.type === 'receita' ? 'Categoria de Receita' : 'Categoria de Despesa'}</Label>
+                      <Label>{formData.type === 'receita' ? 'Categoria de Entrada' : 'Categoria de Saída'}</Label>
                       <Popover open={openCategoryCombobox} onOpenChange={setOpenCategoryCombobox}>
                         <PopoverTrigger asChild>
                           <Button
@@ -1626,7 +1636,7 @@ export default function Transactions() {
       <div className="grid md:grid-cols-4 gap-6 mb-8">
         <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-green-100">Receitas</CardTitle>
+            <CardTitle className="text-sm font-medium text-green-100">Entradas</CardTitle>
             <TrendingUp className="h-5 w-5 text-green-200" />
           </CardHeader>
           <CardContent>
@@ -1637,7 +1647,7 @@ export default function Transactions() {
 
         <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-red-100">Despesas</CardTitle>
+            <CardTitle className="text-sm font-medium text-red-100">Saídas</CardTitle>
             <TrendingDown className="h-5 w-5 text-red-200" />
           </CardHeader>
           <CardContent>
@@ -1655,7 +1665,7 @@ export default function Transactions() {
             <div className={`text-2xl font-bold ${saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatBRL(saldoLiquido)}
             </div>
-            <p className="text-xs text-slate-400 mt-1">Receitas - Despesas</p>
+            <p className="text-xs text-slate-400 mt-1">Entradas - Saídas</p>
           </CardContent>
         </Card>
 
@@ -1698,8 +1708,8 @@ export default function Transactions() {
                       contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
                     />
                     <Legend />
-                    <Bar dataKey="receita" name="Receita" fill="#10B981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="despesa" name="Despesa" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="receita" name="Entrada" fill="#10B981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="despesa" name="Saída" fill="#EF4444" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1756,8 +1766,8 @@ export default function Transactions() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Tipos</SelectItem>
-                <SelectItem value="receita">Receitas</SelectItem>
-                <SelectItem value="despesa">Despesas</SelectItem>
+                <SelectItem value="receita">Entradas</SelectItem>
+                <SelectItem value="despesa">Saídas</SelectItem>
               </SelectContent>
             </Select>
 
