@@ -1,7 +1,29 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Printer } from "lucide-react";
+import { Printer, Calendar } from "lucide-react";
 import { formatBRL, formatDate, formatDateTime } from "@/components/utils/formatters";
+
+const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68ea91a66a9614db4a82043d/0e678bbed_CALCARIOAMAZONIALOGO.png";
+const GREEN = "#1a5e35";
+const GREEN_DARK = "#134228";
+const RED = "#cc0000";
+const GREY_BG = "#f4f4f4";
+
+function SectionHeader({ title }) {
+  return (
+    <div style={{
+      background: GREEN,
+      color: "#fff",
+      padding: "6px 10px",
+      fontWeight: "bold",
+      fontSize: "10pt",
+      letterSpacing: "0.3px",
+      marginBottom: "6px"
+    }}>
+      {title}
+    </div>
+  );
+}
 
 export default function A4Receipt({ type, data, onPrint }) {
   const handlePrint = () => {
@@ -10,10 +32,8 @@ export default function A4Receipt({ type, data, onPrint }) {
   };
 
   const renderSaleReceipt = () => {
-    // Preparar dados de pagamento para a tabela
     const paymentRows = [];
 
-    // Adicionar entrada inicial se existir
     if (data.paid_amount > 0 && (!data.installments || data.installments.length === 0)) {
       paymentRows.push({
         descricao: data.payment_method === 'dinheiro' ? 'Dinheiro' :
@@ -28,9 +48,8 @@ export default function A4Receipt({ type, data, onPrint }) {
       });
     }
 
-    // Adicionar parcelas
     if (data.installments && data.installments.length > 0) {
-      data.installments.forEach((inst, idx) => {
+      data.installments.forEach((inst) => {
         paymentRows.push({
           descricao: `Parcela ${inst.installment_number}/${data.installments.length}`,
           vencimento: formatDate(inst.due_date),
@@ -41,10 +60,9 @@ export default function A4Receipt({ type, data, onPrint }) {
       });
     }
 
-    // Se não houver pagamentos registrados, mostrar o total como pendente
     if (paymentRows.length === 0 && data.total && data.total > 0) {
       paymentRows.push({
-        descricao: 'A definir',
+        descricao: 'Parcela 1/1',
         vencimento: formatDate(data.sale_date),
         pagamento: '-',
         valor: data.total,
@@ -53,87 +71,103 @@ export default function A4Receipt({ type, data, onPrint }) {
     }
 
     return (
-      <div style={{
+      <div className="print-receipt" style={{
         width: '210mm',
-        minHeight: '297mm',
-        background: 'white',
-        padding: '10mm',
-        fontFamily: 'Arial, sans-serif',
+        height: '297mm',
+        background: '#fff',
+        padding: '8mm 10mm',
+        fontFamily: 'Arial, Helvetica, sans-serif',
         fontSize: '9pt',
         color: '#000',
-        lineHeight: '1.2'
+        lineHeight: '1.25',
+        position: 'relative',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}>
+        {/* MARCA D'ÁGUA */}
+        <img src={LOGO_URL} alt="" style={{
+          position: 'absolute',
+          bottom: '8mm',
+          right: '8mm',
+          width: '70mm',
+          opacity: 0.06,
+          pointerEvents: 'none',
+          zIndex: 0
+        }} />
+
         {/* CABEÇALHO */}
-        <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '2px solid #1B3C73', paddingBottom: '5px' }}>
-          <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68ea91a66a9614db4a82043d/0e678bbed_CALCARIOAMAZONIALOGO.png" alt="Logo" style={{ maxHeight: '50px', margin: '0 auto 5px auto', display: 'block' }} />
-          <h1 style={{
-            fontSize: '14pt',
-            fontWeight: 'bold',
-            color: '#1B3C73',
-            margin: '0 0 4px 0'
-          }}>
-            {data.company_name || 'EMPRESA'}
-          </h1>
-          <div style={{ fontSize: '9pt', color: '#555', lineHeight: '1.6' }}>
-            {data.company_cnpj && <div>CNPJ: {data.company_cnpj}</div>}
-            {data.company_address && <div>{data.company_address}</div>}
-            {(data.company_city || data.company_state) && (
-              <div>{data.company_city}{data.company_city && data.company_state && ' - '}{data.company_state}</div>
-            )}
-            {data.company_phone && <div>Tel: {data.company_phone}</div>}
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: '10px', paddingBottom: '8px', borderBottom: `2px solid ${GREEN}`, position: 'relative', zIndex: 1 }}>
+          {/* Logo */}
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+            <img src={LOGO_URL} alt="Logo" style={{ maxHeight: '22mm', maxWidth: '30mm', objectFit: 'contain' }} />
+          </div>
+          {/* Empresa centro */}
+          <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', color: GREEN, letterSpacing: '0.5px' }}>
+              {data.company_name || 'CBA SANTARÉM'}
+            </div>
+            {data.company_cnpj && <div style={{ fontSize: '8.5pt', color: '#333' }}>CNPJ: {data.company_cnpj}</div>}
+            {data.company_address && <div style={{ fontSize: '8.5pt', color: '#333' }}>{data.company_address}</div>}
+            <div style={{ fontSize: '8.5pt', color: '#333' }}>
+              {data.company_city && `${data.company_city}`}{data.company_city && data.company_state && ' - '}{data.company_state}
+            </div>
+            {data.company_phone && <div style={{ fontSize: '8.5pt', color: '#333' }}>Tel: {data.company_phone}</div>}
+          </div>
+          {/* Caixa verde direita */}
+          <div style={{ flex: '0 0 auto', minWidth: '52mm' }}>
+            <div style={{
+              background: GREEN,
+              color: '#fff',
+              padding: '8px 10px',
+              borderRadius: '4px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '11pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>PEDIDO DE VENDA</div>
+              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginTop: '2px' }}>N° {data.reference || ''}</div>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px',
+              marginTop: '6px',
+              fontSize: '8.5pt',
+              color: '#333'
+            }}>
+              <Calendar size={12} color={GREEN} style={{ flexShrink: 0 }} />
+              <span><strong>Data de Emissão:</strong> {formatDate(data.sale_date)}</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h2 style={{
-            fontSize: '14pt',
-            fontWeight: 'bold',
-            color: '#0B1E3C',
-            margin: '0'
-          }}>
-            PEDIDO DE VENDA Nº {data.reference || ''}
-          </h2>
-        </div>
-
         {/* DADOS DO PEDIDO */}
-        <div style={{ marginBottom: '8px', background: '#F9FAFB', padding: '8px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 10px 0',
-            color: '#1B3C73',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '6px'
-          }}>
-            Dados do Pedido
-          </h3>
-          <table style={{ width: '100%', fontSize: '9pt' }}>
+        <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+          <SectionHeader title="Dados do Pedido" />
+          <table style={{ width: '100%', fontSize: '9pt', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
-                <td style={{ width: '33%', padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Cliente:</strong>
+                <td style={{ padding: '4px 8px 4px 0', width: '50%', verticalAlign: 'top' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Cliente</div>
                   <div>{data.client_name || ''}</div>
                 </td>
-                <td style={{ width: '33%', padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>CPF/CNPJ:</strong>
-                  <div>{data.client_document}</div>
-                </td>
-                <td style={{ width: '34%', padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Vendedor:</strong>
-                  <div>{data.seller_name || 'N/A'}</div>
+                <td style={{ padding: '4px 0 4px 8px', width: '50%', verticalAlign: 'top', borderLeft: '1px solid #ddd' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>CPF/CNPJ</div>
+                  <div>{data.client_document || '-'}</div>
                 </td>
               </tr>
-              <tr>
-                <td style={{ padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Data de Criação:</strong>
+              <tr style={{ borderTop: '1px solid #eee' }}>
+                <td style={{ padding: '4px 8px 4px 0', verticalAlign: 'top' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Vendedor</div>
+                  <div>{data.seller_name || 'N/A'}</div>
+                </td>
+                <td style={{ padding: '4px 0 4px 8px', verticalAlign: 'top', borderLeft: '1px solid #ddd' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Data de Criação</div>
                   <div>{formatDate(data.created_date)}</div>
                 </td>
-                <td style={{ padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Data de Emissão:</strong>
-                  <div>{formatDate(data.sale_date)}</div>
-                </td>
-                <td style={{ padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Data de Entrega:</strong>
+              </tr>
+              <tr style={{ borderTop: '1px solid #eee' }}>
+                <td style={{ padding: '4px 8px 4px 0', verticalAlign: 'top' }} colSpan={2}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Data de Entrega</div>
                   <div>{data.delivery_date ? formatDate(data.delivery_date) : 'A combinar'}</div>
                 </td>
               </tr>
@@ -141,76 +175,63 @@ export default function A4Receipt({ type, data, onPrint }) {
           </table>
         </div>
 
-
-
         {/* ITENS DO PEDIDO */}
-        <div style={{ marginBottom: '8px' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 8px 0',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '5px',
-            color: '#1B3C73'
-          }}>
-            📦 Itens do Pedido
-          </h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
+        <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+          <SectionHeader title="Itens do Pedido" />
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
             <thead>
-              <tr style={{ background: '#F9FAFB' }}>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'left', color: '#1B3C73', fontWeight: 'bold', width: '12%' }}>Referência</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'left', color: '#1B3C73', fontWeight: 'bold', width: '28%' }}>Descrição</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center', color: '#1B3C73', fontWeight: 'bold', width: '8%' }}>Un.</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center', color: '#1B3C73', fontWeight: 'bold', width: '12%' }}>Quantidade</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', color: '#1B3C73', fontWeight: 'bold', width: '15%' }}>Unitário</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', color: '#1B3C73', fontWeight: 'bold', width: '10%' }}>Desconto</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', color: '#1B3C73', fontWeight: 'bold', width: '15%' }}>Total</th>
+              <tr style={{ background: GREEN, color: '#fff' }}>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left', width: '10%' }}>Referência</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left' }}>Descrição</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '6%' }}>Un.</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '11%' }}>Quantidade</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '13%' }}>Unitário</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '10%' }}>Desconto</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '14%' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {data.items?.map((item, idx) => (
-                <tr key={idx}>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px' }}>{item.product_code || '-'}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px' }}>{item.product_name}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center' }}>{item.unit}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center' }}>{item.quantity}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right' }}>{formatBRL(item.unit_price)}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right' }}>{formatBRL(item.discount || 0)}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(item.total)}</td>
+                <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : GREY_BG }}>
+                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{item.product_code || '-'}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{item.product_name}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{item.unit}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(item.unit_price)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(item.discount || 0)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(item.total)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
 
-        {/* TOTAIS DO PEDIDO */}
-        <div style={{ marginBottom: '8px', background: '#F0F4F8', padding: '8px', borderRadius: '6px', border: '2px solid #1B3C73' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <table style={{ width: '50%', fontSize: '9pt' }}>
+          {/* TOTAIS */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+            <table style={{ width: '55%', fontSize: '9pt', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Total dos Itens:</strong></td>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(data.subtotal || 0)}</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', background: GREY_BG, border: '1px solid #ddd' }}><strong>Total dos Itens</strong></td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', background: GREY_BG, border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(data.subtotal || 0)}</td>
                 </tr>
                 {data.discount > 0 && (
                   <tr>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Desconto:</strong></td>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', color: '#DC2626', fontWeight: 'bold' }}>- {formatBRL(data.discount)}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd' }}><strong>Desconto</strong></td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', color: RED, fontWeight: 'bold' }}>- {formatBRL(data.discount)}</td>
                   </tr>
                 )}
                 {data.shipping > 0 && (
                   <tr>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Frete:</strong></td>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(data.shipping)}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd' }}><strong>Frete</strong></td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(data.shipping)}</td>
                   </tr>
                 )}
                 <tr>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Outros:</strong></td>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(0)}</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd' }}><strong>Outros</strong></td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(0)}</td>
                 </tr>
-                <tr style={{ borderTop: '2px solid #1B3C73' }}>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11pt', color: '#0B1E3C' }}><strong>Valor Total:</strong></td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12pt', fontWeight: 'bold', color: '#1B3C73' }}>{formatBRL(data.total || 0)}</td>
+                <tr style={{ background: GREEN, color: '#fff' }}>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '10pt', border: `1px solid ${GREEN}` }}><strong>VALOR TOTAL</strong></td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '11pt', fontWeight: 'bold', border: `1px solid ${GREEN}` }}>{formatBRL(data.total || 0)}</td>
                 </tr>
               </tbody>
             </table>
@@ -218,35 +239,26 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* FORMA / CONDIÇÕES DE PAGAMENTO */}
-        <div style={{ marginBottom: '8px' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 10px 0',
-            color: '#1B3C73',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '6px'
-          }}>
-            Forma / Condições de Pagamento
-          </h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
+        <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+          <SectionHeader title="Forma / Condições de Pagamento" />
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
             <thead>
-              <tr style={{ background: '#F8FAFC' }}>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'left', color: '#0B1E3C', fontWeight: 'bold' }}>Descrição</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', color: '#0B1E3C', fontWeight: 'bold' }}>Vencimento</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', color: '#0B1E3C', fontWeight: 'bold' }}>Pagamento</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', color: '#0B1E3C', fontWeight: 'bold' }}>Valor</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', color: '#0B1E3C', fontWeight: 'bold' }}>Saldo</th>
+              <tr style={{ background: GREEN, color: '#fff' }}>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left' }}>Descrição</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '15%' }}>Vencimento</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '15%' }}>Pagamento</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '15%' }}>Valor</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '15%' }}>Saldo</th>
               </tr>
             </thead>
             <tbody>
               {paymentRows.map((row, idx) => (
-                <tr key={idx}>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px' }}>{row.descricao}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{row.vencimento}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center' }}>{row.pagamento}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? '#DC2626' : '#059669' }}>
+                <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : GREY_BG }}>
+                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{row.descricao}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{row.vencimento}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{row.pagamento}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? RED : GREEN }}>
                     {formatBRL(row.saldo)}
                   </td>
                 </tr>
@@ -257,26 +269,31 @@ export default function A4Receipt({ type, data, onPrint }) {
 
         {/* OBSERVAÇÕES */}
         {data.notes && (
-          <div style={{ marginBottom: '8px', background: '#FFFBEB', padding: '8px', borderRadius: '6px', border: '1px solid #FDE047' }}>
-            <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '6px', color: '#854D0E' }}>
-              Observações:
-            </div>
-            <div style={{ fontSize: '9pt', color: '#78350F', lineHeight: '1.6' }}>
+          <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+            <SectionHeader title="Observações" />
+            <div style={{
+              border: '1px solid #ddd',
+              padding: '6px 8px',
+              minHeight: '14mm',
+              fontSize: '8.5pt',
+              whiteSpace: 'pre-wrap',
+              color: '#333'
+            }}>
               {data.notes}
             </div>
           </div>
         )}
 
-        {/* LINHAS DE ASSINATURA */}
-        <div style={{ marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #E2E8F0' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', marginTop: '30px', fontSize: '8pt', color: '#333' }}>
+        {/* ASSINATURAS */}
+        <div style={{ marginTop: '16mm', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', gap: '20mm' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', fontSize: '8pt', color: '#333' }}>
                 <strong>Assinatura do Comprador</strong>
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', marginTop: '30px', fontSize: '8pt', color: '#333' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', fontSize: '8pt', color: '#333' }}>
                 <strong>Assinatura do Recebedor</strong>
               </div>
             </div>
@@ -284,9 +301,23 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* RODAPÉ */}
-        <div style={{ marginTop: '30px', textAlign: 'center', fontSize: '8pt', color: '#666', borderTop: '1px solid #E2E8F0', paddingTop: '12px' }}>
-          <p style={{ margin: '0' }}>Este documento é uma via do pedido de venda e serve como comprovante da transação.</p>
-          <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Emitido em {formatDate(new Date().toISOString())}</p>
+        <div style={{
+          position: 'absolute',
+          bottom: '4mm',
+          left: '10mm',
+          right: '10mm',
+          textAlign: 'center',
+          zIndex: 1
+        }}>
+          <div style={{ background: GREEN, color: '#fff', padding: '5px', fontSize: '8.5pt', fontWeight: 'bold', letterSpacing: '0.5px', borderRadius: '3px' }}>
+            SUSTENTABILIDADE QUE GERA PRODUTIVIDADE.
+          </div>
+          <div style={{ fontSize: '7.5pt', color: '#666', marginTop: '3px' }}>
+            Este documento é uma via do pedido de venda e serve como comprovante da transação.
+          </div>
+          <div style={{ fontSize: '7.5pt', color: '#666' }}>
+            Emitido em {formatDate(new Date().toISOString())}
+          </div>
         </div>
       </div>
     );
@@ -296,31 +327,30 @@ export default function A4Receipt({ type, data, onPrint }) {
     const isReceita = data.type === 'receita';
 
     return (
-      <div style={{
+      <div className="print-receipt" style={{
         width: '210mm',
-        minHeight: '297mm',
+        height: '297mm',
         background: 'white',
         padding: '15mm',
         fontFamily: 'Arial, sans-serif',
         fontSize: '10pt',
-        color: '#000'
+        color: '#000',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}>
-        {/* Cabeçalho */}
-        <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px' }}>
-          <h1 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 5px 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: `2px solid ${GREEN}`, paddingBottom: '10px' }}>
+          <h1 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 5px 0', color: GREEN }}>
             {isReceita ? 'RECIBO DE RECEBIMENTO' : 'COMPROVANTE DE PAGAMENTO'}
           </h1>
           <p style={{ fontSize: '10pt', margin: '0' }}>{data.company_name || 'EMPRESA'}</p>
         </div>
 
-        {/* Informações */}
         <div style={{ marginBottom: '15px' }}>
           <p style={{ margin: '5px 0' }}><strong>Data:</strong> {formatDateTime(data.payment_date || data.created_date)}</p>
           <p style={{ margin: '5px 0' }}><strong>{isReceita ? 'Recebido de' : 'Pago para'}:</strong> {data.contact_name || 'N/A'}</p>
         </div>
 
-        {/* Descrição */}
-        <div style={{ marginBottom: '15px', border: '1px solid #ddd', padding: '10px', background: '#f9f9f9' }}>
+        <div style={{ marginBottom: '15px', border: '1px solid #ddd', padding: '10px', background: GREY_BG }}>
           <p style={{ margin: '0 0 5px 0' }}><strong>Descrição:</strong></p>
           <p style={{ margin: '0' }}>{data.description || ''}</p>
           {data.category && (
@@ -328,8 +358,7 @@ export default function A4Receipt({ type, data, onPrint }) {
           )}
         </div>
 
-        {/* Valores */}
-        <div style={{ border: '2px solid #000', padding: '10px', background: '#f0f0f0' }}>
+        <div style={{ border: `2px solid ${GREEN}`, padding: '10px', background: GREY_BG }}>
           <table style={{ width: '100%', fontSize: '11pt' }}>
             <tbody>
               <tr>
@@ -346,7 +375,7 @@ export default function A4Receipt({ type, data, onPrint }) {
                   </tr>
                   <tr>
                     <td style={{ padding: '5px', textAlign: 'right' }}>Saldo Restante:</td>
-                    <td style={{ padding: '5px', textAlign: 'right', color: '#c62828', fontWeight: 'bold' }}>
+                    <td style={{ padding: '5px', textAlign: 'right', color: RED, fontWeight: 'bold' }}>
                       {formatBRL(data.amount - data.paid_amount)}
                     </td>
                   </tr>
@@ -367,16 +396,14 @@ export default function A4Receipt({ type, data, onPrint }) {
           </div>
         )}
 
-        {/* Assinatura */}
         <div style={{ marginTop: '60px', textAlign: 'center' }}>
           <div style={{ borderTop: '1px solid #000', width: '60%', margin: '0 auto', paddingTop: '10px' }}>
             <strong>Assinatura</strong>
           </div>
         </div>
 
-        {/* Rodapé */}
         <div style={{ marginTop: '40px', textAlign: 'center', fontSize: '9pt' }}>
-          <p style={{ fontWeight: 'bold' }}>
+          <p style={{ fontWeight: 'bold', color: GREEN }}>
             {isReceita ? '✓ RECEBIMENTO EFETUADO COM SUCESSO' : '✓ PAGAMENTO EFETUADO COM SUCESSO'}
           </p>
         </div>
@@ -385,16 +412,14 @@ export default function A4Receipt({ type, data, onPrint }) {
   };
 
   const renderBudgetReceipt = () => {
-    // Preparar dados de pagamento para a tabela (similar ao sale, mas talvez com status diferente se for só orçamento)
     const paymentRows = [];
 
-    // Adicionar parcelas
     if (data.installments && data.installments.length > 0) {
-      data.installments.forEach((inst, idx) => {
+      data.installments.forEach((inst) => {
         paymentRows.push({
           descricao: `Parcela ${inst.installment_number}/${data.installments.length}`,
           vencimento: formatDate(inst.due_date),
-          pagamento: inst.payment_date ? formatDate(inst.payment_date) : '-', // Orçamento pode não ter pagamento
+          pagamento: inst.payment_date ? formatDate(inst.payment_date) : '-',
           valor: inst.amount,
           saldo: inst.status === 'pago' ? 0 : inst.amount - (inst.paid_amount || 0)
         });
@@ -403,8 +428,8 @@ export default function A4Receipt({ type, data, onPrint }) {
 
     if (paymentRows.length === 0 && data.total && data.total > 0) {
       paymentRows.push({
-        descricao: 'A definir',
-        vencimento: formatDate(data.sale_date), // Usar data de emissão/criação do orçamento
+        descricao: 'Parcela 1/1',
+        vencimento: formatDate(data.sale_date),
         pagamento: '-',
         valor: data.total,
         saldo: data.total
@@ -412,87 +437,79 @@ export default function A4Receipt({ type, data, onPrint }) {
     }
 
     return (
-      <div style={{
+      <div className="print-receipt" style={{
         width: '210mm',
-        minHeight: '297mm',
-        background: 'white',
-        padding: '10mm',
-        fontFamily: 'Arial, sans-serif',
+        height: '297mm',
+        background: '#fff',
+        padding: '8mm 10mm',
+        fontFamily: 'Arial, Helvetica, sans-serif',
         fontSize: '9pt',
         color: '#000',
-        lineHeight: '1.2'
+        lineHeight: '1.25',
+        position: 'relative',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}>
+        <img src={LOGO_URL} alt="" style={{
+          position: 'absolute', bottom: '8mm', right: '8mm', width: '70mm', opacity: 0.06, pointerEvents: 'none', zIndex: 0
+        }} />
+
         {/* CABEÇALHO */}
-        <div style={{ textAlign: 'center', marginBottom: '10px', borderBottom: '2px solid #1B3C73', paddingBottom: '5px' }}>
-          <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68ea91a66a9614db4a82043d/0e678bbed_CALCARIOAMAZONIALOGO.png" alt="Logo" style={{ maxHeight: '50px', margin: '0 auto 5px auto', display: 'block' }} />
-          <h1 style={{
-            fontSize: '14pt',
-            fontWeight: 'bold',
-            color: '#1B3C73',
-            margin: '0 0 4px 0'
-          }}>
-            {data.company_name || 'EMPRESA'}
-          </h1>
-          <div style={{ fontSize: '9pt', color: '#555', lineHeight: '1.6' }}>
-            {data.company_cnpj && <div>CNPJ: {data.company_cnpj}</div>}
-            {data.company_address && <div>{data.company_address}</div>}
-            {(data.company_city || data.company_state) && (
-              <div>{data.company_city}{data.company_city && data.company_state && ' - '}{data.company_state}</div>
-            )}
-            {data.company_phone && <div>Tel: {data.company_phone}</div>}
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: '10px', paddingBottom: '8px', borderBottom: `2px solid ${GREEN}`, position: 'relative', zIndex: 1 }}>
+          <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center' }}>
+            <img src={LOGO_URL} alt="Logo" style={{ maxHeight: '22mm', maxWidth: '30mm', objectFit: 'contain' }} />
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', color: GREEN, letterSpacing: '0.5px' }}>
+              {data.company_name || 'CBA SANTARÉM'}
+            </div>
+            {data.company_cnpj && <div style={{ fontSize: '8.5pt', color: '#333' }}>CNPJ: {data.company_cnpj}</div>}
+            {data.company_address && <div style={{ fontSize: '8.5pt', color: '#333' }}>{data.company_address}</div>}
+            <div style={{ fontSize: '8.5pt', color: '#333' }}>
+              {data.company_city && `${data.company_city}`}{data.company_city && data.company_state && ' - '}{data.company_state}
+            </div>
+            {data.company_phone && <div style={{ fontSize: '8.5pt', color: '#333' }}>Tel: {data.company_phone}</div>}
+          </div>
+          <div style={{ flex: '0 0 auto', minWidth: '52mm' }}>
+            <div style={{ background: GREEN, color: '#fff', padding: '8px 10px', borderRadius: '4px', textAlign: 'center' }}>
+              <div style={{ fontSize: '11pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>ORÇAMENTO</div>
+              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginTop: '2px' }}>N° {data.reference || ''}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', marginTop: '6px', fontSize: '8.5pt', color: '#333' }}>
+              <Calendar size={12} color={GREEN} style={{ flexShrink: 0 }} />
+              <span><strong>Data de Emissão:</strong> {formatDate(data.sale_date)}</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h2 style={{
-            fontSize: '14pt',
-            fontWeight: 'bold',
-            color: '#0B1E3C',
-            margin: '0'
-          }}>
-            ORÇAMENTO Nº {data.reference || ''}
-          </h2>
-        </div>
-
         {/* DADOS DO ORÇAMENTO */}
-        <div style={{ marginBottom: '8px', background: '#F9FAFB', padding: '8px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 10px 0',
-            color: '#1B3C73',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '6px'
-          }}>
-            Dados do Orçamento
-          </h3>
-          <table style={{ width: '100%', fontSize: '9pt' }}>
+        <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+          <SectionHeader title="Dados do Orçamento" />
+          <table style={{ width: '100%', fontSize: '9pt', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
-                <td style={{ width: '33%', padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Cliente:</strong>
+                <td style={{ padding: '4px 8px 4px 0', width: '50%', verticalAlign: 'top' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Cliente</div>
                   <div>{data.client_name || ''}</div>
                 </td>
-                <td style={{ width: '33%', padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>CPF/CNPJ:</strong>
-                  <div>{data.client_document}</div>
-                </td>
-                <td style={{ width: '34%', padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Vendedor:</strong>
-                  <div>{data.seller_name || 'N/A'}</div>
+                <td style={{ padding: '4px 0 4px 8px', width: '50%', verticalAlign: 'top', borderLeft: '1px solid #ddd' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>CPF/CNPJ</div>
+                  <div>{data.client_document || '-'}</div>
                 </td>
               </tr>
-              <tr>
-                <td style={{ padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Data de Criação:</strong>
+              <tr style={{ borderTop: '1px solid #eee' }}>
+                <td style={{ padding: '4px 8px 4px 0', verticalAlign: 'top' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Vendedor</div>
+                  <div>{data.seller_name || 'N/A'}</div>
+                </td>
+                <td style={{ padding: '4px 0 4px 8px', verticalAlign: 'top', borderLeft: '1px solid #ddd' }}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Data de Criação</div>
                   <div>{formatDate(data.created_date)}</div>
                 </td>
-                <td style={{ padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Data de Emissão:</strong>
-                  <div>{formatDate(data.sale_date)}</div>
-                </td>
-                <td style={{ padding: '4px 0' }}>
-                  <strong style={{ color: '#0B1E3C' }}>Válido até:</strong>
+              </tr>
+              <tr style={{ borderTop: '1px solid #eee' }}>
+                <td style={{ padding: '4px 8px 4px 0', verticalAlign: 'top' }} colSpan={2}>
+                  <div style={{ fontWeight: 'bold', color: GREEN_DARK }}>Válido até</div>
                   <div>{data.valid_until ? formatDate(data.valid_until) : 'N/A'}</div>
                 </td>
               </tr>
@@ -500,76 +517,62 @@ export default function A4Receipt({ type, data, onPrint }) {
           </table>
         </div>
 
-
-
         {/* ITENS DO ORÇAMENTO */}
-        <div style={{ marginBottom: '8px' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 8px 0',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '5px',
-            color: '#1B3C73'
-          }}>
-            📦 Itens do Orçamento
-          </h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
+        <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+          <SectionHeader title="Itens do Orçamento" />
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
             <thead>
-              <tr style={{ background: '#F9FAFB' }}>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'left', color: '#1B3C73', fontWeight: 'bold', width: '12%' }}>Referência</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'left', color: '#1B3C73', fontWeight: 'bold', width: '28%' }}>Descrição</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center', color: '#1B3C73', fontWeight: 'bold', width: '8%' }}>Un.</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center', color: '#1B3C73', fontWeight: 'bold', width: '12%' }}>Quantidade</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', color: '#1B3C73', fontWeight: 'bold', width: '15%' }}>Unitário</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', color: '#1B3C73', fontWeight: 'bold', width: '10%' }}>Desconto</th>
-                <th style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', color: '#1B3C73', fontWeight: 'bold', width: '15%' }}>Total</th>
+              <tr style={{ background: GREEN, color: '#fff' }}>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left', width: '10%' }}>Referência</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left' }}>Descrição</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '6%' }}>Un.</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '11%' }}>Quantidade</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '13%' }}>Unitário</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '10%' }}>Desconto</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '14%' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {data.items?.map((item, idx) => (
-                <tr key={idx}>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px' }}>{item.product_code || '-'}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px' }}>{item.product_name}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center' }}>{item.unit}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'center' }}>{item.quantity}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right' }}>{formatBRL(item.unit_price)}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right' }}>{formatBRL(item.discount || 0)}</td>
-                  <td style={{ border: '1px solid #E2E8F0', padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(item.total)}</td>
+                <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : GREY_BG }}>
+                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{item.product_code || '-'}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{item.product_name}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{item.unit}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{item.quantity}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(item.unit_price)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(item.discount || 0)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(item.total)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
 
-        {/* TOTAIS DO ORÇAMENTO */}
-        <div style={{ marginBottom: '8px', background: '#F0F4F8', padding: '8px', borderRadius: '6px', border: '2px solid #1B3C73' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <table style={{ width: '50%', fontSize: '9pt' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+            <table style={{ width: '55%', fontSize: '9pt', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Total dos Itens:</strong></td>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(data.subtotal || 0)}</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', background: GREY_BG, border: '1px solid #ddd' }}><strong>Total dos Itens</strong></td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', background: GREY_BG, border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(data.subtotal || 0)}</td>
                 </tr>
                 {data.discount > 0 && (
                   <tr>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Desconto:</strong></td>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', color: '#DC2626', fontWeight: 'bold' }}>- {formatBRL(data.discount)}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd' }}><strong>Desconto</strong></td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', color: RED, fontWeight: 'bold' }}>- {formatBRL(data.discount)}</td>
                   </tr>
                 )}
                 {data.shipping > 0 && (
                   <tr>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Frete:</strong></td>
-                    <td style={{ padding: '4px 12px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(data.shipping)}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd' }}><strong>Frete</strong></td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(data.shipping)}</td>
                   </tr>
                 )}
                 <tr>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', color: '#0B1E3C' }}><strong>Outros:</strong></td>
-                  <td style={{ padding: '4px 12px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(0)}</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd' }}><strong>Outros</strong></td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(0)}</td>
                 </tr>
-                <tr style={{ borderTop: '2px solid #1B3C73' }}>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11pt', color: '#0B1E3C' }}><strong>Valor Total:</strong></td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12pt', fontWeight: 'bold', color: '#1B3C73' }}>{formatBRL(data.total || 0)}</td>
+                <tr style={{ background: GREEN, color: '#fff' }}>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '10pt', border: `1px solid ${GREEN}` }}><strong>VALOR TOTAL</strong></td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '11pt', fontWeight: 'bold', border: `1px solid ${GREEN}` }}>{formatBRL(data.total || 0)}</td>
                 </tr>
               </tbody>
             </table>
@@ -577,35 +580,26 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* FORMA / CONDIÇÕES DE PAGAMENTO */}
-        <div style={{ marginBottom: '8px' }}>
-          <h3 style={{
-            fontSize: '11pt',
-            fontWeight: 'bold',
-            margin: '0 0 10px 0',
-            color: '#1B3C73',
-            borderBottom: '2px solid #1B3C73',
-            paddingBottom: '6px'
-          }}>
-            Forma / Condições de Pagamento
-          </h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
+        <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+          <SectionHeader title="Forma / Condições de Pagamento" />
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
             <thead>
-              <tr style={{ background: '#F8FAFC' }}>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'left', color: '#0B1E3C', fontWeight: 'bold' }}>Descrição</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', color: '#0B1E3C', fontWeight: 'bold' }}>Vencimento</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', color: '#0B1E3C', fontWeight: 'bold' }}>Pagamento</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', color: '#0B1E3C', fontWeight: 'bold' }}>Valor</th>
-                <th style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', color: '#0B1E3C', fontWeight: 'bold' }}>Saldo</th>
+              <tr style={{ background: GREEN, color: '#fff' }}>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left' }}>Descrição</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '15%' }}>Vencimento</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'center', width: '15%' }}>Pagamento</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '15%' }}>Valor</th>
+                <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'right', width: '15%' }}>Saldo</th>
               </tr>
             </thead>
             <tbody>
               {paymentRows.map((row, idx) => (
-                <tr key={idx}>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px' }}>{row.descricao}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{row.vencimento}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'center' }}>{row.pagamento}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
-                  <td style={{ border: '1px solid #E0E0E0', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? '#DC2626' : '#059669' }}>
+                <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : GREY_BG }}>
+                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{row.descricao}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{row.vencimento}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{row.pagamento}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? RED : GREEN }}>
                     {formatBRL(row.saldo)}
                   </td>
                 </tr>
@@ -616,26 +610,24 @@ export default function A4Receipt({ type, data, onPrint }) {
 
         {/* OBSERVAÇÕES */}
         {data.notes && (
-          <div style={{ marginBottom: '8px', background: '#FFFBEB', padding: '8px', borderRadius: '6px', border: '1px solid #FDE047' }}>
-            <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '6px', color: '#854D0E' }}>
-              Observações:
-            </div>
-            <div style={{ fontSize: '9pt', color: '#78350F', lineHeight: '1.6' }}>
+          <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
+            <SectionHeader title="Observações" />
+            <div style={{ border: '1px solid #ddd', padding: '6px 8px', minHeight: '14mm', fontSize: '8.5pt', whiteSpace: 'pre-wrap', color: '#333' }}>
               {data.notes}
             </div>
           </div>
         )}
 
-        {/* LINHAS DE ASSINATURA */}
-        <div style={{ marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #E2E8F0' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', marginTop: '30px', fontSize: '8pt', color: '#333' }}>
+        {/* ASSINATURAS */}
+        <div style={{ marginTop: '16mm', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', gap: '20mm' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', fontSize: '8pt', color: '#333' }}>
                 <strong>Assinatura do Cliente</strong>
               </div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', marginTop: '30px', fontSize: '8pt', color: '#333' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '4px', fontSize: '8pt', color: '#333' }}>
                 <strong>Assinatura do Vendedor</strong>
               </div>
             </div>
@@ -643,14 +635,16 @@ export default function A4Receipt({ type, data, onPrint }) {
         </div>
 
         {/* RODAPÉ */}
-        <div style={{ marginTop: '30px', textAlign: 'center', fontSize: '8pt', color: '#666', borderTop: '1px solid #E2E8F0', paddingTop: '12px' }}>
-          <p style={{ margin: '0' }}>Este documento é um orçamento e não constitui uma venda final.</p>
-          <p style={{ margin: '5px 0 0 0', fontWeight: 'bold' }}>Emitido em {formatDate(new Date().toISOString())}</p>
+        <div style={{ position: 'absolute', bottom: '4mm', left: '10mm', right: '10mm', textAlign: 'center', zIndex: 1 }}>
+          <div style={{ background: GREEN, color: '#fff', padding: '5px', fontSize: '8.5pt', fontWeight: 'bold', letterSpacing: '0.5px', borderRadius: '3px' }}>
+            SUSTENTABILIDADE QUE GERA PRODUTIVIDADE.
+          </div>
+          <div style={{ fontSize: '7.5pt', color: '#666', marginTop: '3px' }}>Este documento é um orçamento e não constitui uma venda final.</div>
+          <div style={{ fontSize: '7.5pt', color: '#666' }}>Emitido em {formatDate(new Date().toISOString())}</div>
         </div>
       </div>
     );
   };
-
 
   const renderReceiptContent = () => {
     switch (type) {
@@ -689,20 +683,37 @@ export default function A4Receipt({ type, data, onPrint }) {
 
       {renderReceiptContent()}
 
-      <style jsx>{`
+      <style>{`
         @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-receipt, .print-receipt * {
+            visibility: visible;
+          }
+          .print-receipt {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            padding: 8mm 10mm;
+            box-sizing: border-box;
+          }
           .no-print {
             display: none !important;
           }
-
-          body {
-            margin: 0;
-            padding: 0;
-          }
-
           @page {
             size: A4;
             margin: 0;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 210mm;
+            height: 297mm;
+            overflow: hidden;
           }
         }
       `}</style>

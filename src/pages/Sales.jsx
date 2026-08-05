@@ -77,7 +77,7 @@ export default function Sales() {
 
   const [receiptSale, setReceiptSale] = useState(null); 
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false); 
-  const [receiptType, setReceiptType] = useState('thermal');
+  const [receiptType, setReceiptType] = useState('a4');
   
   const [paymentReceiptData, setPaymentReceiptData] = useState(null);
   const [isPaymentReceiptOpen, setIsPaymentReceiptOpen] = useState(false);
@@ -1609,7 +1609,7 @@ export default function Sales() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handlePrintReceipt(sale, 'thermal')}
+                        onClick={() => handlePrintReceipt(sale, 'a4')}
                       >
                         <Printer className="w-4 h-4 mr-1" />
                         Pedido
