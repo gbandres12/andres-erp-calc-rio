@@ -52,12 +52,22 @@ export default function DailyFinancialReport() {
   const totalEntradas = entradas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
   const totalSaidas = saidas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
 
-  // Abatimentos (descontos) registrados nas transações do dia
+  // Abatimentos do dia: transações com desconto registrado (discount > 0) OU
+  // transações manuais cuja descrição contenha "ABATIMENTO" (forma como o usuário
+  // registra abatimentos diretamente na tela de Lançamentos).
+  const isAbatimento = (t) =>
+    (t.discount || 0) > 0 ||
+    (t.description || "").toLowerCase().includes("abatimento");
+
+  const abatimentoValue = (t) =>
+    (t.discount || 0) > 0 ? (t.discount || 0) : (t.paid_amount || t.amount || 0);
+
   const abatimentos = useMemo(
-    () => dayTransactions.filter((t) => (t.discount || 0) > 0),
+    () => [...dayTransactions.filter(isAbatimento)].sort((a, b) =>
+      a.description.localeCompare(b.description, "pt-BR")),
     [dayTransactions]
   );
-  const totalAbatimentos = abatimentos.reduce((sum, t) => sum + (t.discount || 0), 0);
+  const totalAbatimentos = abatimentos.reduce((sum, t) => sum + abatimentoValue(t), 0);
 
   // Saldo inicial = saldo da conta - entradas + saidas do dia selecionado
   const saldoFinal = mainAccount?.current_balance ?? 0;
@@ -168,7 +178,7 @@ export default function DailyFinancialReport() {
         <td>${String(i + 1).padStart(2, "0")}</td>
         <td>${t.description}</td>
         <td>${t.category || (t.type === "receita" ? "Venda" : "Compra")}</td>
-        <td style="color:#7c3aed;font-weight:bold;text-align:right">${formatBRL(t.discount)}</td>
+        <td style="color:#7c3aed;font-weight:bold;text-align:right">${formatBRL(abatimentoValue(t))}</td>
       </tr>`).join("")}
       <tr class="total-row">
         <td colspan="3" style="text-align:right">TOTAL ABATIMENTOS</td>
@@ -404,7 +414,7 @@ export default function DailyFinancialReport() {
                     <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">
                       {t.category || (t.type === "receita" ? "Venda" : "Compra")}
                     </td>
-                    <td className="py-2 px-4 text-right font-bold text-purple-600">{formatBRL(t.discount)}</td>
+                    <td className="py-2 px-4 text-right font-bold text-purple-600">{formatBRL(abatimentoValue(t))}</td>
                   </tr>
                 ))}
               </tbody>
