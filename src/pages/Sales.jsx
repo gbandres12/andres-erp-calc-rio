@@ -183,8 +183,9 @@ export default function Sales() {
 
   const createSaleMutation = useMutation({
     mutationFn: async (data) => {
-      // Busca TODAS as vendas do sistema para garantir sequência global sem colisão
-      const allSales = await base44.entities.Sale.list('-created_date', 500);
+      // Sequência POR FILIAL: busca apenas as vendas da filial atual
+      // (evita duplicar numeração entre CBA Santarém, Mucajaí e outras filiais)
+      const allSales = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
       let maxNum = 0;
       allSales.forEach(s => {
         const match = s.reference?.match(/^VENDA-(\d+)$/);

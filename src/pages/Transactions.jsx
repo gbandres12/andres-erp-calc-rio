@@ -72,6 +72,7 @@ export default function Transactions() {
     account_id: "",
     payment_method: "dinheiro",
     discount: 0,
+    cost_center: "",
     notes: ""
   });
 
@@ -179,7 +180,7 @@ export default function Transactions() {
   });
 
   const registerPaymentMutation = useMutation({
-    mutationFn: async ({ id, amount, discount, date, accountId, paymentMethod, notes }) => {
+    mutationFn: async ({ id, amount, discount, date, accountId, paymentMethod, notes, costCenter }) => {
       const transaction = transactions.find(t => t.id === id);
       if (!transaction) throw new Error("Transação não encontrada");
 
@@ -237,6 +238,7 @@ export default function Transactions() {
         status: newStatus,
         payment_date: newStatus === 'pago' ? date : transaction.payment_date,
         account_id: accountId || transaction.account_id,
+        cost_center: costCenter || transaction.cost_center || "",
         notes: transactionNotes
       });
 
@@ -272,6 +274,7 @@ export default function Transactions() {
       payment_date: getTodayDate(),
       account_id: "",
       payment_method: "dinheiro",
+      cost_center: "",
       notes: ""
       });
 
@@ -555,6 +558,7 @@ export default function Transactions() {
       payment_date: new Date().toISOString().split('T')[0],
       account_id: transaction.account_id || "",
       payment_method: "dinheiro",
+      cost_center: transaction.cost_center || "",
       notes: ""
     });
     setIsReceivePayOpen(true);
@@ -583,7 +587,8 @@ export default function Transactions() {
       date: paymentFormData.payment_date,
       accountId: paymentFormData.account_id,
       paymentMethod: paymentFormData.payment_method,
-      notes: paymentFormData.notes
+      notes: paymentFormData.notes,
+      costCenter: paymentFormData.cost_center
     });
   };
 
@@ -1262,16 +1267,15 @@ export default function Transactions() {
                     </div>
                   </div>
 
-                  {formData.type === 'despesa' && (
-                    <div className="space-y-2">
-                       <Label>Centro de Custo</Label>
-                       <Input 
-                          value={formData.cost_center} 
-                          onChange={e => setFormData({...formData, cost_center: e.target.value})} 
-                          placeholder="Ex: Administrativo, Frota, Obras..."
-                       />
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                     <Label>Centro de Custo</Label>
+                     <Input
+                        value={formData.cost_center}
+                        onChange={e => setFormData({...formData, cost_center: e.target.value})}
+                        placeholder="Ex: Administrativo, Frota, Obras, Vendas..."
+                     />
+                     <p className="text-xs text-slate-500">Necessário para o extrato por centro de custo e abatimentos.</p>
+                  </div>
 
                   <div className="space-y-2">
                     <Label>Data de Vencimento *</Label>
@@ -1476,6 +1480,16 @@ export default function Transactions() {
                       <SelectItem value="cheque">📝 Cheque</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Centro de Custo</Label>
+                  <Input
+                    value={paymentFormData.cost_center}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, cost_center: e.target.value })}
+                    placeholder="Ex: Administrativo, Frota, Obras, Vendas..."
+                  />
+                  <p className="text-xs text-slate-500">Informe o centro de custo onde este abatimento deve ser contabilizado.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -1868,6 +1882,16 @@ export default function Transactions() {
                         )}
                         {transaction.contact_name && (
                           <span className="text-xs text-slate-500">• {transaction.contact_name}</span>
+                        )}
+                        {transaction.cost_center && (
+                          <Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200">
+                            CC: {transaction.cost_center}
+                          </Badge>
+                        )}
+                        {((transaction.discount || 0) > 0 || (transaction.description || '').toLowerCase().includes('abatimento')) && (
+                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                            Abatimento
+                          </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
