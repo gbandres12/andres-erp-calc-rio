@@ -25,7 +25,7 @@ const PAYMENT_METHODS = [
 
 export default function SalePaymentDialog({ sale, accounts, company, open, onClose, onSuccess }) {
   const [payments, setPayments] = useState([
-    { description: "Pagamento", amount: "", date: getTodayDate(), account_id: "", payment_method: "pix" }
+    { description: "Pagamento", amount: "", date: getTodayDate(), account_id: "", payment_method: "pix", discount: 0 }
   ]);
   const [saving, setSaving] = useState(false);
   const [receiptData, setReceiptData] = useState(null); // { payment, sale, previousPayments }
@@ -36,10 +36,11 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
   const saleTotal = sale.total || 0;
   const remaining = saleTotal - alreadyPaid;
   const totalThisPayment = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const newRemaining = remaining - totalThisPayment;
+  const totalAbatimento = payments.reduce((s, p) => s + (parseFloat(p.discount) || 0), 0);
+  const newRemaining = remaining - totalThisPayment - totalAbatimento;
 
   const addPayment = () =>
-    setPayments([...payments, { description: `Pagamento ${payments.length + 1}`, amount: "", date: getTodayDate(), account_id: "", payment_method: "pix" }]);
+    setPayments([...payments, { description: `Pagamento ${payments.length + 1}`, amount: "", date: getTodayDate(), account_id: "", payment_method: "pix", discount: 0 }]);
 
   const removePayment = (idx) =>
     setPayments(payments.filter((_, i) => i !== idx));
@@ -85,10 +86,14 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           notes: p.description || ""
         });
 
+        const disc = parseFloat(p.discount) || 0;
         // Criar transação financeira
         await base44.entities.Transaction.create({
           description: `${sale.reference} - ${p.description || "Pagamento"} - ${sale.client_name}`,
           amount: amt,
+          original_amount: amt + disc,
+          discount: disc,
+          discount_type: "valor",
           type: "receita",
           category: "Vendas",
           status: "pago",
@@ -99,7 +104,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           contact_name: sale.client_name,
           company_id: sale.company_id,
           paid_amount: amt,
-          notes: `Venda: ${sale.reference}`
+          notes: `Venda: ${sale.reference}${disc > 0 ? ` | Abatimento: ${formatBRL(disc)}` : ""}`
         });
 
         createdPayments.push({ ...salePayment, amount: amt, payment_date: p.date, payment_method: p.payment_method, notes: p.description });
@@ -107,7 +112,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
 
       // Atualizar venda
       const newPaid = alreadyPaid + totalThisPayment;
-      const newRem = Math.max(0, saleTotal - newPaid);
+      const newRem = Math.max(0, saleTotal - newPaid - totalAbatimento);
       let paymentStatus = "parcial";
       if (newRem <= 0.01) paymentStatus = "pago";
       else if (newPaid === 0) paymentStatus = "pendente";
@@ -116,7 +121,8 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
         paid_amount: newPaid,
         remaining_amount: newRem,
         payment_status: paymentStatus,
-        status: newRem <= 0.01 ? "concluida" : sale.status
+        status: newRem <= 0.01 ? "concluida" : sale.status,
+        discount: (sale.discount || 0) + totalAbatimento
       });
 
       await base44.functions.invoke("recalculateBalance", { company_id: sale.company_id });
@@ -236,6 +242,16 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
                     />
                   </div>
                   <div className="space-y-1">
+                    <Label className="text-xs">Abatimento (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      value={p.discount}
+                      onChange={e => updatePayment(idx, "discount", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
                     <Label className="text-xs">Data</Label>
                     <Input
                       type="date"
@@ -296,6 +312,12 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
               <span>Pagando agora:</span>
               <span className="font-bold text-blue-700">{formatBRL(totalThisPayment)}</span>
             </div>
+            {totalAbatimento > 0 && (
+              <div className="flex justify-between text-sm mt-1">
+                <span>Abatimento:</span>
+                <span className="font-bold text-purple-600">- {formatBRL(totalAbatimento)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm mt-1">
               <span>Saldo após pagamento:</span>
               <span className={`font-bold ${newRemaining <= 0.01 ? "text-green-700" : "text-orange-700"}`}>

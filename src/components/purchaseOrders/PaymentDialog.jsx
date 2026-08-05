@@ -20,6 +20,7 @@ export default function PaymentDialog({ order, accounts, open, onClose, payments
 
   const [formData, setFormData] = useState({
     amount: "",
+    discount: "",
     payment_date: new Date().toISOString().split("T")[0],
     account_id: "",
     payment_method: "pix",
@@ -30,26 +31,32 @@ export default function PaymentDialog({ order, accounts, open, onClose, payments
     mutationFn: async (data) => {
       const account = accounts.find(a => a.id === data.account_id);
       const amount = parseFloat(data.amount);
+      const discount = parseFloat(data.discount) || 0;
 
-      if (amount > remaining + 0.01) {
-        throw new Error(`Valor (${formatCurrency(amount)}) supera o saldo devedor (${formatCurrency(remaining)})`);
+      if (amount + discount > remaining + 0.01) {
+        throw new Error(`Valor + abatimento (${formatCurrency(amount + discount)}) supera o saldo devedor (${formatCurrency(remaining)})`);
       }
 
       // Criar pagamento parcial
       await base44.entities.PurchaseOrderPayment.create({
-        ...data,
+        payment_method: data.payment_method,
         amount,
+        payment_date: data.payment_date,
+        account_id: data.account_id,
+        notes: data.notes,
         purchase_order_id: order.id,
         purchase_order_reference: order.reference,
         account_name: account?.name || "",
         company_id: companyId,
       });
 
-      // Criar lançamento financeiro (despesa paga)
+      // Criar lançamento financeiro (despesa paga) com abatimento registrado
       await base44.entities.Transaction.create({
         description: `Pgto parcial ${order.reference} - ${order.item_name}`,
         amount,
-        original_amount: amount,
+        original_amount: amount + discount,
+        discount,
+        discount_type: "valor",
         type: "despesa",
         category: "Compras de Insumos",
         status: "pago",
@@ -60,18 +67,14 @@ export default function PaymentDialog({ order, accounts, open, onClose, payments
         contact_name: order.supplier_name,
         company_id: companyId,
         paid_amount: amount,
-        notes: `Pagamento parcial do pedido ${order.reference}`,
+        notes: `Pagamento parcial do pedido ${order.reference}${discount > 0 ? ` | Abatimento: ${formatCurrency(discount)}` : ""}`,
       });
 
-      // Atualizar saldo da conta
-      if (account) {
-        await base44.entities.FinancialAccount.update(account.id, {
-          current_balance: (account.current_balance || 0) - amount,
-        });
-      }
+      // Recalcular saldo da conta via função backend
+      await base44.functions.invoke("recalculateBalance", { company_id: companyId });
 
       // Verificar se quitou tudo e atualizar status
-      const newTotalPaid = totalPaid + amount;
+      const newTotalPaid = totalPaid + amount + discount;
       if (newTotalPaid >= order.total_amount - 0.01) {
         await base44.entities.PurchaseOrder.update(order.id, { status: "recebido" });
       }
@@ -82,7 +85,7 @@ export default function PaymentDialog({ order, accounts, open, onClose, payments
       queryClient.invalidateQueries(["transactions"]);
       queryClient.invalidateQueries(["financialAccounts"]);
       toast.success("Pagamento registrado com sucesso!");
-      setFormData({ amount: "", payment_date: new Date().toISOString().split("T")[0], account_id: "", payment_method: "pix", notes: "" });
+      setFormData({ amount: "", discount: "", payment_date: new Date().toISOString().split("T")[0], account_id: "", payment_method: "pix", notes: "" });
       onClose();
     },
     onError: (error) => {
@@ -158,6 +161,17 @@ export default function PaymentDialog({ order, accounts, open, onClose, payments
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   placeholder={`Máx: ${formatCurrency(remaining)}`}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Abatimento (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.discount}
+                  onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+                  placeholder="0,00"
                 />
               </div>
               <div className="space-y-2">

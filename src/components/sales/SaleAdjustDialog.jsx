@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +17,16 @@ export default function SaleAdjustDialog({ sale, open, onClose, onSuccess }) {
     sale?.items?.[0]?.quantity || sale?.total || 0
   );
   const [notes, setNotes] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const companyId = sale?.company_id || localStorage.getItem("selectedCompanyId");
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts", companyId],
+    queryFn: () => base44.entities.FinancialAccount.filter({ company_id: companyId, is_active: true }),
+    enabled: !!open && !!companyId,
+    initialData: [],
+  });
 
   if (!sale) return null;
 
@@ -52,25 +63,34 @@ export default function SaleAdjustDialog({ sale, open, onClose, onSuccess }) {
           : `[AJUSTE em ${getTodayDate()}] Quantidade: ${originalQty} → ${newQuantity} ton | Valor: ${formatBRL(originalTotal)} → ${formatBRL(newTotal)}`
       });
 
-      // 2. Se houve diferença, lançar ajuste no financeiro
+      // 2. Se houve diferença, lançar abatimento no caixa como transação paga
       if (Math.abs(difference) > 0.01) {
+        const today = getTodayDate();
         await base44.entities.Transaction.create({
-          description: `Ajuste de venda ${sale.reference} - ${sale.client_name}`,
+          description: `Abatimento de venda ${sale.reference} - ${sale.client_name}`,
           amount: Math.abs(difference),
-          type: difference > 0 ? "receita" : "despesa",
-          category: "Ajustes",
-          status: "pendente",
-          due_date: getTodayDate(),
+          original_amount: Math.abs(difference),
+          discount: difference > 0 ? Math.abs(difference) : 0,
+          discount_type: "valor",
+          type: difference > 0 ? "despesa" : "receita",
+          category: "Abatimentos Vendas",
+          status: "pago",
+          due_date: today,
+          payment_date: today,
+          account_id: accountId || accounts[0]?.id || null,
           contact_id: sale.client_id,
           contact_name: sale.client_name,
           company_id: sale.company_id,
+          paid_amount: Math.abs(difference),
           notes: `Ajuste proporcional: ${originalQty} → ${newQuantity} ton\n${notes || ''}`
         });
+        await base44.functions.invoke("recalculateBalance", { company_id: sale.company_id });
       }
 
       toast.success("Venda ajustada com sucesso!");
       setNewQuantity(originalQty);
       setNotes("");
+      setAccountId("");
       setStep(1);
       onClose();
       onSuccess();
@@ -167,6 +187,18 @@ export default function SaleAdjustDialog({ sale, open, onClose, onSuccess }) {
                 Um lançamento de {adjustmentType} de *{formatBRL(Math.abs(difference))}* será criado automaticamente no financeiro.
               </AlertDescription>
             </Alert>
+
+            <div className="space-y-2">
+              <Label>Conta (caixa) para o abatimento</Label>
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a conta (opcional)" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name} ({formatBRL(a.current_balance)})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2">
               <Label>Observações (opcional)</Label>

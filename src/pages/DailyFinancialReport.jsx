@@ -52,6 +52,13 @@ export default function DailyFinancialReport() {
   const totalEntradas = entradas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
   const totalSaidas = saidas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
 
+  // Abatimentos (descontos) registrados nas transações do dia
+  const abatimentos = useMemo(
+    () => dayTransactions.filter((t) => (t.discount || 0) > 0),
+    [dayTransactions]
+  );
+  const totalAbatimentos = abatimentos.reduce((sum, t) => sum + (t.discount || 0), 0);
+
   // Saldo inicial = saldo da conta - entradas + saidas do dia selecionado
   const saldoFinal = mainAccount?.current_balance ?? 0;
   const saldoInicial = saldoFinal - totalEntradas + totalSaidas;
@@ -150,6 +157,26 @@ export default function DailyFinancialReport() {
       </tr>
     </tbody>
   </table>
+
+  ${abatimentos.length > 0 ? `
+  <div class="section-title">🏷️ Abatimentos (${abatimentos.length})</div>
+  <table>
+    <thead><tr><th style="width:30px">#</th><th>Descrição</th><th style="width:80px">Origem</th><th style="width:120px;text-align:right">Abatimento</th></tr></thead>
+    <tbody>
+      ${abatimentos.map((t, i) => `
+      <tr>
+        <td>${String(i + 1).padStart(2, "0")}</td>
+        <td>${t.description}</td>
+        <td>${t.category || (t.type === "receita" ? "Venda" : "Compra")}</td>
+        <td style="color:#7c3aed;font-weight:bold;text-align:right">${formatBRL(t.discount)}</td>
+      </tr>`).join("")}
+      <tr class="total-row">
+        <td colspan="3" style="text-align:right">TOTAL ABATIMENTOS</td>
+        <td style="color:#7c3aed;text-align:right">${formatBRL(totalAbatimentos)}</td>
+      </tr>
+    </tbody>
+  </table>
+  ` : ""}
 
   <script>window.onload = function(){ window.print(); }<\/script>
 </body>
@@ -344,6 +371,53 @@ export default function DailyFinancialReport() {
           )}
         </CardContent>
       </Card>
+
+      {/* Abatimentos */}
+      {abatimentos.length > 0 && (
+        <Card className="mt-6 border-purple-200">
+          <CardHeader className="border-b border-purple-100 bg-purple-50/50">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-purple-800 flex items-center gap-2">
+                <span className="text-xl">🏷️</span>
+                Abatimentos do Dia
+              </CardTitle>
+              <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
+                {formatBRL(totalAbatimentos)}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-slate-50">
+                  <th className="text-left py-2 px-4 font-medium text-slate-500 w-10">#</th>
+                  <th className="text-left py-2 px-4 font-medium text-slate-500">Descrição</th>
+                  <th className="text-left py-2 px-4 font-medium text-slate-500 hidden md:table-cell">Origem</th>
+                  <th className="text-right py-2 px-4 font-medium text-slate-500">Abatimento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {abatimentos.map((t, i) => (
+                  <tr key={t.id} className="border-b last:border-0 hover:bg-purple-50/30">
+                    <td className="py-2 px-4 text-slate-400 text-xs">{String(i + 1).padStart(2, "0")}</td>
+                    <td className="py-2 px-4 font-medium text-slate-800">{t.description}</td>
+                    <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">
+                      {t.category || (t.type === "receita" ? "Venda" : "Compra")}
+                    </td>
+                    <td className="py-2 px-4 text-right font-bold text-purple-600">{formatBRL(t.discount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-purple-50 border-t-2 border-purple-200">
+                  <td colSpan={3} className="py-3 px-4 font-bold text-purple-800 text-right">TOTAL ABATIMENTOS</td>
+                  <td className="py-3 px-4 text-right font-bold text-purple-700 text-base">{formatBRL(totalAbatimentos)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
