@@ -1,0 +1,107 @@
+{
+  "name": "Barter",
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "string",
+      "description": "Refer\u00eancia \u00fanica (PERM-00001)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa/filial"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID do cliente"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Nome do cliente (cache)"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da permuta"
+    },
+    "limestone_tons": {
+      "type": "number",
+      "default": 0,
+      "description": "Toneladas de calc\u00e1rio entregues (sa\u00edda para o cliente)"
+    },
+    "limestone_unit_value": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor por tonelada de calc\u00e1rio"
+    },
+    "corn_tons": {
+      "type": "number",
+      "default": 0,
+      "description": "Toneladas de milho recebidas (entrada no p\u00e1tio)"
+    },
+    "corn_unit_value": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor por tonelada de milho"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "aberto",
+        "parcial",
+        "compensado"
+      ],
+      "default": "aberto",
+      "description": "Status da permuta"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "reference",
+    "company_id",
+    "client_name",
+    "date"
+  ],
+  "rls": {
+    "create": {
+      "data.company_id": {
+        "$in": "{{user.data.allowed_companies}}"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.company_id": {
+            "$in": "{{user.data.allowed_companies}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

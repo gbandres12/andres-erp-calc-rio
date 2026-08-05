@@ -8,7 +8,7 @@ import {
   BarChart3, Settings, LogOut, ChevronDown, ChevronUp,
   Home, FileText, History, UserCircle, PackageCheck,
   ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
-  ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight, Receipt, Upload, Layers
+  ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight, Receipt, Upload, Layers, Wheat
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarProvider, SidebarTrigger
@@ -66,6 +66,7 @@ const navigationGroups = [
       { title: "Orçamentos", url: "Quotes", icon: FileText },
       { title: "Vendas", url: "Sales", icon: ShoppingCart },
       { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck },
+      { title: "Saídas e Permutas", url: "ClientDeliveries", icon: Wheat },
       { title: "CRM", url: "CRM", icon: Users }
     ]
   },
