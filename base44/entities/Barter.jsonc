@@ -18,6 +18,14 @@
       "type": "string",
       "description": "Nome do cliente (cache)"
     },
+    "sale_id": {
+      "type": "string",
+      "description": "ID da venda vinculada (opcional)"
+    },
+    "sale_reference": {
+      "type": "string",
+      "description": "Refer\u00eancia da venda vinculada (cache)"
+    },
     "date": {
       "type": "string",
       "format": "date",

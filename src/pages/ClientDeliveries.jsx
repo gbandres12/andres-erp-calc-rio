@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { BarterDialog } from "@/components/barter/BarterDialog";
 import {
   TruckIcon, Users, Package, Wheat, ArrowLeftRight, Plus, Scale
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 export default function ClientDeliveries() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [barterOpen, setBarterOpen] = useState(false);
+  const [barterSearch, setBarterSearch] = useState("");
   const queryClient = useQueryClient();
 
   // Pesagens (carregamentos) da filial
@@ -79,6 +81,11 @@ export default function ClientDeliveries() {
     });
     return { limestone, corn, limestoneValue, cornValue, balance: limestoneValue - cornValue, open };
   }, [barters]);
+
+  const filteredBarters = useMemo(
+    () => barters.filter(b => (b.client_name || '').toLowerCase().includes(barterSearch.toLowerCase())),
+    [barters, barterSearch]
+  );
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['barters'] });
@@ -265,10 +272,14 @@ export default function ClientDeliveries() {
       {/* Permutas (Calcário × Milho) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ArrowLeftRight className="w-5 h-5 text-amber-600" />
-            Permutas (Calcário × Milho)
-          </CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="w-5 h-5 text-amber-600" />
+              Permutas (Calcário × Milho)
+            </CardTitle>
+            <Input placeholder="Buscar cliente..." value={barterSearch}
+              onChange={e => setBarterSearch(e.target.value)} className="md:w-64" />
+          </div>
         </CardHeader>
         <CardContent>
           {barters.length === 0 ? (
@@ -310,6 +321,7 @@ export default function ClientDeliveries() {
                       <th className="py-2 px-3">Referência</th>
                       <th className="py-2 px-3">Data</th>
                       <th className="py-2 px-3">Cliente</th>
+                      <th className="py-2 px-3">Venda</th>
                       <th className="py-2 px-3 text-right">Calcário (t)</th>
                       <th className="py-2 px-3 text-right">Milho (t)</th>
                       <th className="py-2 px-3 text-right">Saldo</th>
@@ -317,7 +329,7 @@ export default function ClientDeliveries() {
                     </tr>
                   </thead>
                   <tbody>
-                    {barters.map(b => {
+                    {filteredBarters.map(b => {
                       const ls = (b.limestone_tons || 0) * (b.limestone_unit_value || 0);
                       const cn = (b.corn_tons || 0) * (b.corn_unit_value || 0);
                       const bal = ls - cn;
@@ -326,6 +338,7 @@ export default function ClientDeliveries() {
                           <td className="py-2 px-3 font-mono text-xs text-slate-500">{b.reference}</td>
                           <td className="py-2 px-3 text-slate-600">{formatDate(b.date)}</td>
                           <td className="py-2 px-3 font-medium">{b.client_name}</td>
+                          <td className="py-2 px-3 text-slate-600 text-xs">{b.sale_reference || '-'}</td>
                           <td className="py-2 px-3 text-right text-blue-700 font-medium">
                             {(b.limestone_tons || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
                           </td>

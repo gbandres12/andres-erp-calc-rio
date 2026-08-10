@@ -10,19 +10,22 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { formatBRL, getTodayDate } from "@/components/utils/formatters";
+import { formatBRL, formatDate, getTodayDate } from "@/components/utils/formatters";
 import { toast } from "sonner";
 
 const empty = {
   client_id: "", client_name: "", date: getTodayDate(),
   limestone_tons: 0, limestone_unit_value: 0,
-  corn_tons: 0, corn_unit_value: 0, notes: ""
+  corn_tons: 0, corn_unit_value: 0,
+  sale_id: "", sale_reference: "", notes: ""
 };
 
 export function BarterDialog({ open, onOpenChange, companyId, onSaved }) {
   const [contacts, setContacts] = useState([]);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [sales, setSales] = useState([]);
 
   useEffect(() => {
     if (open && companyId) {
@@ -32,15 +35,35 @@ export function BarterDialog({ open, onOpenChange, companyId, onSaved }) {
     }
   }, [open, companyId]);
 
+  useEffect(() => {
+    if (form.client_id && companyId) {
+      base44.entities.Sale.filter({ client_id: form.client_id, company_id: companyId }, "-sale_date", 100)
+        .then(list => setSales(list.filter(s => ["faturada", "concluida"].includes(s.status))))
+        .catch(() => setSales([]));
+    } else {
+      setSales([]);
+    }
+  }, [form.client_id, companyId]);
+
   const limestoneTotal = (form.limestone_tons || 0) * (form.limestone_unit_value || 0);
   const cornTotal = (form.corn_tons || 0) * (form.corn_unit_value || 0);
   const balance = limestoneTotal - cornTotal;
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  const filteredContacts = contacts.filter(c =>
+    c.name.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
   const handleSelectClient = (id) => {
     const c = contacts.find(x => x.id === id);
-    setForm(p => ({ ...p, client_id: id, client_name: c?.name || "" }));
+    setForm(p => ({ ...p, client_id: id, client_name: c?.name || "", sale_id: "", sale_reference: "" }));
+    setClientSearch("");
+  };
+
+  const handleSelectSale = (id) => {
+    const s = sales.find(x => x.id === id);
+    setForm(p => ({ ...p, sale_id: id, sale_reference: s?.reference || "" }));
   };
 
   const handleSave = async () => {
@@ -78,15 +101,52 @@ export function BarterDialog({ open, onOpenChange, companyId, onSaved }) {
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Cliente</Label>
-            <Select value={form.client_id} onValueChange={handleSelectClient}>
-              <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-              <SelectContent>
-                {contacts.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {form.client_id ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border rounded-md bg-slate-50">
+                <span className="font-medium text-slate-800">{form.client_name}</span>
+                <Button type="button" variant="ghost" size="sm"
+                  onClick={() => { setForm(p => ({ ...p, client_id: "", client_name: "", sale_id: "", sale_reference: "" })); setClientSearch(""); }}>
+                  Trocar
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Input placeholder="Buscar cliente..." value={clientSearch}
+                  onChange={e => setClientSearch(e.target.value)} />
+                {clientSearch && (
+                  <div className="max-h-44 overflow-auto border rounded-md bg-white divide-y">
+                    {filteredContacts.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-slate-400">Nenhum cliente encontrado</div>
+                    ) : filteredContacts.slice(0, 20).map(c => (
+                      <button key={c.id} type="button" onClick={() => handleSelectClient(c.id)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50">
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
+
+          {form.client_id && sales.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Vincular à venda (opcional)</Label>
+              <Select value={form.sale_id} onValueChange={handleSelectSale}>
+                <SelectTrigger><SelectValue placeholder="Sem venda vinculada" /></SelectTrigger>
+                <SelectContent>
+                  {sales.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.reference} — {formatDate(s.sale_date)} — {formatBRL(s.total)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.sale_reference && (
+                <p className="text-xs text-slate-500">Venda vinculada: <strong>{form.sale_reference}</strong></p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Data</Label>
