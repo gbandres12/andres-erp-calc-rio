@@ -27,7 +27,36 @@ function SectionHeader({ title }) {
 
 export default function A4Receipt({ type, data, onPrint }) {
   const handlePrint = () => {
-    window.print();
+    const node = document.querySelector('.print-receipt');
+    if (!node) { window.print(); if (onPrint) onPrint(); return; }
+    const win = window.open('', '_blank', 'width=820,height=620');
+    if (!win) { window.print(); if (onPrint) onPrint(); return; }
+    win.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${getButtonText()}</title>` +
+      `<style>@page{size:A4;margin:0}html,body{margin:0;padding:0}body{width:210mm;font-family:Arial,Helvetica,sans-serif}</style>` +
+      `</head><body>${node.outerHTML}</body></html>`
+    );
+    win.document.close();
+    win.focus();
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setTimeout(() => { win.print(); win.close(); }, 250);
+    };
+    const imgs = Array.from(win.document.images);
+    if (imgs.length === 0) {
+      finish();
+    } else {
+      let remaining = imgs.length;
+      const onImg = () => { remaining -= 1; if (remaining <= 0) finish(); };
+      imgs.forEach(img => {
+        if (img.complete) { remaining -= 1; }
+        else { img.onload = onImg; img.onerror = onImg; }
+      });
+      if (remaining <= 0) finish();
+      setTimeout(finish, 1500);
+    }
     if (onPrint) onPrint();
   };
 
@@ -683,40 +712,7 @@ export default function A4Receipt({ type, data, onPrint }) {
 
       {renderReceiptContent()}
 
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-receipt, .print-receipt * {
-            visibility: visible;
-          }
-          .print-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 210mm;
-            height: 297mm;
-            margin: 0;
-            padding: 8mm 10mm;
-            box-sizing: border-box;
-          }
-          .no-print {
-            display: none !important;
-          }
-          @page {
-            size: A4;
-            margin: 0;
-          }
-          html, body {
-            margin: 0;
-            padding: 0;
-            width: 210mm;
-            height: 297mm;
-            overflow: hidden;
-          }
-        }
-      `}</style>
+      {/* Impressão isolada em nova janela A4 — garante uma única página */}
     </>
   );
 }
