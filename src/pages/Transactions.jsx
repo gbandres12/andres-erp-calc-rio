@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap, ScanLine, FileText } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap, ScanLine, FileText, Trash2 } from "lucide-react";
 import CategorySuggestion from "@/components/transactions/CategorySuggestion";
+import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -43,6 +44,35 @@ export default function Transactions() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [pendingEditTransaction, setPendingEditTransaction] = useState(null);
+
+  // Delete with Password States
+  const [isDeleteAuthOpen, setIsDeleteAuthOpen] = useState(false);
+  const [pendingDeleteTransaction, setPendingDeleteTransaction] = useState(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Transaction.delete(id),
+    onSuccess: () => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
+      queryClient.invalidateQueries(['transactions']);
+      queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['payment-history']);
+      setIsDeleteAuthOpen(false);
+      setPendingDeleteTransaction(null);
+      toast.success("Lançamento excluído com sucesso!");
+    },
+    onError: (err) => toast.error("Erro ao excluir lançamento: " + err.message)
+  });
+
+  const initiateDelete = (transaction) => {
+    setPendingDeleteTransaction(transaction);
+    setIsDeleteAuthOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (pendingDeleteTransaction) {
+      deleteMutation.mutate(pendingDeleteTransaction.id);
+    }
+  };
 
   // Import States
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -1521,6 +1551,14 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Senha para Exclusão */}
+      <DeleteAuthDialog
+        open={isDeleteAuthOpen}
+        onClose={() => { setIsDeleteAuthOpen(false); setPendingDeleteTransaction(null); }}
+        onSuccess={confirmDelete}
+        itemType="lançamento"
+      />
+
       {/* Dialog Senha para Edição */}
       <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
         <DialogContent className="max-w-sm">
@@ -1948,6 +1986,14 @@ export default function Transactions() {
                         className="text-slate-500 hover:text-blue-600"
                       >
                         <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => initiateDelete(transaction)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                       {transaction.status !== 'pago' && (
                         <Button
