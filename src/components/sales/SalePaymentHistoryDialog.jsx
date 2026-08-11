@@ -1,11 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, DollarSign, Tag, Calendar, CreditCard, TrendingDown, Receipt } from "lucide-react";
+import { History, DollarSign, Tag, Calendar, CreditCard, TrendingDown, Receipt, Pencil } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatBRL, formatDate } from "@/components/utils/formatters";
+import SalePaymentDateEditDialog from "./SalePaymentDateEditDialog";
 
 const METHOD_LABELS = {
   dinheiro: "💵 Dinheiro",
@@ -18,6 +19,7 @@ const METHOD_LABELS = {
 };
 
 export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
+  const [editingPayment, setEditingPayment] = useState(null);
   const { data: payments = [] } = useQuery({
     queryKey: ["sale-payments-history", sale?.id],
     queryFn: () => base44.entities.SalePayment.filter({ sale_id: sale.id }, "payment_date"),
@@ -89,9 +91,17 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
                       </Badge>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 group">
                         <Calendar className="w-3 h-3" />
                         {formatDate(p.payment_date)}
+                        <button
+                          type="button"
+                          onClick={() => setEditingPayment(p)}
+                          className="ml-0.5 text-violet-600 hover:text-violet-800 transition-colors"
+                          title="Alterar data (requer senha de autorização)"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
                       </span>
                       <span className="flex items-center gap-1">
                         <CreditCard className="w-3 h-3" />
@@ -123,9 +133,17 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
                       <Badge variant="outline">#{i + 1}</Badge>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 group">
                         <Calendar className="w-3 h-3" />
                         {formatDate(p.payment_date)}
+                        <button
+                          type="button"
+                          onClick={() => setEditingPayment(p)}
+                          className="ml-0.5 text-violet-600 hover:text-violet-800 transition-colors"
+                          title="Alterar data (requer senha de autorização)"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
                       </span>
                       <span className="flex items-center gap-1">
                         <CreditCard className="w-3 h-3" />
@@ -152,6 +170,13 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
           <span className="mx-1">•</span>
           <span>Status: <strong className="text-slate-700">{sale.payment_status}</strong></span>
         </div>
+
+        <SalePaymentDateEditDialog
+          payment={editingPayment}
+          saleId={sale.id}
+          open={!!editingPayment}
+          onClose={() => setEditingPayment(null)}
+        />
       </DialogContent>
     </Dialog>
   );
