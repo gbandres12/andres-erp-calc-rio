@@ -16,6 +16,7 @@ import CostsDashboard from "@/components/reports/CostsDashboard";
 import CohortReport from "@/components/reports/CohortReport";
 import FinancialOverview from "@/components/reports/FinancialOverview";
 import StockDashboard from "@/components/reports/StockDashboard";
+import SalesReceiptsReport from "@/components/reports/SalesReceiptsReport";
 
 export default function Reports() {
   const [user, setUser] = React.useState(null);
@@ -496,6 +497,7 @@ export default function Reports() {
           {!isOperator && <TabsTrigger value="financial">DRE & Fluxo</TabsTrigger>}
           {!isOperator && <TabsTrigger value="statement">Extrato Bancário</TabsTrigger>}
           {!isOperator && <TabsTrigger value="payables">A Pagar/Receber</TabsTrigger>}
+          {!isOperator && <TabsTrigger value="sales-receipts">💰 Vendas x Recebido</TabsTrigger>}
           {!isOperator && <TabsTrigger value="operational">Operacional</TabsTrigger>}
           {!isOperator && <TabsTrigger value="cohort">📊 Cohort</TabsTrigger>}
         </TabsList>
@@ -903,6 +905,17 @@ export default function Reports() {
                 </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="sales-receipts" className="space-y-6">
+          <SalesReceiptsReport
+            sales={sales}
+            startDate={startDate}
+            endDate={endDate}
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            generatingPDF={generatingPDF}
+          />
         </TabsContent>
 
         <TabsContent value="payables" className="space-y-6">
