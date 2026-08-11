@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette, RefreshCw, Bot } from "lucide-react";
+import { Settings as SettingsIcon, Save, Building2, Bell, Shield, Palette, RefreshCw, Bot, Lock } from "lucide-react";
 import FinancialAlertsSettings from "@/components/settings/FinancialAlertsSettings";
+import DeletionPasswordSettings from "@/components/settings/DeletionPasswordSettings";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -211,6 +212,14 @@ export default function Settings() {
                   <p className="text-sm text-slate-600">Conectado como: <strong>{user?.email}</strong></p>
                   <p className="text-xs text-slate-500 mt-1">Último acesso: {new Date().toLocaleString('pt-BR')}</p>
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <Lock className="h-5 w-5 text-violet-600" />
+                  <h3 className="font-semibold text-slate-900">Senha de Exclusão</h3>
+                </div>
+                <DeletionPasswordSettings />
               </div>
             </CardContent>
           </Card>
