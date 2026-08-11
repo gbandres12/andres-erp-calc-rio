@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { base44 } from "@/api/base44Client";
 
 export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = "venda" }) {
   const [password, setPassword] = useState("");
@@ -21,30 +22,25 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
 
     setLoading(true);
     setError("");
-    
+
     try {
-      const res = await fetch("/api/base44/functions/validateDeletionPassword", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_id: localStorage.getItem("selectedCompanyId"),
-          password
-        })
+      const result = await base44.functions.invoke("validateDeletionPassword", {
+        company_id: localStorage.getItem("selectedCompanyId"),
+        password
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Senha incorreta");
-        return;
+      if (result?.data?.success) {
+        toast.success("Autenticado!");
+        setPassword("");
+        setError("");
+        onClose();
+        onSuccess();
+      } else {
+        setError("Senha incorreta");
       }
-
-      toast.success("Autenticado!");
-      setPassword("");
-      setError("");
-      onClose();
-      onSuccess();
     } catch (err) {
-      setError("Erro ao validar senha: " + err.message);
+      const apiError = err?.response?.data?.error || err?.message;
+      setError(apiError || "Senha incorreta");
     } finally {
       setLoading(false);
     }
