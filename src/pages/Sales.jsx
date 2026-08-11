@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle, Pencil, XCircle, RefreshCw } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle, Pencil, XCircle, RefreshCw, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,6 +22,7 @@ import PaymentReceipt from "../components/receipts/PaymentReceipt";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 import SalePaymentDialog from "@/components/sales/SalePaymentDialog";
+import SalePaymentHistoryDialog from "@/components/sales/SalePaymentHistoryDialog";
 import SaleEditDialog from "@/components/sales/SaleEditDialog";
 import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
 import SaleAdjustDialog from "@/components/sales/SaleAdjustDialog";
@@ -281,6 +282,9 @@ export default function Sales() {
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [saleToPayment, setSaleToPayment] = useState(null);
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [saleToHistory, setSaleToHistory] = useState(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [saleToEdit, setSaleToEdit] = useState(null);
@@ -1340,6 +1344,13 @@ export default function Sales() {
         onSuccess={() => { queryClient.invalidateQueries(['sales']); queryClient.invalidateQueries(['accounts']); queryClient.invalidateQueries(['transactions']); }}
       />
 
+      {/* Dialog Histórico de Pagamentos */}
+      <SalePaymentHistoryDialog
+        sale={saleToHistory}
+        open={isHistoryOpen}
+        onClose={() => { setIsHistoryOpen(false); setSaleToHistory(null); }}
+      />
+
       {/* Dialog Novo Cliente Rápido */}
       <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1583,6 +1594,18 @@ export default function Sales() {
                         >
                           <DollarSign className="w-4 h-4 mr-1" />
                           Receber
+                        </Button>
+                      )}
+
+                      {(sale.paid_amount > 0 || (sale.discount || 0) > 0) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-slate-400 text-slate-600 hover:bg-slate-50"
+                          onClick={() => { setSaleToHistory(sale); setIsHistoryOpen(true); }}
+                        >
+                          <History className="w-4 h-4 mr-1" />
+                          Histórico
                         </Button>
                       )}
                       

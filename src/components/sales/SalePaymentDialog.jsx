@@ -80,6 +80,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           sale_reference: sale.reference,
           payment_method: p.payment_method,
           amount: amt,
+          discount: disc,
           payment_date: p.date,
           account_id: p.account_id,
           company_id: sale.company_id,

@@ -53,6 +53,7 @@ export default function Payables() {
 
   const [paymentForm, setPaymentForm] = useState({
     amount: 0,
+    discount: 0,
     payment_date: getTodayDate(),
     account_id: "",
     payment_method: "dinheiro",
@@ -113,20 +114,23 @@ export default function Payables() {
 
   // Mutations
   const payMutation = useMutation({
-    mutationFn: async ({ id, amount, date, accountId, paymentMethod, notes }) => {
+    mutationFn: async ({ id, amount, discount, date, accountId, paymentMethod, notes }) => {
       const transaction = payables.find(t => t.id === id);
       if (!transaction) throw new Error("Transação não encontrada");
 
+      const abatimento = parseFloat(discount) || 0;
       const currentPaid = transaction.paid_amount || 0;
       let newPaid = currentPaid + amount;
-      if (newPaid > transaction.amount) newPaid = transaction.amount;
+      const newDiscountTotal = (transaction.discount || 0) + abatimento;
+      if (newPaid > transaction.amount - newDiscountTotal) newPaid = transaction.amount - newDiscountTotal;
 
-      const remaining = transaction.amount - newPaid;
+      const remaining = transaction.amount - newPaid - newDiscountTotal;
       let newStatus = remaining <= 0.005 ? 'pago' : 'parcial';
 
       // Update Transaction
       await base44.entities.Transaction.update(id, {
         paid_amount: newPaid,
+        discount: newDiscountTotal,
         status: newStatus,
         payment_date: newStatus === 'pago' ? date : transaction.payment_date,
         account_id: accountId || transaction.account_id
@@ -140,12 +144,13 @@ export default function Payables() {
         transaction_id: id,
         transaction_reference: transaction.description,
         amount: amount,
+        discount: abatimento,
         payment_date: date,
         account_id: accountId,
         account_name: account?.name || '',
         payment_method: paymentMethod,
         responsible: user?.full_name || user?.email,
-        notes: notes,
+        notes: abatimento > 0 ? `Abatimento: ${formatBRL(abatimento)}${notes ? ' | ' + notes : ''}` : notes,
         company_id: selectedCompanyId
       });
 
@@ -166,6 +171,7 @@ export default function Payables() {
       setSelectedTransaction(null);
       setPaymentForm({
         amount: 0,
+        discount: 0,
         payment_date: getTodayDate(),
         account_id: "",
         payment_method: "dinheiro",
@@ -447,8 +453,8 @@ export default function Payables() {
     const allOverdue = allPending.filter(t => isOverdue(t.due_date));
     
     return {
-      totalPending: allPending.reduce((acc, t) => acc + (t.amount - (t.paid_amount || 0)), 0),
-      totalOverdue: allOverdue.reduce((acc, t) => acc + (t.amount - (t.paid_amount || 0)), 0),
+      totalPending: allPending.reduce((acc, t) => acc + (t.amount - (t.paid_amount || 0) - (t.discount || 0)), 0),
+      totalOverdue: allOverdue.reduce((acc, t) => acc + (t.amount - (t.paid_amount || 0) - (t.discount || 0)), 0),
       countOverdue: allOverdue.length
     };
   }, [payables]);
@@ -456,7 +462,8 @@ export default function Payables() {
   const openPayDialog = (t) => {
     setSelectedTransaction(t);
     setPaymentForm({
-      amount: t.amount - (t.paid_amount || 0),
+      amount: t.amount - (t.paid_amount || 0) - (t.discount || 0),
+      discount: 0,
       payment_date: getTodayDate(),
       account_id: "",
       payment_method: "dinheiro",
@@ -595,7 +602,7 @@ export default function Payables() {
             {filteredPayables.map(t => {
                const statusLabel = getStatusLabel(t.status, t.due_date);
                const statusClass = getStatusColor(t.status, t.due_date);
-               const remaining = t.amount - (t.paid_amount || 0);
+               const remaining = t.amount - (t.paid_amount || 0) - (t.discount || 0);
 
                const isVeryOverdue = !t.payment_date && isBefore(parseISO(t.due_date), subDays(new Date(), 30));
 
@@ -669,13 +676,25 @@ export default function Payables() {
         <DialogContent>
           <DialogHeader><DialogTitle>Registrar Pagamento</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-             <div className="space-y-2">
-               <Label>Valor Pago</Label>
-               <Input 
-                 type="number" 
-                 value={paymentForm.amount} 
-                 onChange={e => setPaymentForm({...paymentForm, amount: parseFloat(e.target.value)})}
-               />
+             <div className="grid grid-cols-2 gap-3">
+               <div className="space-y-2">
+                 <Label>Valor Pago</Label>
+                 <Input 
+                   type="number" 
+                   value={paymentForm.amount} 
+                   onChange={e => setPaymentForm({...paymentForm, amount: parseFloat(e.target.value)})}
+                 />
+               </div>
+               <div className="space-y-2">
+                 <Label>Abatimento (R$)</Label>
+                 <Input 
+                   type="number" 
+                   step="0.01"
+                   placeholder="0,00"
+                   value={paymentForm.discount} 
+                   onChange={e => setPaymentForm({...paymentForm, discount: parseFloat(e.target.value) || 0})}
+                 />
+               </div>
              </div>
              <div className="space-y-2">
                <Label>Data do Pagamento</Label>
@@ -725,9 +744,16 @@ export default function Payables() {
             ) : (
               paymentHistory.map((p, i) => (
                 <div key={p.id} className="flex justify-between items-center p-3 bg-slate-50 rounded border">
-                  <div>
-                    <p className="font-medium">{formatBRL(p.amount)}</p>
-                    <p className="text-xs text-slate-500">{formatDate(p.payment_date)} • {p.payment_method}</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{formatBRL(p.amount)}</p>
+                      {(p.discount || 0) > 0 && (
+                        <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                          Abatimento: {formatBRL(p.discount)}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500">{formatDate(p.payment_date)} • {p.payment_method}{p.responsible ? ` • ${p.responsible}` : ''}</p>
                   </div>
                   <Badge variant="outline">#{paymentHistory.length - i}</Badge>
                 </div>

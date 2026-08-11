@@ -26,6 +26,11 @@
       "type": "number",
       "description": "Valor pago"
     },
+    "discount": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor do abatimento concedido neste pagamento"
+    },
     "payment_date": {
       "type": "string",
       "format": "date",
