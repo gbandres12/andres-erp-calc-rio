@@ -72,6 +72,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
       const createdPayments = [];
       for (const p of payments) {
         const amt = parseFloat(p.amount) || 0;
+        const disc = parseFloat(p.discount) || 0;
         if (amt <= 0) continue;
 
         // Criar pagamento
@@ -86,8 +87,6 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           company_id: sale.company_id,
           notes: p.description || ""
         });
-
-        const disc = parseFloat(p.discount) || 0;
         // Criar transação financeira
         await base44.entities.Transaction.create({
           description: `${sale.reference} - ${p.description || "Pagamento"} - ${sale.client_name}`,
