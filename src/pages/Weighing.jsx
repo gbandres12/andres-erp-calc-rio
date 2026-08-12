@@ -104,6 +104,41 @@ export default function Weighing() {
     initialData: []
   });
 
+  const { data: receivableSales = [] } = useQuery({
+    queryKey: ['receivableSales', selectedCompanyId],
+    queryFn: () => base44.entities.Sale.filter({ company_id: selectedCompanyId, remaining_amount: { $gt: 0 } }),
+    initialData: []
+  });
+
+  // Cálculos de saldo de estoque (entradas - saídas) — espelha planilha de calcário
+  const totalEntradas = weighings.filter(w => w.purpose === 'entrada_estoque').reduce((sum, w) => sum + (w.net || 0), 0);
+  const totalSaidas = weighings.filter(w => w.purpose === 'saida_venda').reduce((sum, w) => sum + (w.net || 0), 0);
+  const saldoEstoque = totalEntradas - totalSaidas;
+
+  // Resumo por cliente (saídas de calcário)
+  const clientDeliveries = {};
+  weighings.filter(w => w.purpose === 'saida_venda').forEach(w => {
+    const name = w.client_name || 'Sem cliente';
+    if (!clientDeliveries[name]) clientDeliveries[name] = { name, totalKg: 0, count: 0, lastDate: null };
+    clientDeliveries[name].totalKg += (w.net || 0);
+    clientDeliveries[name].count += 1;
+    const wDate = w.gross_datetime || w.created_date;
+    if (!clientDeliveries[name].lastDate || (wDate && wDate > clientDeliveries[name].lastDate)) {
+      clientDeliveries[name].lastDate = wDate;
+    }
+  });
+
+  // Dívidas por cliente (vendas com remaining > 0)
+  const clientDebts = {};
+  receivableSales.forEach(s => {
+    const name = s.client_name || 'Sem cliente';
+    clientDebts[name] = (clientDebts[name] || 0) + (s.remaining_amount || 0);
+  });
+
+  const clientSummary = Object.values(clientDeliveries)
+    .map(c => ({ ...c, debt: clientDebts[c.name] || 0 }))
+    .sort((a, b) => b.totalKg - a.totalKg);
+
   const { data: purchaseOrders = [] } = useQuery({
     queryKey: ['purchaseOrdersWeighing', selectedCompanyId],
     queryFn: () => base44.entities.PurchaseOrder.filter({ company_id: selectedCompanyId, status: { $in: ['pendente', 'aprovado'] } }, '-created_date'),
@@ -674,50 +709,101 @@ export default function Weighing() {
         </Dialog>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs - Saldo de Estoque Calcário */}
       <div className="grid md:grid-cols-4 gap-6 mb-8">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100">Total de Pesagens</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-100">Entradas (Pedras)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{(totalEntradas / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t</div>
+            <p className="text-xs text-blue-200 mt-1">{totalEntradas.toLocaleString("pt-BR")} kg</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-orange-100">Saídas (Moído)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{(totalSaidas / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t</div>
+            <p className="text-xs text-orange-200 mt-1">{totalSaidas.toLocaleString("pt-BR")} kg</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-100">Saldo Estoque</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{(saldoEstoque / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t</div>
+            <p className="text-xs text-emerald-200 mt-1">{saldoEstoque.toLocaleString("pt-BR")} kg</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-slate-500 to-slate-600 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-100">Total Pesagens</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{weighings.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-100">Peso Total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-            {weighings.reduce((sum, w) => sum + (w.net || 0), 0).toLocaleString("pt-BR")} Kg
-            </div>
-            </CardContent>
-            </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-purple-100">Concluídas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {weighings.filter(w => w.status === 'concluida').length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-yellow-100">Pendentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {weighings.filter(w => w.status !== 'concluida').length}
-            </div>
+            <p className="text-xs text-slate-200 mt-1">{weighings.filter(w => w.status === 'concluida').length} concluídas</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Resumo por Cliente — Saídas de Calcário */}
+      {clientSummary.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Resumo por Cliente — Saídas de Calcário</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-slate-600">
+                    <th className="pb-2 font-semibold">Cliente</th>
+                    <th className="pb-2 font-semibold text-right">Entregas</th>
+                    <th className="pb-2 font-semibold text-right">Total (kg)</th>
+                    <th className="pb-2 font-semibold text-right">Total (t)</th>
+                    <th className="pb-2 font-semibold text-right">A Pagar</th>
+                    <th className="pb-2 font-semibold">Última Entrega</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientSummary.map(c => (
+                    <tr key={c.name} className="border-b hover:bg-slate-50">
+                      <td className="py-2 font-medium text-slate-900">{c.name}</td>
+                      <td className="py-2 text-right text-slate-600">{c.count}</td>
+                      <td className="py-2 text-right font-semibold">{c.totalKg.toLocaleString("pt-BR")}</td>
+                      <td className="py-2 text-right text-slate-600">{(c.totalKg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</td>
+                      <td className="py-2 text-right">
+                        {c.debt > 0 ? (
+                          <span className="font-bold text-red-600">R$ {c.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        ) : (
+                          <Badge variant="secondary" className="bg-green-100 text-green-700">Quitado</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 text-slate-600">{c.lastDate ? new Date(c.lastDate).toLocaleDateString("pt-BR") : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-bold text-slate-900">
+                    <td className="pt-3">Total Geral</td>
+                    <td className="pt-3 text-right">{clientSummary.reduce((s, c) => s + c.count, 0)}</td>
+                    <td className="pt-3 text-right">{clientSummary.reduce((s, c) => s + c.totalKg, 0).toLocaleString("pt-BR")}</td>
+                    <td className="pt-3 text-right">{(clientSummary.reduce((s, c) => s + c.totalKg, 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</td>
+                    <td className="pt-3 text-right text-red-600">R$ {clientSummary.reduce((s, c) => s + c.debt, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtros de Data */}
       <Card className="mb-6">
