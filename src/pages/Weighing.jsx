@@ -901,16 +901,16 @@ export default function Weighing() {
                     <div className="flex items-center gap-4 mb-2">
                       <div>
                         <p className="text-xs text-slate-500">Tara</p>
-                        <p className="font-semibold">{(weighing.tare || 0).toLocaleString("pt-BR")} Kg</p>
+                        <p className="font-semibold">{((weighing.tare || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} t</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Bruto</p>
-                        <p className="font-semibold">{(weighing.gross || 0).toLocaleString("pt-BR")} Kg</p>
+                        <p className="font-semibold">{((weighing.gross || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} t</p>
                       </div>
                       <div>
                         <p className="text-xs text-slate-500">Líquido</p>
                         <p className="text-lg font-bold text-blue-600">
-                            {(weighing.net || 0).toLocaleString("pt-BR")} Kg
+                            {((weighing.net || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} t
                         </p>
                       </div>
                     </div>
