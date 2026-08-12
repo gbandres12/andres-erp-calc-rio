@@ -336,7 +336,18 @@ export default function Sales() {
       }
 
       // 3. Processar pagamentos registrados no faturamento
+      //    Validar para impedir pagamentos duplicados que excedam o total da venda
       let totalPaidNow = 0;
+      for (const payment of payments) {
+        totalPaidNow += (parseFloat(payment.amount) || 0);
+      }
+      if ((entradaJaPaga + totalPaidNow) > (sale.total || 0) + 0.01) {
+        throw new Error(
+          `Pagamentos do faturamento excedem o total da venda. ` +
+          `Entrada: ${formatBRL(entradaJaPaga)} + Agora: ${formatBRL(totalPaidNow)} > Total: ${formatBRL(sale.total || 0)}`
+        );
+      }
+      totalPaidNow = 0;
       for (const payment of payments) {
         if (payment.amount > 0) {
           await base44.entities.Transaction.create({
@@ -565,6 +576,18 @@ export default function Sales() {
   };
 
   const confirmInvoice = () => {
+    const totalPaidNow = invoicePayments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+    const entradaJaPaga = saleToInvoice.paid_amount || 0;
+    const totalVenda = saleToInvoice.total || 0;
+    const totalComEntrada = entradaJaPaga + totalPaidNow;
+    if (totalComEntrada > totalVenda + 0.01) {
+      toast.error(
+        `Pagamento excede o total da venda.\n` +
+        `Entrada já paga: ${formatBRL(entradaJaPaga)} + Pagamentos agora: ${formatBRL(totalPaidNow)} = ${formatBRL(totalComEntrada)}\n` +
+        `Total da venda: ${formatBRL(totalVenda)}`
+      );
+      return;
+    }
     invoiceSaleMutation.mutate({ sale: saleToInvoice, payments: invoicePayments });
   };
 
