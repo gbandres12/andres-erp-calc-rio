@@ -150,10 +150,11 @@ ${accountList}
 ${history ? `HISTÓRICO:\n${history}\n` : ''}
 MENSAGEM: "${userText}"
 
-REGRAS CRÍTICAS DE FILIAL:
+REGRAS CRÍTICAS DE FILIAL E CONTEXTO:
+- CONTEXTO DA CONVERSA: a filial mencionada em mensagens anteriores fica como filial ativa. Se o usuário agora pergunta algo SEM mencionar filial (ex: "e as vendas?", "me fala o caixa", "quanto devo?"), NÃO preencha company_name nem all_companies — o sistema usa a filial ativa. Entenda o contexto da conversa, não trate cada mensagem isoladamente.
 - Se o usuário pedir "todas as filiais", "todas", "geral", "consolidado" → use all_companies=true no query
-- Se o usuário mencionar uma filial pelo nome (ex: "Santarém", "Roraima", "Sertanejo") → use company_name com o nome exato da lista acima
-- Se nenhuma filial for mencionada → use a filial ativa (não preencha company_name nem all_companies)
+- Se o usuário mencionar uma filial pelo nome (ex: "Santarém", "Roraima", "Sertanejo", "CBA", "Loja do Sertanejo", "Mucajaí") → use company_name com o nome exato da lista acima
+- Se nenhuma filial for mencionada e não há filial ativa → não preencha company_name nem all_companies
 - NUNCA misture filiais: cada filial tem seu próprio ID, use o ID correto da lista
 
 PERÍODOS DISPONÍVEIS:
@@ -165,6 +166,8 @@ MAPEAMENTO:
 - "saldo devedor/quanto devo/contas a pagar/o que devo" → check_balance
 - "vencimentos/o que vence" → upcoming_bills
 - "relatório de hoje/fluxo do dia/fechamento/vendas do dia" → daily_report (mostra entradas, saídas, movimentação de caixa, vendas do dia e saldo devedor)
+- "vendas/quais vendas/quantas vendas/me fala as vendas/vendeu/vendas de hoje/vendas do mês" → sales_query (consulta vendas da filial ativa ou mencionada, por período)
+- "nota fiscal/nf-e/emitiu nota/fiscal/ativado para nota/emissão de nota" → fiscal_status (status da configuração e emissão fiscal)
 - "relatório mensal/do mês/resultado do mês" → financial_summary (query.period=this_month)
 - "relatório trimestral/do trimestre" → financial_summary (query.period=this_quarter)
 - "relatório anual/do ano" → financial_summary (query.period=this_year)
@@ -179,6 +182,8 @@ AÇÕES:
 - financial_summary → query={company_name?, all_companies?, period?}
 - daily_report → query={company_name?, all_companies?, date?}
 - check_balance → query={company_name?, all_companies?}
+- sales_query → query={company_name?, all_companies?, period?, date?}
+- fiscal_status → query={company_name?, all_companies?, period?}
 - search_transactions → query={type?, status?, company_name?, all_companies?, period?, keyword?}
 - upcoming_bills → query={company_name?, all_companies?, days?, type?}
 - add_transaction → transaction={description, amount, type, category, due_date?, payment_date?, is_paid?, contact_name?}
@@ -186,6 +191,8 @@ AÇÕES:
 - select_company → target_company=nome
 - search_contacts → search_term=nome
 - create_contact → contact={name, phone?, email?, type?}
+
+PERÍODOS PARA sales_query: today, yesterday, this_week, this_month, last_month, this_year (default se não especificado: this_month)
 
 CATEGORIAS:
 - receita: "Vendas", "Serviços", "Outras Receitas"
@@ -623,7 +630,149 @@ async function executeAction(base44, ai, companies, accounts, session) {
         return `👥 *Contatos (${found.length}):*\n` + found.map(c=>`  • *${c.name}* | ${c.type} | ${c.phone||'-'}`).join('\n');
     }
 
+    // ── sales_query (consultar vendas por período) ──────────────────────────────
+    if (action === 'sales_query') {
+        const period = query.period || (query.date ? null : 'this_month');
+        const dateRange = query.date
+            ? { start: query.date.includes('/') ? query.date.split('/').reverse().join('-') : query.date, end: query.date.includes('/') ? query.date.split('/').reverse().join('-') : query.date }
+            : (period ? getDateRange(period) : getDateRange('this_month'));
+        const periodLabel = PERIOD_LABELS[period || 'this_month'] || (query.date ? fmtDate(query.date.includes('/') ? query.date.split('/').reverse().join('-') : query.date) : 'Este Mês');
+
+        let report = `🛒 *Vendas — ${periodLabel}*\n`;
+        if (targets.length > 1) report += `_(${targets.length} filiais)_\n`;
+        report += '\n';
+
+        let totalGeral = 0, totalPago = 0, totalPendente = 0, totalVendasGeral = 0;
+
+        for (const comp of targets) {
+            const allSales = await base44.asServiceRole.entities.Sale.filter({ company_id: comp.id }, '-sale_date', 200);
+            const vendas = allSales.filter(s =>
+                s.status !== 'cancelada' &&
+                s.sale_date && s.sale_date >= dateRange.start && s.sale_date <= dateRange.end
+            );
+            if (!vendas.length) continue;
+
+            const totalComp = vendas.reduce((s,v) => s + (v.total||0), 0);
+            const pagas = vendas.filter(v => v.payment_status === 'pago');
+            const parciais = vendas.filter(v => v.payment_status === 'parcial');
+            const pendentes = vendas.filter(v => v.payment_status === 'pendente');
+            const totalPagas = pagas.reduce((s,v) => s + (v.total||0), 0);
+            const totalPendComp = [...parciais, ...pendentes].reduce((s,v) => s + ((v.total||0) - (v.paid_amount||0)), 0);
+
+            totalGeral += totalComp;
+            totalPago += totalPagas;
+            totalPendente += totalPendComp;
+            totalVendasGeral += vendas.length;
+
+            report += `🏢 *${comp.name}* (${vendas.length} vendas — ${brl(totalComp)})\n`;
+            vendas.slice(0, 15).forEach(v => {
+                const st = v.payment_status === 'pago' ? '✅' : (v.payment_status === 'parcial' ? '🟠' : '🟡');
+                report += `  ${st} ${v.reference || '-'} | ${v.client_name || '—'} | *${brl(v.total||0)}*\n`;
+            });
+            if (vendas.length > 15) report += `  _... e mais ${vendas.length - 15} vendas_\n`;
+            report += `  💰 Pago: ${brl(totalPagas)} | 🟡 A receber: ${brl(totalPendComp)}\n\n`;
+        }
+
+        if (!totalVendasGeral) return `🛒 Nenhuma venda encontrada no período de ${periodLabel}.`;
+
+        if (targets.length > 1) {
+            report += `${'─'.repeat(28)}\n`;
+            report += `🛒 *TOTAL: ${totalVendasGeral} vendas — ${brl(totalGeral)}*\n`;
+            report += `💰 Recebido: ${brl(totalPago)} | 🟡 A receber: ${brl(totalPendente)}\n`;
+        }
+        return report.trim();
+    }
+
+    // ── fiscal_status (status fiscal da filial) ──────────────────────────────────
+    if (action === 'fiscal_status') {
+        const period = query.period || 'this_month';
+        const dateRange = getDateRange(period) || getDateRange('this_month');
+        const periodLabel = PERIOD_LABELS[period] || 'Este Mês';
+
+        let report = `🧾 *Status Fiscal — ${periodLabel}*\n`;
+        if (targets.length > 1) report += `_(${targets.length} filiais)_\n`;
+        report += '\n';
+
+        for (const comp of targets) {
+            const [configs, certAtivos, allInvoices] = await Promise.all([
+                base44.asServiceRole.entities.FiscalConfig.filter({ company_id: comp.id }),
+                base44.asServiceRole.entities.FiscalCertificate.filter({ company_id: comp.id, status: 'ativo' }),
+                base44.asServiceRole.entities.FiscalInvoice.filter({ company_id: comp.id }, '-issue_date', 200),
+            ]);
+            const config = configs[0];
+            const notasPeriodo = allInvoices.filter(n => n.issue_date && n.issue_date >= dateRange.start && n.issue_date <= dateRange.end);
+            const autorizadas = notasPeriodo.filter(n => n.status === 'autorizada');
+            const pendentes = notasPeriodo.filter(n => ['rascunho','validando','pendente_envio','enviada','processando'].includes(n.status));
+            const rejeitadas = notasPeriodo.filter(n => n.status === 'rejeitada');
+            const canceladas = notasPeriodo.filter(n => n.status === 'cancelada');
+            const totalNotas = autorizadas.reduce((s,n) => s + (n.total||0), 0);
+
+            report += `🏢 *${comp.name}*\n`;
+            if (config) {
+                report += `  ⚙️ Ambiente: ${config.environment === 'producao' ? '🟢 Produção' : '🟡 Homologação'}\n`;
+                report += `  📄 Tipo: ${(config.document_type||'nfe').toUpperCase()} | Série: ${config.serie || '1'}\n`;
+                report += `  🔢 Próximo número: ${config.next_number || 1}\n`;
+            } else {
+                report += `  ⚠️ Configuração fiscal não cadastrada\n`;
+            }
+            report += `  🔏 Certificado: ${certAtivos.length > 0 ? '✅ Ativo' : '🔴 Nenhum ativo'}\n`;
+            let linhaNotas = `  📊 Notas do período: ${notasPeriodo.length} (✅${autorizadas.length} autorizadas`;
+            if (pendentes.length) linhaNotas += `, 🟡${pendentes.length} pendentes`;
+            if (rejeitadas.length) linhaNotas += `, 🔴${rejeitadas.length} rejeitadas`;
+            if (canceladas.length) linhaNotas += `, 🚫${canceladas.length} canceladas`;
+            linhaNotas += `)\n`;
+            report += linhaNotas;
+            report += `  💰 Valor autorizado: *${brl(totalNotas)}*\n`;
+            if (autorizadas.length > 0) {
+                report += `  Últimas: ${autorizadas.slice(0,3).map(n => `${n.number||'-'} (${fmtDate(n.issue_date)})`).join(', ')}\n`;
+            }
+            report += '\n';
+        }
+        return report.trim();
+    }
+
     return null;
+}
+
+// ── Gerar resposta natural conversacional via IA ─────────────────────────────────
+async function generateNaturalReply(base44, userText, dataResult, session, ai, companies) {
+    const activeComp = session.selected_company_id
+        ? companies.find(c => c.id === session.selected_company_id)
+        : null;
+    const history = (session.history || []).slice(-8)
+        .map(m => `${m.role === 'user' ? 'Usuário' : 'FINAN'}: ${m.content.slice(0, 250)}`).join('\n');
+
+    const prompt = `Você é FINAN, assistente financeiro de uma empresa de mineração de calcário com múltiplas filiais. Você está conversando com o dono da empresa pelo Telegram. Responda em português brasileiro, de forma NATURAL e CONVERSACIONAL, como uma conversa informal de WhatsApp — NÃO como um robô lendo dados.
+
+CONTEXTO DA CONVERSA (mensagens anteriores):
+${history || '(início da conversa)'}
+
+${activeComp ? `FILIAL ATIVA NO CONTEXTO: ${activeComp.name}\n` : ''}PERGUNTA DO USUÁRIO: "${userText}"
+
+DADOS CONSULTADOS DO SISTEMA (use SOMENTE estes dados — NÃO invente números):
+${dataResult}
+
+INSTRUÇÕES:
+- Responda de forma natural e conversacional, como se estivesse falando com o chefe informalmente
+- Use SOMENTE os dados acima — NUNCA invente números ou informações que não estejam ali
+- Seja direto, responda o que foi perguntado
+- Use emojis com moderação (1-3 no máximo), apenas quando fizer sentido
+- Se os dados mostrarem algo importante (saldo negativo, contas vencidas, vendas baixas, boa notícia), comente naturalmente
+- NÃO repita a pergunta do usuário
+- NÃO diga "consultando...", "aqui estão os dados..." — responda direto
+- Se os dados não responderem à pergunta, diga que não encontrou e sugira como buscar
+- Formate valores em R$ de forma legível
+- Se houver múltiplas filiais nos dados, resuma por filial de forma clara e objetiva
+
+RESPONDA APENAS A MENSAGEM NATURAL (sem prefixos, sem explicar o que fez):`;
+
+    const raw = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt, model: 'gemini_3_flash' });
+    let reply = typeof raw === 'string' ? raw : (raw?.text || raw?.response || JSON.stringify(raw));
+    reply = reply.trim();
+    if ((reply.startsWith('"') && reply.endsWith('"')) || (reply.startsWith("'") && reply.endsWith("'"))) {
+        reply = reply.slice(1, -1);
+    }
+    return reply || dataResult;
 }
 
 // ── Processar mídia ────────────────────────────────────────────────────────────
@@ -717,11 +866,24 @@ Deno.serve(async (req) => {
         }
     }
 
+    const DATA_ACTIONS = ['check_balance', 'daily_report', 'financial_summary', 'search_transactions', 'upcoming_bills', 'sales_query', 'fiscal_status'];
     let finalReply = ai.reply || '';
     if (ai.action !== 'reply') {
         try {
             const result = await executeAction(base44, ai, companies, accounts, session);
-            if (result) finalReply = result;
+            if (result) {
+                // Ações de dados: gera resposta natural conversacional via IA
+                if (DATA_ACTIONS.includes(ai.action)) {
+                    try {
+                        finalReply = await generateNaturalReply(base44, user_text, result, session, ai, companies);
+                    } catch (e) {
+                        console.error('[NATURAL]', e.message);
+                        finalReply = result; // fallback: relatório estruturado
+                    }
+                } else {
+                    finalReply = result;
+                }
+            }
         } catch (e) {
             console.error('[EXEC]', e.message);
             finalReply = `⚠️ Erro ao executar: ${e.message}`;
