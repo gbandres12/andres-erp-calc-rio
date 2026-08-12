@@ -161,9 +161,10 @@ today | yesterday | this_week | last_week | this_month | last_month | this_quart
 
 MAPEAMENTO:
 - "oi/olá/bom dia" → reply (apresentação)
-- "saldo/caixa/quanto tenho" → check_balance
+- "saldo/caixa/quanto tenho" → check_balance (mostra saldo das contas + saldo devedor/contas a pagar)
+- "saldo devedor/quanto devo/contas a pagar/o que devo" → check_balance
 - "vencimentos/o que vence" → upcoming_bills
-- "relatório de hoje/fluxo do dia/fechamento" → daily_report (query.date=hoje ou data específica)
+- "relatório de hoje/fluxo do dia/fechamento/vendas do dia" → daily_report (mostra entradas, saídas, movimentação de caixa, vendas do dia e saldo devedor)
 - "relatório mensal/do mês/resultado do mês" → financial_summary (query.period=this_month)
 - "relatório trimestral/do trimestre" → financial_summary (query.period=this_quarter)
 - "relatório anual/do ano" → financial_summary (query.period=this_year)
@@ -231,16 +232,24 @@ async function executeAction(base44, ai, companies, accounts, session) {
         return `✅ *Filial: ${nc.name}*\n🏦 Saldo: ${brl(saldo)}\n\nComo posso ajudar?`;
     }
 
-    // ── check_balance ─────────────────────────────────────────────────────────
+    // ── check_balance (caixa + saldo devedor) ─────────────────────────────────
     if (action === 'check_balance') {
         let msg = '🏦 *Saldos das Contas*\n\n';
         for (const comp of targets) {
             const compAccounts = accounts.filter(a => a.company_id === comp.id);
-            if (!compAccounts.length) continue;
+            // Saldo devedor = contas a pagar pendentes + atrasadas
+            const [pendP, atrasP] = await Promise.all([
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pendente' }),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'atrasado' }),
+            ]);
+            const devedor = [...pendP, ...atrasP].reduce((s,t)=>s+(t.amount||0),0);
+            const qtdDevedor = pendP.length + atrasP.length;
+            if (!compAccounts.length && qtdDevedor === 0) continue;
             msg += `*${comp.name}*\n`;
             compAccounts.forEach(a => msg += `  ${a.current_balance >= 0 ? '🟢' : '🔴'} ${a.name}: ${brl(a.current_balance)}\n`);
             const total = compAccounts.reduce((s, a) => s + (a.current_balance || 0), 0);
-            msg += `  📊 *Total: ${brl(total)}*\n\n`;
+            msg += `  📊 *Total caixa: ${brl(total)}*\n`;
+            msg += `  💳 *Saldo devedor: ${brl(devedor)}* (${qtdDevedor} contas a pagar)\n\n`;
         }
         return msg.trim() || '⚠️ Nenhuma conta encontrada.';
     }
@@ -264,13 +273,18 @@ async function executeAction(base44, ai, companies, accounts, session) {
 
         let totalGeralEntradas = 0;
         let totalGeralSaidas = 0;
+        let totalGeralVendas = 0;
+        let totalGeralDevedor = 0;
 
         for (const comp of targets) {
             // Buscar todas as transações pagas da filial (sem limite de 200, busca em lotes de 500)
-            const [allPagas, pendDesp, pendRec] = await Promise.all([
+            // + vendas da filial + contas a pagar atrasadas (para saldo devedor)
+            const [allPagas, pendDesp, pendRec, atrasDesp, vendasTodas] = await Promise.all([
                 base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, status: 'pago' }, '-payment_date', 500),
                 base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'pendente' }, 'due_date', 50),
                 base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'receita', status: 'pendente' }, 'due_date', 50),
+                base44.asServiceRole.entities.Transaction.filter({ company_id: comp.id, type: 'despesa', status: 'atrasado' }, 'due_date', 50),
+                base44.asServiceRole.entities.Sale.filter({ company_id: comp.id }, '-sale_date', 200),
             ]);
 
             // Filtrar pelo dia selecionado — igual à página: usa payment_date OU due_date
@@ -281,6 +295,17 @@ async function executeAction(base44, ai, companies, accounts, session) {
 
             const entradasDia = pagasDia.filter(t => t.type === 'receita').sort((a,b) => a.description.localeCompare(b.description, 'pt-BR'));
             const saidasDia   = pagasDia.filter(t => t.type === 'despesa').sort((a,b) => a.description.localeCompare(b.description, 'pt-BR'));
+
+            // Vendas do dia (sale_date === dia selecionado, exceto canceladas)
+            const vendasDia = (vendasTodas || []).filter(s =>
+                s.sale_date && s.sale_date.slice(0, 10) === normalizedDate && s.status !== 'cancelada'
+            );
+            const totalVendasDia = vendasDia.reduce((s, v) => s + (v.total || 0), 0);
+            const vendasPagas = vendasDia.filter(v => v.payment_status === 'pago').length;
+
+            // Saldo devedor = contas a pagar pendentes + atrasadas
+            const devedor = [...pendDesp, ...atrasDesp].reduce((s, t) => s + (t.amount || 0), 0);
+            const qtdDevedor = pendDesp.length + atrasDesp.length;
 
             const totalE = entradasDia.reduce((s,t) => s + txVal(t), 0);
             const totalS = saidasDia.reduce((s,t) => s + txVal(t), 0);
@@ -294,9 +319,12 @@ async function executeAction(base44, ai, companies, accounts, session) {
 
             totalGeralEntradas += totalE;
             totalGeralSaidas   += totalS;
+            totalGeralVendas   += totalVendasDia;
+            totalGeralDevedor  += devedor;
 
             report += `🏢 *${comp.name}*\n`;
-            report += `🏦 Saldo Inicial: *${brl(saldoInicial)}* → Final: *${brl(saldoFinal)}*\n\n`;
+            report += `🏦 Saldo Inicial: *${brl(saldoInicial)}* → Final: *${brl(saldoFinal)}*\n`;
+            report += `💳 Saldo devedor: *${brl(devedor)}* (${qtdDevedor} contas a pagar)\n\n`;
 
             if (entradasDia.length > 0) {
                 report += `📥 *Entradas (${entradasDia.length}) — ${brl(totalE)}*\n`;
@@ -318,6 +346,19 @@ async function executeAction(base44, ai, companies, accounts, session) {
                 report += `📤 Saídas: nenhuma\n`;
             }
 
+            report += '\n';
+
+            // Vendas do dia
+            if (vendasDia.length > 0) {
+                report += `🛒 *Vendas do dia (${vendasDia.length}) — ${brl(totalVendasDia)}*\n`;
+                vendasDia.forEach(v => {
+                    const st = v.payment_status === 'pago' ? '✅' : (v.payment_status === 'parcial' ? '🟠' : '🟡');
+                    report += `  ${st} ${v.reference || '-'} | ${v.client_name || '—'} | *${brl(v.total || 0)}*\n`;
+                });
+            } else {
+                report += `🛒 Vendas do dia: nenhuma\n`;
+            }
+
             report += `\n📊 Resultado do dia: ${resultado>=0?'🟢':'🔴'} *${brl(resultado)}*\n`;
 
             if (vencendoHoje.length > 0) {
@@ -333,7 +374,9 @@ async function executeAction(base44, ai, companies, accounts, session) {
             report += `📊 *CONSOLIDADO*\n`;
             report += `📥 Total entradas: *${brl(totalGeralEntradas)}*\n`;
             report += `📤 Total saídas: *${brl(totalGeralSaidas)}*\n`;
-            report += `💼 Resultado: ${resGeral>=0?'🟢':'🔴'} *${brl(resGeral)}*\n`;
+            report += `🛒 Total vendas: *${brl(totalGeralVendas)}*\n`;
+            report += `💳 Saldo devedor: *${brl(totalGeralDevedor)}*\n`;
+            report += `💼 Resultado caixa: ${resGeral>=0?'🟢':'🔴'} *${brl(resGeral)}*\n`;
         }
 
         return report.trim();
