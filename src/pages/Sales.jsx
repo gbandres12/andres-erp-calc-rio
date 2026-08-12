@@ -226,14 +226,14 @@ export default function Sales() {
         remaining_amount: remainingAmount,
         payment_method: data.payment_method,
         payment_account_id: data.account_id,
-        status: 'rascunho',
+        status: paymentStatus === 'pago' ? 'faturada' : 'rascunho',
         payment_status: paymentStatus,
         withdrawal_status: 'aguardando',
         notes: data.notes
       });
 
       if (paidAmount > 0) {
-        await base44.entities.SalePayment.create({
+        const salePayment = await base44.entities.SalePayment.create({
           sale_id: sale.id,
           sale_reference: newRef,
           payment_method: data.payment_method,
@@ -243,6 +243,26 @@ export default function Sales() {
           company_id: selectedCompanyId,
           notes: "Entrada da venda"
         });
+
+        // Se a venda foi quitada na entrada, faturar automaticamente
+        // e criar a Transaction para o valor entrar no caixa
+        if (paymentStatus === 'pago') {
+          await base44.entities.Transaction.create({
+            description: `${newRef} - Entrada - ${data.client_name}`,
+            amount: paidAmount,
+            type: 'receita',
+            category: 'Vendas',
+            status: 'pago',
+            due_date: data.sale_date,
+            payment_date: data.sale_date,
+            account_id: data.account_id,
+            contact_id: data.client_id,
+            contact_name: data.client_name,
+            company_id: selectedCompanyId,
+            paid_amount: paidAmount,
+            notes: `entrada:${salePayment.id}`
+          });
+        }
       }
 
       if (remainingAmount > 0 && data.installments > 0) {
@@ -268,11 +288,19 @@ export default function Sales() {
 
       return sale;
     },
-    onSuccess: () => {
+    onSuccess: async (sale) => {
       queryClient.invalidateQueries(['sales']);
+      queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['transactions']);
       setIsDialogOpen(false);
       resetForm();
-      toast.success("Venda criada como rascunho. Fature para gerar lançamentos financeiros!");
+      // Se a venda foi quitada na entrada, já foi faturada automaticamente
+      if (sale && sale.status === 'faturada') {
+        await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
+        toast.success("✅ Venda quitada e faturada automaticamente! Valor lançado no caixa.");
+      } else {
+        toast.success("Venda criada como rascunho. Fature para gerar lançamentos financeiros!");
+      }
     },
     onError: (error) => {
       console.error("ERRO CRIAR VENDA:", error, JSON.stringify(error));
