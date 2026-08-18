@@ -36,18 +36,19 @@ Deno.serve(async (req) => {
             // O ideal seria paginação, mas para este fix rápido vamos aumentar o limite.
             // Base44 SDK filter suporta limit? Sim. Vamos por um limite alto seguro.
             
-            // Buscar todas as transações da conta
+            // Buscar todas as transações da conta (pagas e parciais)
+            // Transações parciais têm paid_amount > 0 que representa dinheiro que entrou/saiu
             const transactions = await base44.entities.Transaction.filter({
-                account_id: account.id,
-                status: 'pago'
-            }, undefined, 10000); // Somente transações pagas
+                account_id: account.id
+            }, undefined, 10000);
 
             let totalReceitas = 0;
             let totalDespesas = 0;
 
             transactions.forEach(t => {
-                // paid_amount é source of truth; fallback para amount em registros antigos
-                const valor = t.paid_amount || t.amount || 0;
+                // paid_amount é source of truth do que realmente movimentou
+                // Fallback para amount apenas em registros antigos já quitados
+                const valor = t.paid_amount || (t.status === 'pago' ? t.amount : 0) || 0;
 
                 if (t.type === 'receita') {
                     totalReceitas += valor;

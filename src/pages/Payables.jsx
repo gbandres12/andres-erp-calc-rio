@@ -154,16 +154,11 @@ export default function Payables() {
         company_id: selectedCompanyId
       });
 
-      // Update Account Balance (Decrease)
-      if (account) {
-        await base44.entities.FinancialAccount.update(accountId, {
-          current_balance: account.current_balance - amount
-        });
-      }
-      
+      // O saldo da conta é recalculado pelo recalculateBalance (source of truth)
       return { newStatus, remaining };
     },
     onSuccess: ({ newStatus, remaining }) => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['payables']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
