@@ -53,40 +53,62 @@ export default function FinancialAccounts() {
     initialData: []
   });
 
-  // NOVO: Buscar TODAS as transações pagas para cálculo real do saldo e gráfico
+  // Buscar TODAS as transações da empresa (para mapear tipo/descrição e
+  // contabilizar lançamentos antigos/vendas sem registros de pagamento).
   const { data: allTransactions = [] } = useQuery({
     queryKey: ['all-transactions', selectedCompanyId],
-    queryFn: () => base44.entities.Transaction.filter({ 
-      company_id: selectedCompanyId,
-      status: 'pago'
-    }),
+    queryFn: () => base44.entities.Transaction.filter({
+      company_id: selectedCompanyId
+    }, undefined, 10000),
     initialData: []
   });
 
-  // NOVO: Calcular saldos reais dinamicamente
+  // SOURCE OF TRUTH dos saldos: cada TransactionPayment é uma movimentação real
+  // (valor + conta) de um pagamento/abatimento. Usar Transaction.paid_amount +
+  // account_id desajusta o caixa quando há pagamentos parciais em contas
+  // diferentes (o account_id é sobrescrito a cada pagamento).
+  const { data: allPayments = [] } = useQuery({
+    queryKey: ['all-payments', selectedCompanyId],
+    queryFn: () => base44.entities.TransactionPayment.filter({
+      company_id: selectedCompanyId
+    }, '-payment_date', 10000),
+    initialData: []
+  });
+
+  // Calcular saldos reais dinamicamente, usando TransactionPayment como fonte
+  // de verdade (cada pagamento tem sua própria conta/valor). Fallback para
+  // transações sem registros de pagamento (lançamentos antigos/vendas).
   const accountBalances = useMemo(() => {
     const balances = {};
-    // Inicializa com saldos iniciais
     accounts.forEach(acc => {
       balances[acc.id] = acc.initial_balance || 0;
     });
 
-    // Processa todas as transações
-    allTransactions.forEach(t => {
-      if (t.account_id && balances[t.account_id] !== undefined) {
-        // Usa paid_amount preferencialmente, fallback para amount
-        const valor = Number(t.paid_amount || t.amount || 0);
-        if (!isNaN(valor)) {
-          if (t.type === 'receita') {
-            balances[t.account_id] += valor;
-          } else {
-            balances[t.account_id] -= valor;
-          }
-        }
-      }
+    const txTypeMap = {};
+    allTransactions.forEach(t => { txTypeMap[t.id] = t.type; });
+    const txsWithPayments = new Set(allPayments.map(p => p.transaction_id));
+
+    // 1) Pagamentos granulares (multi-conta seguro)
+    allPayments.forEach(p => {
+      if (!p.account_id || balances[p.account_id] === undefined) return;
+      const type = txTypeMap[p.transaction_id];
+      const valor = Number(p.amount) || 0;
+      if (type === 'receita') balances[p.account_id] += valor;
+      else if (type === 'despesa') balances[p.account_id] -= valor;
     });
+
+    // 2) Transações legadas sem pagamentos registrados
+    allTransactions.forEach(t => {
+      if (txsWithPayments.has(t.id)) return;
+      if (!t.account_id || balances[t.account_id] === undefined) return;
+      const valor = Number(t.paid_amount || (t.status === 'pago' ? t.amount : 0)) || 0;
+      if (valor <= 0) return;
+      if (t.type === 'receita') balances[t.account_id] += valor;
+      else if (t.type === 'despesa') balances[t.account_id] -= valor;
+    });
+
     return balances;
-  }, [accounts, allTransactions]);
+  }, [accounts, allTransactions, allPayments]);
 
   // NOVO: Dados para o gráfico de movimentação diária
   const dailyChartData = useMemo(() => {
@@ -114,27 +136,68 @@ export default function FinancialAccounts() {
       }));
   }, [allTransactions]);
 
-  // ATUALIZAR: Buscar transações da conta selecionada com filtro de data
-  const { data: accountTransactions = [] } = useQuery({
-    queryKey: ['account-transactions', viewingAccount?.id, startDate, endDate],
-    queryFn: () => {
-      if (!viewingAccount?.id) return [];
-      return base44.entities.Transaction.filter({ 
-        account_id: viewingAccount.id,
-        status: 'pago'
-      }, '-payment_date', 1000); // Increased limit to ensure we get enough history
-    },
-    enabled: !!viewingAccount?.id,
-    initialData: []
-  });
+  // Mapa id -> transação (tipo, descrição, categoria, contato) para enriquecer
+  // os registros de pagamento no extrato.
+  const txMap = useMemo(() => {
+    const m = {};
+    allTransactions.forEach(t => { m[t.id] = t; });
+    return m;
+  }, [allTransactions]);
 
-  // NOVO: Filtrar transações por data (compara strings YYYY-MM-DD para evitar fusos horários)
-  const filteredTransactions = useMemo(() => {
-    if (!startDate && !endDate) return accountTransactions;
+  // Extrato da conta: cada movimentação real que entrou/saiu desta conta.
+  // 1) TransactionPayment (pagamentos granulares — cobre pagamentos parciais
+  //    em contas diferentes sem desajustar o caixa).
+  // 2) Transações legadas sem registros de pagamento (ex.: lançamentos de
+  //    venda), contabilizadas pelo paid_amount + account_id próprios.
+  const statementEntries = useMemo(() => {
+    if (!viewingAccount) return [];
+    const entries = [];
+    const txsWithPayments = new Set(allPayments.map(p => p.transaction_id));
+
+    allPayments.forEach(p => {
+      if (p.account_id !== viewingAccount.id) return;
+      const tx = txMap[p.transaction_id];
+      entries.push({
+        id: `pay-${p.id}`,
+        date: p.payment_date,
+        description: p.transaction_reference || tx?.description || 'Pagamento',
+        type: tx?.type,
+        category: tx?.category,
+        contact_name: tx?.contact_name,
+        amount: Number(p.amount) || 0,
+        discount: p.discount || 0,
+        payment_method: p.payment_method
+      });
+    });
+
+    allTransactions.forEach(t => {
+      if (txsWithPayments.has(t.id)) return;
+      if (t.account_id !== viewingAccount.id) return;
+      const valor = Number(t.paid_amount || (t.status === 'pago' ? t.amount : 0)) || 0;
+      if (valor <= 0) return;
+      entries.push({
+        id: `tx-${t.id}`,
+        date: t.payment_date,
+        description: t.description,
+        type: t.type,
+        category: t.category,
+        contact_name: t.contact_name,
+        amount: valor,
+        discount: t.discount || 0,
+        payment_method: null
+      });
+    });
+
+    entries.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    return entries;
+  }, [allPayments, allTransactions, txMap, viewingAccount]);
+
+  // Filtrar movimentações por data (compara strings YYYY-MM-DD para evitar fusos)
+  const filteredEntries = useMemo(() => {
+    if (!startDate && !endDate) return statementEntries;
 
     const formatYMD = (date) => {
        if (!date) return null;
-       // Create local date string YYYY-MM-DD manually to match DB storage
        const d = new Date(date);
        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     };
@@ -142,47 +205,26 @@ export default function FinancialAccounts() {
     const startStr = formatYMD(startDate);
     const endStr = formatYMD(endDate);
 
-    return accountTransactions.filter(transaction => {
-      if (!transaction.payment_date) return false;
-      
-      // transaction.payment_date is typically "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ss..."
-      // We take the first 10 chars to get YYYY-MM-DD
-      const transDateStr = String(transaction.payment_date).substring(0, 10);
-
-      if (startStr && endStr) {
-        return transDateStr >= startStr && transDateStr <= endStr;
-      }
-
-      if (startStr) {
-        return transDateStr >= startStr;
-      }
-
-      if (endStr) {
-        return transDateStr <= endStr;
-      }
-
+    return statementEntries.filter(entry => {
+      if (!entry.date) return false;
+      const dateStr = String(entry.date).substring(0, 10);
+      if (startStr && endStr) return dateStr >= startStr && dateStr <= endStr;
+      if (startStr) return dateStr >= startStr;
+      if (endStr) return dateStr <= endStr;
       return true;
     });
-  }, [accountTransactions, startDate, endDate]);
+  }, [statementEntries, startDate, endDate]);
 
-  // NOVO: Calcular totais do período filtrado usando paid_amount
+  // Totais do período filtrado
   const periodStats = useMemo(() => {
-    if (!filteredTransactions) return { entradas: 0, saidas: 0, saldo: 0 };
-    
-    const entradas = filteredTransactions
-      .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + Number(t.paid_amount || t.amount || 0), 0);
-    
-    const saidas = filteredTransactions
-      .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + Number(t.paid_amount || t.amount || 0), 0);
-
-    return {
-      entradas,
-      saidas,
-      saldo: entradas - saidas
-    };
-  }, [filteredTransactions]);
+    const entradas = filteredEntries
+      .filter(e => e.type === 'receita')
+      .reduce((sum, e) => sum + e.amount, 0);
+    const saidas = filteredEntries
+      .filter(e => e.type === 'despesa')
+      .reduce((sum, e) => sum + e.amount, 0);
+    return { entradas, saidas, saldo: entradas - saidas };
+  }, [filteredEntries]);
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.FinancialAccount.create({
@@ -811,14 +853,14 @@ export default function FinancialAccounts() {
               </CardContent>
             </Card>
 
-            {/* Lista de Transações */}
+            {/* Lista de Movimentações */}
             <div className="max-h-[300px] overflow-y-auto space-y-3">
-              {filteredTransactions.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
                     <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                     <p className="text-slate-500">
-                      {accountTransactions.length === 0 
+                      {statementEntries.length === 0
                         ? 'Nenhuma movimentação registrada'
                         : 'Nenhuma movimentação encontrada no período selecionado.'}
                     </p>
@@ -827,47 +869,57 @@ export default function FinancialAccounts() {
               ) : (
                 <>
                   <div className="flex justify-between items-center px-2 text-sm text-slate-600">
-                    <span>{filteredTransactions.length} transação(ões) encontrada(s)</span>
+                    <span>{filteredEntries.length} movimentação(ões) encontrada(s)</span>
                   </div>
-                  {filteredTransactions.map((transaction) => (
-                    <Card key={transaction.id} className="hover:shadow-md transition-shadow">
+                  {filteredEntries.map((entry) => (
+                    <Card key={entry.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              transaction.type === 'receita' ? 'bg-green-100' : 'bg-red-100'
+                              entry.type === 'receita' ? 'bg-green-100' : 'bg-red-100'
                             }`}>
-                              {transaction.type === 'receita' ? (
+                              {entry.type === 'receita' ? (
                                 <TrendingUp className="w-5 h-5 text-green-600" />
                               ) : (
                                 <TrendingDown className="w-5 h-5 text-red-600" />
                               )}
                             </div>
                             <div>
-                              <p className="font-semibold text-slate-900">{transaction.description}</p>
-                              <div className="flex items-center gap-2 mt-1">
+                              <p className="font-semibold text-slate-900">{entry.description}</p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <Badge variant="secondary" className="text-xs">
-                                  {transaction.type === 'receita' ? 'Receita' : 'Despesa'}
+                                  {entry.type === 'receita' ? 'Receita' : 'Despesa'}
                                 </Badge>
-                                {transaction.category && (
+                                {entry.category && (
                                   <Badge variant="outline" className="text-xs">
-                                    {transaction.category}
+                                    {entry.category}
+                                  </Badge>
+                                )}
+                                {entry.discount > 0 && (
+                                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                    Abatimento: {formatBRL(entry.discount)}
+                                  </Badge>
+                                )}
+                                {entry.payment_method && (
+                                  <Badge variant="outline" className="text-xs capitalize">
+                                    {entry.payment_method.replace('_', ' ')}
                                   </Badge>
                                 )}
                                 <span className="text-xs text-slate-500">
-                                  {formatDate(transaction.payment_date)}
+                                  {formatDate(entry.date)}
                                 </span>
                               </div>
                             </div>
                           </div>
                           <div className="text-right">
                             <p className={`text-xl font-bold ${
-                              transaction.type === 'receita' ? 'text-green-600' : 'text-red-600'
+                              entry.type === 'receita' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {transaction.type === 'receita' ? '+' : '-'} {formatBRL(transaction.paid_amount || transaction.amount)}
+                              {entry.type === 'receita' ? '+' : '-'} {formatBRL(entry.amount)}
                             </p>
-                            {transaction.contact_name && (
-                              <p className="text-xs text-slate-500 mt-1">{transaction.contact_name}</p>
+                            {entry.contact_name && (
+                              <p className="text-xs text-slate-500 mt-1">{entry.contact_name}</p>
                             )}
                           </div>
                         </div>

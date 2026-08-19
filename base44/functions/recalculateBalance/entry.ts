@@ -18,9 +18,8 @@ Deno.serve(async (req) => {
 
         // Se account_id for fornecido, recalcula só aquela conta.
         // Se não, recalcula todas as contas da empresa.
-        
         let accountsToRecalculate = [];
-        
+
         if (account_id) {
             const account = await base44.entities.FinancialAccount.get(account_id);
             if (account) accountsToRecalculate.push(account);
@@ -28,64 +27,77 @@ Deno.serve(async (req) => {
             accountsToRecalculate = await base44.entities.FinancialAccount.filter({ company_id });
         }
 
+        // Mapa id -> type para classificar cada movimentação como receita/despesa
+        const transactions = await base44.entities.Transaction.filter({ company_id }, undefined, 10000);
+        const txTypeMap = {};
+        transactions.forEach(t => { txTypeMap[t.id] = t.type; });
+
+        // SOURCE OF TRUTH: TransactionPayment é o registro granular de cada
+        // pagamento/abatimento, com o account_id e o amount CORRETOS de cada
+        // movimentação. Usar Transaction.paid_amount + Transaction.account_id
+        // desajusta o caixa quando há pagamentos parciais em contas diferentes
+        // (o account_id é sobrescrito a cada pagamento e o paid_amount é
+        // acumulado), atribuindo o valor total à última conta usada.
+        const payments = await base44.entities.TransactionPayment.filter({ company_id }, undefined, 10000);
+        const transactionsWithPayments = new Set(payments.map(p => p.transaction_id));
+
+        // Acumular movimentações por conta
+        const byAccount = {};
+        const addMovement = (accId, type, valor) => {
+            if (!accId) return;
+            if (!byAccount[accId]) byAccount[accId] = { receitas: 0, despesas: 0 };
+            if (type === 'receita') byAccount[accId].receitas += valor;
+            else if (type === 'despesa') byAccount[accId].despesas += valor;
+        };
+
+        // 1) Pagamentos granulares (transações com registros de pagamento)
+        payments.forEach(p => {
+            const type = txTypeMap[p.transaction_id];
+            addMovement(p.account_id, type, Number(p.amount) || 0);
+        });
+
+        // 2) Fallback para transações sem registros de pagamento (lançamentos
+        //    antigos ou gerados por vendas/compras): contabiliza pelo paid_amount
+        //    + account_id próprios. Não processa transações já cobertas pelo
+        //    passo 1 para evitar duplicidade.
+        transactions.forEach(t => {
+            if (transactionsWithPayments.has(t.id)) return;
+            const valor = Number(t.paid_amount || (t.status === 'pago' ? t.amount : 0)) || 0;
+            if (valor > 0) addMovement(t.account_id, t.type, valor);
+        });
+
         const results = [];
 
         for (const account of accountsToRecalculate) {
-            // Buscar todas as transações pagas dessa conta
-            // Nota: O limite de listagem padrão pode ser um problema se houver muitas transações.
-            // O ideal seria paginação, mas para este fix rápido vamos aumentar o limite.
-            // Base44 SDK filter suporta limit? Sim. Vamos por um limite alto seguro.
-            
-            // Buscar todas as transações da conta (pagas e parciais)
-            // Transações parciais têm paid_amount > 0 que representa dinheiro que entrou/saiu
-            const transactions = await base44.entities.Transaction.filter({
-                account_id: account.id
-            }, undefined, 10000);
-
-            let totalReceitas = 0;
-            let totalDespesas = 0;
-
-            transactions.forEach(t => {
-                // paid_amount é source of truth do que realmente movimentou
-                // Fallback para amount apenas em registros antigos já quitados
-                const valor = t.paid_amount || (t.status === 'pago' ? t.amount : 0) || 0;
-
-                if (t.type === 'receita') {
-                    totalReceitas += valor;
-                } else if (t.type === 'despesa') {
-                    totalDespesas += valor;
-                }
-            });
-
+            const stats = byAccount[account.id] || { receitas: 0, despesas: 0 };
             const initialBalance = account.initial_balance || 0;
-            const newCurrentBalance = initialBalance + totalReceitas - totalDespesas;
+            const newCurrentBalance = initialBalance + stats.receitas - stats.despesas;
 
-            // Atualizar a conta se o saldo for diferente
             if (account.current_balance !== newCurrentBalance) {
                 await base44.entities.FinancialAccount.update(account.id, {
                     current_balance: newCurrentBalance
                 });
-                results.push({ 
-                    id: account.id, 
-                    name: account.name, 
-                    old: account.current_balance, 
+                results.push({
+                    id: account.id,
+                    name: account.name,
+                    old: account.current_balance,
                     new: newCurrentBalance,
-                    updated: true 
+                    updated: true
                 });
             } else {
-                results.push({ 
-                    id: account.id, 
-                    name: account.name, 
+                results.push({
+                    id: account.id,
+                    name: account.name,
                     balance: newCurrentBalance,
-                    updated: false 
+                    updated: false
                 });
             }
         }
 
-        return Response.json({ 
-            success: true, 
+        return Response.json({
+            success: true,
             message: `Recalculated ${results.length} accounts`,
-            results 
+            results
         });
 
     } catch (error) {
