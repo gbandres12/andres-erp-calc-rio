@@ -115,6 +115,18 @@ export default function Layout({ children, currentPageName }) {
     return navigationGroups;
   }, [user]);
 
+  // Perfil personalizado: expandir automaticamente os grupos com módulos permitidos,
+  // para que o usuário veja seus módulos sem precisar clicar em cada grupo.
+  useEffect(() => {
+    if (user?.custom_role === 'custom') {
+      const allowed = new Set(user.custom_permissions || []);
+      const groupsToOpen = navigationGroups
+        .filter(g => g.items.some(i => allowed.has(i.url)))
+        .map(g => g.title);
+      setOpenGroups(new Set(groupsToOpen));
+    }
+  }, [user]);
+
   const { data: companies = [] } = useQuery({
     queryKey: ['companies', user?.id],
     queryFn: async () => {
