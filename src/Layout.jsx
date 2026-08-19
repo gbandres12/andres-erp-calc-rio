@@ -3,13 +3,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { createPageUrl } from "@/utils";
 import {
-  Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
-  CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
-  BarChart3, Settings, LogOut, ChevronDown, ChevronUp,
-  Home, FileText, History, UserCircle, PackageCheck,
-  ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
-  ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight, Receipt, Upload, Layers, Wheat
+  Building2, LogOut, ChevronDown, ChevronUp,
+  UserCircle, RefreshCw, ArrowLeftRight
 } from "lucide-react";
+import { navigationGroups } from "@/lib/navigationConfig";
 import {
   Sidebar, SidebarContent, SidebarProvider, SidebarTrigger, useSidebar
 } from "@/components/ui/sidebar";
@@ -21,83 +18,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-
-const navigationGroups = [
-  {
-    title: "Gestão de Materiais",
-    icon: Package,
-    items: [
-      { title: "Produtos", url: "Products", icon: Package },
-      { title: "Almoxarifado", url: "Warehouse", icon: Warehouse },
-      { title: "Transferências", url: "Transfers", icon: ArrowLeftRight },
-      { title: "Requisições", url: "Requisitions", icon: FileText },
-      { title: "Pedidos de Compra", url: "PurchaseOrders", icon: ClipboardList }
-    ]
-  },
-  {
-    title: "Logística",
-    icon: TruckIcon,
-    items: [
-      { title: "Veículos", url: "Vehicles", icon: TruckIcon },
-      { title: "Pesagens", url: "Weighing", icon: Scale },
-      { title: "Combustível", url: "Fuel", icon: Fuel }
-    ]
-  },
-  {
-    title: "Financeiro",
-    icon: CreditCard,
-    items: [
-      { title: "Contas", url: "FinancialAccounts", icon: CreditCard },
-      { title: "Contas a Receber", url: "Receivables", icon: ArrowDownToLine },
-      { title: "Contas a Pagar", url: "Payables", icon: ArrowUpFromLine },
-      { title: "Lançamentos", url: "Transactions", icon: FileText },
-      { title: "Recorrências", url: "RecurringTransactions", icon: RepeatIcon },
-      { title: "Extrato por CC", url: "CostCenterReport", icon: Layers },
-      { title: "Relatório Diário", url: "DailyFinancialReport", icon: BarChart3 },
-      { title: "Clientes/Fornecedores", url: "Contacts", icon: Users }
-    ]
-  },
-  {
-    title: "Comercial",
-    icon: ShoppingCart,
-    items: [
-      { title: "Cotações com IA", url: "SupplierQuotes", icon: Bot },
-      { title: "Previsão de Vendas", url: "SalesForecast", icon: TrendingUp },
-      { title: "Orçamentos", url: "Quotes", icon: FileText },
-      { title: "Vendas", url: "Sales", icon: ShoppingCart },
-      { title: "Retiradas", url: "SaleWithdrawals", icon: PackageCheck },
-      { title: "Saídas e Permutas", url: "ClientDeliveries", icon: Wheat },
-      { title: "CRM", url: "CRM", icon: Users }
-    ]
-  },
-  {
-    title: "Fiscal",
-    icon: Receipt,
-    items: [
-      { title: "Notas Fiscais", url: "FiscalInvoices", icon: Receipt },
-      { title: "Importar Emissor Antigo", url: "FiscalImport", icon: Upload },
-      { title: "Config. Fiscal", url: "FiscalSettings", icon: Settings }
-    ]
-  },
-  {
-    title: "Controles",
-    icon: ShieldCheck,
-    items: [
-      { title: "EPIs", url: "EPIs", icon: ShieldCheck },
-      { title: "Ativos de TI", url: "ITAssets", icon: Monitor }
-    ]
-  },
-  {
-    title: "Gestão",
-    icon: BarChart3,
-    items: [
-      { title: "Relatórios", url: "Reports", icon: BarChart3 },
-      { title: "Auditoria", url: "ActivityLogs", icon: History },
-      { title: "Usuários", url: "Users", icon: Users },
-      { title: "Configurações", url: "Settings", icon: Settings }
-    ]
-  }
-];
 
 // Groups start collapsed and expand when selected.
 const DEFAULT_OPEN = new Set();
@@ -179,6 +99,15 @@ export default function Layout({ children, currentPageName }) {
         const allowedItems = allowed[group.title];
         if (!allowedItems) return null;
         const items = group.items.filter(i => allowedItems.includes(i.url));
+        return items.length ? { ...group, items } : null;
+      }).filter(Boolean);
+    }
+
+    // Perfil personalizado: mostra apenas os módulos marcados em custom_permissions
+    if (user.custom_role === 'custom') {
+      const allowed = new Set(user.custom_permissions || []);
+      return navigationGroups.map(group => {
+        const items = group.items.filter(i => allowed.has(i.url));
         return items.length ? { ...group, items } : null;
       }).filter(Boolean);
     }

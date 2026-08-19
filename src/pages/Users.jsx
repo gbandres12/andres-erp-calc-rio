@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Users, Edit, Shield, Building2 } from "lucide-react";
+import { Users as UsersIcon, Edit, Shield, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { navigationGroups } from "@/lib/navigationConfig";
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
@@ -46,7 +47,8 @@ export default function UsersPage() {
     setEditingUser({
       id: user.id,
       custom_role: user.custom_role || '',
-      allowed_companies: user.allowed_companies || []
+      allowed_companies: user.allowed_companies || [],
+      custom_permissions: user.custom_permissions || []
     });
     setIsDialogOpen(true);
   };
@@ -57,8 +59,21 @@ export default function UsersPage() {
       id: editingUser.id,
       data: {
         custom_role: editingUser.custom_role,
-        allowed_companies: editingUser.allowed_companies
+        allowed_companies: editingUser.allowed_companies,
+        custom_permissions: editingUser.custom_role === 'custom' ? editingUser.custom_permissions : []
       }
+    });
+  };
+
+  const togglePermission = (url) => {
+    setEditingUser(prev => {
+      const current = prev.custom_permissions || [];
+      return {
+        ...prev,
+        custom_permissions: current.includes(url)
+          ? current.filter(u => u !== url)
+          : [...current, url]
+      };
     });
   };
 
@@ -87,7 +102,7 @@ export default function UsersPage() {
               <div key={user.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-slate-500" />
+                    <UsersIcon className="w-5 h-5 text-slate-500" />
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">{user.full_name || 'Sem nome'}</p>
@@ -101,6 +116,7 @@ export default function UsersPage() {
                           admin: { label: 'Admin — Acesso Total', className: 'bg-blue-50 text-blue-700 border-blue-200' },
                           operator: { label: 'Operador — Vendas + Clientes', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
                           scale_operator: { label: 'Op. Balança — Pesagem + Vendas', className: 'bg-orange-50 text-orange-700 border-orange-200' },
+                          custom: { label: `Personalizado — ${(user.custom_permissions || []).length} módulo(s)`, className: 'bg-violet-50 text-violet-700 border-violet-200' },
                         };
                         const r = roleMap[user.custom_role] || { label: user.custom_role ? user.custom_role : '⚠️ Sem perfil definido', className: user.custom_role ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200' };
                         return <Badge variant="outline" className={r.className}>{r.label}</Badge>;
@@ -161,12 +177,49 @@ export default function UsersPage() {
                    <SelectItem value="admin">🔵 Admin — Acesso total ao sistema</SelectItem>
                    <SelectItem value="operator">🟡 Operador — Vendas, Orçamentos, Retiradas e Clientes/Fornecedores</SelectItem>
                    <SelectItem value="scale_operator">🟠 Op. Balança — Apenas Pesagem, Vendas e Retiradas</SelectItem>
+                   <SelectItem value="custom">🟣 Personalizado — Selecionar módulos manualmente</SelectItem>
                   </SelectContent>
-                </Select>
-              </div>
+                  </Select>
+                  </div>
 
-              <div className="space-y-3">
-                <Label>Empresas Permitidas</Label>
+                  {editingUser.custom_role === 'custom' && (
+                  <div className="space-y-3">
+                  <Label>Módulos Permitidos</Label>
+                  <p className="text-xs text-slate-500 -mt-1">
+                    Marque apenas o que este usuário poderá acessar. Ex.: para cadastrar clientes e fornecedores, marque "Clientes/Fornecedores".
+                  </p>
+                  <div className="space-y-3 border rounded-lg p-3 max-h-[260px] overflow-y-auto bg-slate-50/50">
+                    {navigationGroups.map((group) => (
+                      <div key={group.title}>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{group.title}</p>
+                        <div className="space-y-1.5">
+                          {group.items.map((item) => {
+                            const checked = (editingUser.custom_permissions || []).includes(item.url);
+                            return (
+                              <div key={item.url} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`perm-${item.url}`}
+                                  checked={checked}
+                                  onCheckedChange={() => togglePermission(item.url)}
+                                />
+                                <label
+                                  htmlFor={`perm-${item.url}`}
+                                  className="text-sm leading-none cursor-pointer flex items-center gap-2 select-none"
+                                >
+                                  {item.title}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  </div>
+                  )}
+
+                  <div className="space-y-3">
+                  <Label>Empresas Permitidas</Label>
                 <div className="space-y-2 border rounded-lg p-3 max-h-[200px] overflow-y-auto">
                   {companies.map((company) => (
                     <div key={company.id} className="flex items-center space-x-2">
