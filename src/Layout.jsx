@@ -11,7 +11,7 @@ import {
   ClipboardList, RepeatIcon, RefreshCw, ArrowLeftRight, Receipt, Upload, Layers, Wheat
 } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarProvider, SidebarTrigger
+  Sidebar, SidebarContent, SidebarProvider, SidebarTrigger, useSidebar
 } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import {
@@ -101,6 +101,16 @@ const navigationGroups = [
 
 // Groups start collapsed and expand when selected.
 const DEFAULT_OPEN = new Set();
+
+// Fecha o menu lateral mobile ao trocar de página
+function MobileNavCloser() {
+  const { setOpenMobile } = useSidebar();
+  const location = useLocation();
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [location.pathname, setOpenMobile]);
+  return null;
+}
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
@@ -232,9 +242,11 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <SidebarProvider>
+      <MobileNavCloser />
       <div className="min-h-screen flex w-full bg-slate-50">
         {/* Sidebar */}
-        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 min-h-screen flex-shrink-0">
+        <Sidebar>
+          <div className="bg-white flex flex-col h-full w-full border-r border-slate-200">
           {/* Header */}
           <div className="px-5 pt-6 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3 mb-5">
@@ -383,7 +395,8 @@ export default function Layout({ children, currentPageName }) {
               </DropdownMenu>
             </div>
           )}
-        </aside>
+          </div>
+        </Sidebar>
 
         {/* Main content */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
