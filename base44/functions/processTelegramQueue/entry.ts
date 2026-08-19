@@ -174,7 +174,8 @@ MAPEAMENTO:
 - "recebi X/entrou X" → add_transaction (type=receita, is_paid=true)
 - "paguei X/gastei X" → add_transaction (type=despesa, is_paid=true)
 - "conta a pagar de X" → add_transaction (type=despesa, is_paid=false)
-- "dar baixa/quitar/paguei a conta" → pay_bill
+- "dar baixa/quitar/paguei a conta/paguei X de/pagamento de/pagamento parcial/quitei parte" → pay_bill (baixa com valor parcial, abatimento, conta e forma de pagamento)
+- "abatimento de X/desconto de X/abater X/dei desconto de X/renegociei desconto" → apply_discount (abate do saldo devedor sem saída de dinheiro)
 - "lançamentos/movimentações/extrato" → search_transactions
 
 AÇÕES:
@@ -187,11 +188,16 @@ AÇÕES:
 - search_transactions → query={type?, status?, company_name?, all_companies?, period?, keyword?}
 - upcoming_bills → query={company_name?, all_companies?, days?, type?}
 - add_transaction → transaction={description, amount, type, category, due_date?, payment_date?, is_paid?, contact_name?}
-- pay_bill → payment={search_term, amount?, payment_date?}
+- pay_bill → payment={search_term, amount?, payment_date?, discount?, account_name?, payment_method?, reason?}
+  • amount = valor pago em dinheiro (omitir = quitar tudo). discount = abatimento concedido. account_name = conta (parcial ok). payment_method = dinheiro|pix|transferencia|cartao_debito|cartao_credito|cheque.
+- apply_discount → payment={search_term, discount, payment_date?, reason?}
+  • discount = valor do abatimento (reduz o saldo devedor, sem saída de caixa).
 - select_company → target_company=nome
 - search_contacts → search_term=nome
 - create_contact → contact={name, phone?, email?, type?}
 
+CONTAS: use account_name com nome parcial (ex: "caixa", "bb", "bradesco", "porto"). Se não informado, usa o caixa da filial.
+ABATIMENTO: discount abate do restante a pagar; não move dinheiro da conta. Pode vir junto com pay_bill (pagamento + abatimento na mesma baixa).
 PERÍODOS PARA sales_query: today, yesterday, this_week, this_month, last_month, this_year (default se não especificado: this_month)
 
 CATEGORIAS:
@@ -584,28 +590,128 @@ async function executeAction(base44, ai, companies, accounts, session) {
         return `✅ *${td.type==='receita'?'Receita':'Despesa'} lançada!*\n📝 ${td.description}\n💰 ${brl(td.amount)}\n📁 ${td.category||'Outras'}\n🏢 ${comp?.name||''}\n📅 ${fmtDate(due)}\n${isPaid?'✅ Pago':'🟡 Pendente'}`;
     }
 
-    // ── pay_bill ──────────────────────────────────────────────────────────────
+    // ── pay_bill (baixa parcial/total + abatimento + conta + forma) ───────────
     if (action === 'pay_bill') {
         if (!cid) return '⚠️ Informe a filial.';
-        const [p1,p2] = await Promise.all([
+        const [p1,p2,p3] = await Promise.all([
             base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'pendente' }),
             base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'atrasado' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'parcial' }),
         ]);
-        const pending = [...p1,...p2];
+        const pending = [...p1,...p2,...p3];
         const term = (pd.search_term || '').toLowerCase();
+        const restanteDe = (t) => (t.amount||0) - (t.paid_amount||0) - (t.discount||0);
         const match = pending.find(t =>
             (!term || t.description.toLowerCase().includes(term)) &&
-            (!pd.amount || Math.abs(t.amount - pd.amount) < t.amount * 0.1)
+            (!pd.amount || Math.abs(restanteDe(t) - pd.amount) < Math.abs(t.amount) * 0.1 + 1)
         );
         if (!match) {
-            const sug = pending.filter(t=>t.description.toLowerCase().includes(term.split(' ')[0]||'')).slice(0,3)
-                .map(t=>`  • ${t.description} | ${brl(t.amount)}`).join('\n');
-            return `⚠️ Conta não encontrada: *"${pd.search_term}"*${sug?`\n\nSimilares:\n${sug}`:''}`;
+            const sug = pending.filter(t=>t.description.toLowerCase().includes(term.split(' ')[0]||'')).slice(0,5)
+                .map(t=>`  • ${t.description} | ${brl(restanteDe(t))} restante`).join('\n');
+            return `⚠️ Conta não encontrada: *"${pd.search_term}"*${sug?`\n\nPendentes:\n${sug}`:''}`;
         }
-        await base44.asServiceRole.entities.Transaction.update(match.id, {
-            status: 'pago', paid_amount: match.amount, payment_date: pd.payment_date || today()
+        const restanteBefore = restanteDe(match);
+        const abat = Math.max(0, Number(pd.discount || 0));
+        const payAmount = Math.max(0, Number(pd.amount || (pd.amount === 0 ? 0 : restanteBefore - abat)));
+        if (payAmount <= 0 && abat <= 0) return '⚠️ Informe o valor pago e/ou o abatimento.';
+
+        // resolver conta de destino
+        let acct = null;
+        if (pd.account_name) {
+            const s = String(pd.account_name).toLowerCase();
+            acct = accounts.find(a => a.company_id===cid && a.name.toLowerCase().includes(s));
+        }
+        if (!acct) acct = accounts.find(a=>a.company_id===cid && a.type==='caixa')
+                  || accounts.find(a=>a.company_id===cid);
+        let payDate = pd.payment_date || today();
+        if (payDate.includes('/')) { const pp = payDate.split('/'); payDate = `${pp[2]}-${pp[1]}-${pp[0]}`; }
+        const method = pd.payment_method || 'dinheiro';
+
+        let newPaid = (match.paid_amount||0) + payAmount;
+        const newDiscount = (match.discount||0) + abat;
+        let remaining = (match.amount||0) - newPaid - newDiscount;
+        if (remaining < 0) { newPaid += remaining; remaining = 0; } // evita ultrapassar
+        const newStatus = remaining <= 0.005 ? 'pago' : 'parcial';
+
+        // 1) Registro granular (source of truth do saldo)
+        await base44.asServiceRole.entities.TransactionPayment.create({
+            transaction_id: match.id,
+            transaction_reference: match.description,
+            amount: payAmount,
+            discount: abat,
+            payment_date: payDate,
+            account_id: acct?.id || match.account_id || null,
+            account_name: acct?.name || '',
+            payment_method: method,
+            responsible: 'TelegramBot',
+            notes: abat > 0 ? `Abatimento: ${brl(abat)}${pd.reason?' | '+pd.reason:''}` : (pd.reason || 'Via TelegramBot'),
+            company_id: cid
         });
-        return `✅ *Baixa realizada!*\n📝 ${match.description}\n💰 ${brl(match.amount)}\n📅 ${fmtDate(pd.payment_date || today())}`;
+        // 2) Atualiza transação
+        await base44.asServiceRole.entities.Transaction.update(match.id, {
+            paid_amount: newPaid,
+            discount: newDiscount,
+            status: newStatus,
+            payment_date: newStatus === 'pago' ? payDate : (match.payment_date || null),
+            account_id: acct?.id || match.account_id
+        });
+        // 3) Recalcula saldo da conta (consistência com novo modelo)
+        if (acct?.id) {
+            await base44.asServiceRole.functions.invoke('recalculateBalance', { account_id: acct.id, company_id: cid }).catch(()=>{});
+        }
+
+        let msg = `✅ *${newStatus==='pago'?'Baixa total!':'Pagamento parcial'}*\n📝 ${match.description}\n`;
+        if (payAmount>0) msg += `💰 Pago: ${brl(payAmount)}\n`;
+        if (abat>0) msg += `🏷️ Abatimento: ${brl(abat)}\n`;
+        msg += `📊 Restante: ${brl(remaining)}\n🏦 Conta: ${acct?.name||'-'} (${method})\n📅 ${fmtDate(payDate)}`;
+        return msg;
+    }
+
+    // ── apply_discount (abatimento puro, sem pagamento em dinheiro) ──────────
+    if (action === 'apply_discount') {
+        if (!cid) return '⚠️ Informe a filial.';
+        const [p1,p2,p3] = await Promise.all([
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'pendente' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'atrasado' }),
+            base44.asServiceRole.entities.Transaction.filter({ company_id: cid, status: 'parcial' }),
+        ]);
+        const pending = [...p1,...p2,...p3];
+        const term = (pd.search_term || '').toLowerCase();
+        const match = pending.find(t => !term || t.description.toLowerCase().includes(term));
+        if (!match) {
+            const sug = pending.slice(0,5)
+                .map(t=>`  • ${t.description} | ${brl((t.amount - (t.paid_amount||0) - (t.discount||0)))} restante`).join('\n');
+            return `⚠️ Conta não encontrada: *"${pd.search_term}"*${sug?`\n\nPendentes:\n${sug}`:''}`;
+        }
+        const abat = Math.max(0, Number(pd.discount || 0));
+        if (abat <= 0) return '⚠️ Informe o valor do abatimento (discount).';
+        const restanteBefore = (match.amount||0) - (match.paid_amount||0) - (match.discount||0);
+        if (abat > restanteBefore) return `⚠️ Abatimento (${brl(abat)}) maior que o restante (${brl(restanteBefore)}).`;
+        let payDate = pd.payment_date || today();
+        if (payDate.includes('/')) { const pp = payDate.split('/'); payDate = `${pp[2]}-${pp[1]}-${pp[0]}`; }
+        const newDiscount = (match.discount||0) + abat;
+        const remaining = (match.amount||0) - (match.paid_amount||0) - newDiscount;
+        const newStatus = remaining <= 0.005 ? 'pago' : (['pendente','atrasado'].includes(match.status) ? 'parcial' : match.status);
+
+        const acctName = accounts.find(a=>a.id===match.account_id)?.name || '';
+        await base44.asServiceRole.entities.TransactionPayment.create({
+            transaction_id: match.id,
+            transaction_reference: match.description,
+            amount: 0,
+            discount: abat,
+            payment_date: payDate,
+            account_id: match.account_id || null,
+            account_name: acctName,
+            payment_method: 'dinheiro',
+            responsible: 'TelegramBot',
+            notes: `Abatimento: ${brl(abat)}${pd.reason?' | '+pd.reason:''}`,
+            company_id: cid
+        });
+        await base44.asServiceRole.entities.Transaction.update(match.id, {
+            discount: newDiscount,
+            status: newStatus
+        });
+        return `🏷️ *Abatimento registrado!*\n📝 ${match.description}\n💸 Abatido: ${brl(abat)}\n📊 Restante: ${brl(remaining)}\n📅 ${fmtDate(payDate)}`;
     }
 
     // ── create_contact ────────────────────────────────────────────────────────
