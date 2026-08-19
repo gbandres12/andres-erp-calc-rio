@@ -14,10 +14,19 @@
       "enum": [
         "admin",
         "operator",
-        "scale_operator"
+        "scale_operator",
+        "custom"
       ],
       "default": "admin",
       "description": "Perfil de acesso"
+    },
+    "custom_permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "M\u00f3dulos (urls) permitidos quando custom_role = 'custom'"
     },
     "dark_mode": {
       "type": "boolean",
