@@ -205,10 +205,34 @@ export default function Payables() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
+      const oldTx = payables.find(t => t.id === id);
       await base44.entities.Transaction.update(id, data);
+
+      // Sincronizar TransactionPayment (fonte de verdade do saldo do caixa).
+      // Sem isso, editar o valor de uma conta paga não reflete no caixa, pois
+      // o recalculateBalance lê o TransactionPayment com o valor antigo.
+      const payments = await base44.entities.TransactionPayment.filter({ transaction_id: id });
+      const isPago = (data.status || oldTx?.status) === 'pago';
+      const account = accounts.find(a => a.id === (data.account_id || oldTx?.account_id));
+
+      if (isPago && payments.length === 1) {
+        // Conta paga com pagamento único (criado na criação/baixa): sincroniza valor
+        await base44.entities.TransactionPayment.update(payments[0].id, {
+          amount: data.amount ?? payments[0].amount,
+          account_id: data.account_id || payments[0].account_id,
+          account_name: account?.name || payments[0].account_name,
+          transaction_reference: data.description || payments[0].transaction_reference
+        });
+      }
+      // Múltiplos pagamentos (parcial/abatimentos): histórico mantido
     },
     onSuccess: () => {
+      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['payables']);
+      queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['all-payments']);
+      queryClient.invalidateQueries(['all-transactions']);
+      queryClient.invalidateQueries(['payment-history']);
       setIsEditOpen(false);
       setEditingPayable(null);
       toast.success("Conta atualizada com sucesso!");
