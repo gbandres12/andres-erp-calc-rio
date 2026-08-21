@@ -5,7 +5,10 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
         
-        if (!user || user.role !== 'admin') {
+        // O sistema de papéis do app é custom_role (admin/operator/scale_operator/custom).
+        // role é o built-in da Base44 — aceitamos os dois para não bloquear admins legítimos.
+        const isAdmin = user.custom_role === 'admin' || user.role === 'admin';
+        if (!user || !isAdmin) {
             return Response.json({ error: 'Apenas admins podem deletar' }, { status: 403 });
         }
 

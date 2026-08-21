@@ -5,7 +5,8 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
-        if (!user || user.role !== 'admin') {
+        const isAdmin = user.custom_role === 'admin' || user.role === 'admin';
+        if (!user || !isAdmin) {
             return Response.json({ error: 'Apenas admins podem configurar a senha' }, { status: 403 });
         }
 
