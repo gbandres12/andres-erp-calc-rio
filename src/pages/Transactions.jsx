@@ -198,11 +198,57 @@ export default function Transactions() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Transaction.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const oldTx = transactions.find(t => t.id === id);
+      const updated = await base44.entities.Transaction.update(id, data);
+
+      // Sincronizar TransactionPayment (fonte de verdade do saldo do caixa).
+      // Sem isso, editar valor/conta/status de um lançamento pago não reflete
+      // no caixa, pois o recalculateBalance lê o TransactionPayment antigo.
+      const payments = await base44.entities.TransactionPayment.filter({ transaction_id: id });
+      const wasPago = oldTx?.status === 'pago';
+      const isPago = data.status === 'pago';
+      const account = accounts.find(a => a.id === data.account_id);
+
+      if (isPago) {
+        if (payments.length === 0 && account) {
+          // Lançamento passou a ser pago na edição: criar o registro de pagamento
+          const user = await base44.auth.me();
+          await base44.entities.TransactionPayment.create({
+            transaction_id: id,
+            transaction_reference: data.description,
+            amount: data.amount,
+            payment_date: data.payment_date || getTodayDate(),
+            account_id: data.account_id,
+            account_name: account.name,
+            payment_method: 'dinheiro',
+            responsible: user?.full_name || user?.email || '',
+            notes: 'Pagamento registrado na edição',
+            company_id: selectedCompanyId
+          });
+        } else if (payments.length === 1) {
+          // Lançamento pago com um único pagamento (criado na criação): sincronizar
+          await base44.entities.TransactionPayment.update(payments[0].id, {
+            amount: data.amount,
+            account_id: data.account_id,
+            account_name: account?.name || payments[0].account_name,
+            payment_date: data.payment_date || payments[0].payment_date,
+            transaction_reference: data.description
+          });
+        }
+        // Múltiplos pagamentos (parcial/abatimentos): histórico é mantido
+      } else if (wasPago && !isPago && payments.length === 1) {
+        // Reverteu de pago para pendente: remover o pagamento único da criação
+        await base44.entities.TransactionPayment.delete(payments[0].id);
+      }
+
+      return updated;
+    },
     onSuccess: () => {
       base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['payment-history']);
       setIsDialogOpen(false);
       resetForm();
       toast.success("Lançamento atualizado!");
