@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle, Pencil, XCircle, RefreshCw, History } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, DollarSign, Package, TrendingUp, AlertCircle, Receipt, Printer, FileText, Check, ChevronsUpDown, Search, MessageCircle, Pencil, XCircle, RefreshCw, History, Wheat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -94,7 +94,10 @@ export default function Sales() {
     discount: 0,
     shipping: 0,
     total: 0,
-    notes: ""
+    notes: "",
+    is_barter: false,
+    corn_tons: 0,
+    corn_unit_value: 0
   });
 
   const [paymentData, setPaymentData] = useState({
@@ -287,16 +290,62 @@ export default function Sales() {
         }
       }
 
+      // Se a venda for permuta, registrar a troca de calcário por milho
+      if (data.is_barter) {
+        const toTonsMut = (qty, unit) => {
+          const n = parseFloat(qty) || 0;
+          if (unit === "TON") return n;
+          if (unit === "KG") return n / 1000;
+          if (unit === "SACA") return n * 0.06;
+          return n;
+        };
+        const lsItems = data.items.filter(i => i.product_id && (parseFloat(i.quantity) || 0) > 0);
+        const lsTons = lsItems.reduce((s, i) => s + toTonsMut(i.quantity, i.unit), 0);
+        const lsValue = lsItems.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+        const lsUnitValue = lsTons > 0 ? lsValue / lsTons : 0;
+        const cornTons = parseFloat(data.corn_tons) || 0;
+        const cornUnitValue = parseFloat(data.corn_unit_value) || 0;
+        const cornTotal = cornTons * cornUnitValue;
+        const balance = lsValue - cornTotal;
+        const barterStatus = Math.abs(balance) < 0.01 ? "compensado" : (balance > 0 ? "aberto" : "parcial");
+
+        // Gerar referência PERM-00001 sequencial por filial
+        const existingBarters = await base44.entities.Barter.filter({ company_id: selectedCompanyId }, "-created_date", 200);
+        const maxB = existingBarters.reduce((m, b) => {
+          const n = parseInt((b.reference || "").replace(/\D/g, "")) || 0;
+          return Math.max(m, n);
+        }, 0);
+        const barterRef = `PERM-${String(maxB + 1).padStart(5, "0")}`;
+
+        await base44.entities.Barter.create({
+          reference: barterRef,
+          company_id: selectedCompanyId,
+          client_id: data.client_id,
+          client_name: data.client_name,
+          sale_id: sale.id,
+          sale_reference: newRef,
+          date: data.sale_date,
+          limestone_tons: lsTons,
+          limestone_unit_value: lsUnitValue,
+          corn_tons: cornTons,
+          corn_unit_value: cornUnitValue,
+          status: barterStatus,
+          notes: `Permuta gerada pela venda ${newRef}`
+        });
+      }
+
       return sale;
     },
-    onSuccess: async (sale) => {
+    onSuccess: async (sale, data) => {
       queryClient.invalidateQueries(['sales']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['transactions']);
+      queryClient.invalidateQueries(['barters']);
       setIsDialogOpen(false);
       resetForm();
-      // Se a venda foi quitada na entrada, já foi faturada automaticamente
-      if (sale && sale.status === 'faturada') {
+      if (data?.is_barter) {
+        toast.success("✅ Venda criada e permuta registrada em Saídas e Permutas!");
+      } else if (sale && sale.status === 'faturada') {
         await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
         toast.success("✅ Venda quitada e faturada automaticamente! Valor lançado no caixa.");
       } else {
@@ -470,7 +519,10 @@ export default function Sales() {
       discount: 0,
       shipping: 0,
       total: 0,
-      notes: ""
+      notes: "",
+      is_barter: false,
+      corn_tons: 0,
+      corn_unit_value: 0
     });
     setPaymentData({
       initial_payment: 0,
@@ -481,6 +533,23 @@ export default function Sales() {
     });
     setActiveTab("dados");
   };
+
+  // Converte quantidade de um item para toneladas (usado no cálculo de permuta)
+  const toTons = (qty, unit) => {
+    const n = parseFloat(qty) || 0;
+    if (unit === "TON") return n;
+    if (unit === "KG") return n / 1000;
+    if (unit === "SACA") return n * 0.06; // saco de 60kg
+    return n;
+  };
+  const limestoneTonsPreview = formData.items
+    .filter(i => i.product_id && (parseFloat(i.quantity) || 0) > 0)
+    .reduce((s, i) => s + toTons(i.quantity, i.unit), 0);
+  const limestoneValuePreview = formData.items
+    .filter(i => i.product_id && (parseFloat(i.quantity) || 0) > 0)
+    .reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+  const cornTotalPreview = (parseFloat(formData.corn_tons) || 0) * (parseFloat(formData.corn_unit_value) || 0);
+  const barterBalancePreview = limestoneValuePreview - cornTotalPreview;
 
   const addItem = () => {
     setFormData({
@@ -776,9 +845,10 @@ export default function Sales() {
             <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit}>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="dados">Dados da Venda</TabsTrigger>
                   <TabsTrigger value="itens">Itens ({formData.items.length})</TabsTrigger>
+                  <TabsTrigger value="permuta">Permuta</TabsTrigger>
                   <TabsTrigger value="pagamento">Pagamento</TabsTrigger>
                 </TabsList>
 
@@ -1003,6 +1073,96 @@ export default function Sales() {
                       </div>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="permuta" className="space-y-4">
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <Wheat className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-sm text-amber-800">
+                      Marque abaixo se esta venda é uma <strong>permuta</strong> (troca de calcário por milho).
+                      A permuta será registrada automaticamente na área <strong>Saídas e Permutas</strong>.
+                    </AlertDescription>
+                  </Alert>
+
+                  <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_barter}
+                      onChange={(e) => setFormData({ ...formData, is_barter: e.target.checked })}
+                      className="w-5 h-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="font-semibold text-slate-800">É permuta? (Calcário × Milho)</span>
+                      <p className="text-xs text-slate-500">O calcário vendido será a saída; o milho recebido será a entrada no pátio.</p>
+                    </div>
+                  </label>
+
+                  {formData.is_barter && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="col-span-2 text-sm font-semibold text-blue-800">Saída de Calcário (da venda)</div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Toneladas de Calcário</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            readOnly
+                            value={limestoneTonsPreview.toFixed(2)}
+                            className="bg-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Valor Médio R$/Ton</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            readOnly
+                            value={limestoneTonsPreview > 0 ? (limestoneValuePreview / limestoneTonsPreview).toFixed(2) : "0.00"}
+                            className="bg-white"
+                          />
+                        </div>
+                        <div className="col-span-2 text-right text-sm text-blue-700 font-medium">
+                          Total calcário: {formatBRL(limestoneValuePreview)}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                        <div className="col-span-2 text-sm font-semibold text-amber-800">Entrada de Milho (pátio) *</div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Toneladas de Milho</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.corn_tons}
+                            onChange={(e) => setFormData({ ...formData, corn_tons: e.target.value === '' ? '' : e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">R$ / Ton de Milho</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.corn_unit_value}
+                            onChange={(e) => setFormData({ ...formData, corn_unit_value: e.target.value === '' ? '' : e.target.value })}
+                          />
+                        </div>
+                        <div className="col-span-2 text-right text-sm text-amber-700 font-medium">
+                          Total milho: {formatBRL(cornTotalPreview)}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-100">
+                        <span className="text-sm font-medium text-slate-700">Saldo da permuta</span>
+                        <span className={`font-bold ${barterBalancePreview >= 0 ? "text-blue-700" : "text-amber-700"}`}>
+                          {formatBRL(barterBalancePreview)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Saldo positivo = cliente ainda deve calcário (permanece em aberto).
+                        Saldo zerado = permuta compensada.
+                      </p>
+                    </>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="pagamento" className="space-y-4">
