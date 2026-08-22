@@ -59,7 +59,7 @@ export default function DeletionPasswordSettings() {
             <p className="text-sm font-semibold text-amber-900">Senha de Exclusão (4 a 6 dígitos)</p>
             <p className="text-xs text-amber-800 mt-1">
               Esta senha é exigida para excluir vendas e lançamentos financeiros.
-              Ela é específica por filial. Configure uma sequência de 5 dígitos numéricos.
+              Ela é específica por filial. Configure uma sequência de 4 a 6 dígitos numéricos.
             </p>
           </div>
         </div>
