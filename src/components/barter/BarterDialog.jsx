@@ -12,6 +12,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { formatBRL, formatDate, getTodayDate } from "@/components/utils/formatters";
 import { toast } from "sonner";
+import BranchBadge from "@/components/BranchBadge";
 
 const empty = {
   client_id: "", client_name: "", date: getTodayDate(),
@@ -97,6 +98,7 @@ export function BarterDialog({ open, onOpenChange, companyId, onSaved }) {
             🌽 Registrar Permuta (Calcário × Milho)
           </DialogTitle>
         </DialogHeader>
+        <BranchBadge className="mb-2" />
 
         <div className="space-y-4">
           <div className="space-y-1.5">

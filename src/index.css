@@ -156,3 +156,90 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================================
+   MODO NOTURNO — sobrescreve as paletas claras hardcoded
+   (bg-white, bg-slate-*, text-slate-*, tinted -50/-100) para que
+   funcionem no .dark sem refatorar cada tela.
+   ============================================================ */
+.dark .bg-white { background-color: hsl(var(--card)); }
+.dark .bg-slate-50 { background-color: hsl(var(--muted)); }
+.dark .bg-slate-100 { background-color: hsl(0 0% 17%); }
+.dark .bg-slate-200 { background-color: hsl(0 0% 22%); }
+.dark .hover\:bg-slate-50:hover { background-color: hsl(0 0% 17%); }
+.dark .hover\:bg-slate-100:hover { background-color: hsl(0 0% 22%); }
+
+.dark .text-slate-900 { color: hsl(var(--foreground)); }
+.dark .text-slate-800 { color: hsl(var(--foreground)); }
+.dark .text-slate-700 { color: hsl(var(--muted-foreground)); }
+.dark .text-slate-600 { color: hsl(var(--muted-foreground)); }
+.dark .text-slate-500 { color: hsl(var(--muted-foreground)); }
+.dark .text-slate-400 { color: hsl(0 0% 55%); }
+
+.dark .border-slate-200 { border-color: hsl(var(--border)); }
+.dark .border-slate-100 { border-color: hsl(var(--border)); }
+.dark .border-slate-300 { border-color: hsl(0 0% 28%); }
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(var(--border)); }
+
+/* Tinted info boxes e badges — viram versões escuras para não virar "mancha branca" */
+.dark .bg-blue-50 { background-color: hsl(217 60% 16% / 0.5); }
+.dark .bg-green-50 { background-color: hsl(142 60% 16% / 0.5); }
+.dark .bg-red-50 { background-color: hsl(0 60% 16% / 0.5); }
+.dark .bg-orange-50 { background-color: hsl(25 70% 16% / 0.5); }
+.dark .bg-yellow-50 { background-color: hsl(45 70% 16% / 0.5); }
+.dark .bg-purple-50 { background-color: hsl(265 60% 16% / 0.5); }
+.dark .bg-violet-50 { background-color: hsl(262 60% 16% / 0.5); }
+.dark .bg-emerald-50 { background-color: hsl(152 60% 16% / 0.5); }
+.dark .bg-sky-50 { background-color: hsl(199 70% 16% / 0.5); }
+.dark .bg-amber-50 { background-color: hsl(38 70% 16% / 0.5); }
+
+.dark .bg-blue-100 { background-color: hsl(217 50% 20% / 0.6); }
+.dark .bg-green-100 { background-color: hsl(142 50% 20% / 0.6); }
+.dark .bg-red-100 { background-color: hsl(0 50% 20% / 0.6); }
+.dark .bg-orange-100 { background-color: hsl(25 60% 20% / 0.6); }
+.dark .bg-yellow-100 { background-color: hsl(45 60% 20% / 0.6); }
+.dark .bg-purple-100 { background-color: hsl(265 50% 20% / 0.6); }
+.dark .bg-violet-100 { background-color: hsl(262 50% 20% / 0.6); }
+.dark .bg-emerald-100 { background-color: hsl(152 50% 20% / 0.6); }
+.dark .bg-sky-100 { background-color: hsl(199 60% 20% / 0.6); }
+.dark .bg-amber-100 { background-color: hsl(38 60% 20% / 0.6); }
+.dark .bg-slate-100 { background-color: hsl(0 0% 17%); }
+
+/* Textos coloridos -700/-800/-900 ficam legíveis no escuro */
+.dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900 { color: hsl(200 80% 70%); }
+.dark .text-green-700, .dark .text-green-800, .dark .text-green-900 { color: hsl(142 65% 65%); }
+.dark .text-red-700, .dark .text-red-800, .dark .text-red-900 { color: hsl(0 75% 70%); }
+.dark .text-orange-700, .dark .text-orange-800, .dark .text-orange-900 { color: hsl(25 80% 65%); }
+.dark .text-yellow-700, .dark .text-yellow-800, .dark .text-yellow-900 { color: hsl(45 85% 65%); }
+.dark .text-purple-700, .dark .text-purple-800, .dark .text-purple-900 { color: hsl(265 70% 75%); }
+.dark .text-violet-700, .dark .text-violet-800, .dark .text-violet-900 { color: hsl(262 70% 75%); }
+.dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900 { color: hsl(152 65% 65%); }
+.dark .text-sky-700, .dark .text-sky-800, .dark .text-sky-900 { color: hsl(199 75% 70%); }
+.dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900 { color: hsl(38 80% 65%); }
+
+/* Números destacados -600 ficam mais claros no escuro */
+.dark .text-green-600 { color: hsl(142 60% 60%); }
+.dark .text-red-600 { color: hsl(0 70% 68%); }
+.dark .text-orange-600 { color: hsl(25 75% 62%); }
+.dark .text-blue-600 { color: hsl(200 80% 65%); }
+.dark .text-purple-600 { color: hsl(265 65% 72%); }
+.dark .text-violet-600 { color: hsl(262 65% 72%); }
+.dark .text-emerald-600 { color: hsl(152 60% 58%); }
+
+/* Bordas tintas acompanham */
+.dark .border-blue-200 { border-color: hsl(217 50% 30%); }
+.dark .border-green-200 { border-color: hsl(142 50% 30%); }
+.dark .border-red-200 { border-color: hsl(0 50% 30%); }
+.dark .border-orange-200 { border-color: hsl(25 60% 30%); }
+.dark .border-yellow-200 { border-color: hsl(45 60% 30%); }
+.dark .border-purple-200 { border-color: hsl(265 50% 30%); }
+.dark .border-violet-200 { border-color: hsl(262 50% 30%); }
+.dark .border-emerald-200 { border-color: hsl(152 50% 30%); }
+.dark .border-sky-200 { border-color: hsl(199 60% 30%); }
+.dark .border-amber-200 { border-color: hsl(38 60% 30%); }
+
+/* Hover tinted */
+.dark .hover\:bg-blue-100:hover { background-color: hsl(217 50% 22% / 0.6); }
+.dark .hover\:bg-green-50:hover { background-color: hsl(142 60% 18% / 0.5); }
+.dark .hover\:bg-red-50:hover { background-color: hsl(0 60% 18% / 0.5); }
+.dark .hover\:bg-violet-50:hover { background-color: hsl(262 60% 18% / 0.5); }

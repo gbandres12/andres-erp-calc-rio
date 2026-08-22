@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FileUp, ScanLine } from "lucide-react";
 import { toast } from "sonner";
+import BranchBadge from "@/components/BranchBadge";
 
 const emptyPayment = { description: "", amount: "", due_date: "", category: "" };
 
@@ -82,6 +83,7 @@ export default function BoletoPaymentDialog({ companyId, onCreated }) {
     <DialogTrigger asChild><Button variant="outline"><FileUp className="w-4 h-4 mr-2" />Ler boleto ou nota</Button></DialogTrigger>
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>Programar pagamentos por PDF</DialogTitle></DialogHeader>
+      <BranchBadge className="mb-2" />
       {!payments.length ? <div className="space-y-4 py-2">
         <p className="text-sm text-slate-500">Envie um boleto ou nota fiscal. A leitura sugere os valores e vencimentos; os campos sem identificação ficam para você preencher.</p>
         <div className="space-y-2"><Label>Arquivo PDF</Label><Input type="file" accept="application/pdf" onChange={event => setFile(event.target.files?.[0] || null)} /></div>

@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL, getTodayDate } from "@/components/utils/formatters";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function SaleAdjustDialog({ sale, open, onClose, onSuccess }) {
   const [step, setStep] = useState(1);
@@ -109,6 +110,8 @@ export default function SaleAdjustDialog({ sale, open, onClose, onSuccess }) {
             Ajustar Venda — Passo {step} de 2
           </DialogTitle>
         </DialogHeader>
+
+        <BranchBadge className="mb-4" />
 
         {/* Info da venda */}
         <div className="bg-slate-50 rounded-lg p-3 space-y-2">

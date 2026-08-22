@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatBRL, formatDate } from "@/components/utils/formatters";
+import BranchBadge from "@/components/BranchBadge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function FinancialAccounts() {
@@ -419,6 +420,7 @@ export default function FinancialAccounts() {
                 {editingAccount ? "Editar Conta" : "Nova Conta"}
               </DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">

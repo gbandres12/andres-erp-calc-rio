@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, AlertCircle, History, CheckCircle2, Check, ChevronsUpDown, Upload, Lock, Pencil, Zap, ScanLine, FileText, Trash2 } from "lucide-react";
 import CategorySuggestion from "@/components/transactions/CategorySuggestion";
 import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
+import BranchBadge from "@/components/BranchBadge";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -944,6 +945,7 @@ export default function Transactions() {
                   Lançamento Rápido
                 </DialogTitle>
               </DialogHeader>
+              <BranchBadge className="mb-2" />
               <form onSubmit={handleQuickEntry} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1116,6 +1118,7 @@ export default function Transactions() {
             <DialogHeader>
               <DialogTitle>{editingTransaction ? "Editar" : "Novo"} Lançamento</DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit} className="space-y-4">
               <Tabs defaultValue="dados">
                 <TabsList className="grid w-full grid-cols-2">
@@ -1451,6 +1454,7 @@ export default function Transactions() {
               {selectedTransaction?.type === 'receita' ? '💰 Receber' : '💸 Pagar'} - Abatimento
             </DialogTitle>
           </DialogHeader>
+          <BranchBadge className="mb-2" />
 
           {selectedTransaction && (
             <div className="space-y-4">

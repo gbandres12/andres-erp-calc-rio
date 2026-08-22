@@ -241,7 +241,7 @@ export default function Settings() {
                     className={`p-4 border-2 rounded-lg cursor-pointer ${settings.theme === 'light' ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}
                     onClick={() => { setSettings({...settings, theme: 'light'}); document.documentElement.classList.remove('dark'); }}
                   >
-                    <div className="w-full h-20 bg-white rounded mb-2 border"></div>
+                    <div className="w-full h-20 !bg-white rounded mb-2 border"></div>
                     <p className="text-sm font-medium text-center">Claro</p>
                   </div>
                   <div 

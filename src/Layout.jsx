@@ -165,6 +165,7 @@ export default function Layout({ children, currentPageName }) {
     setSelectedCompanyId(company.id);
     localStorage.setItem('selectedCompanyId', company.id);
     localStorage.setItem('selectedCompanyName', company.name);
+    window.dispatchEvent(new Event('branch-changed'));
     await queryClient.invalidateQueries();
     navigate(createPageUrl('Dashboard'));
     toast.success(`Filial alterada para ${company.name}`);

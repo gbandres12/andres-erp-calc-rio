@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { Plus, Search, CheckCircle, XCircle, Clock, CreditCard } from "lucide-react";
 import { formatCurrency, formatDate } from "@/components/utils/formatters";
 import PaymentDialog from "@/components/purchaseOrders/PaymentDialog";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function PurchaseOrders() {
   const queryClient = useQueryClient();
@@ -466,6 +467,7 @@ export default function PurchaseOrders() {
             <DialogHeader>
               <DialogTitle>{editingOrder ? "Editar Pedido" : "Novo Pedido de Compra"}</DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

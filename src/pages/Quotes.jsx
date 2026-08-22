@@ -17,6 +17,7 @@ import { createPageUrl } from "@/utils";
 import { useNavigate } from "react-router-dom";
 import QuoteReceipt from "../components/receipts/QuoteReceipt";
 import { formatBRL } from "@/components/utils/formatters";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function Quotes() {
   const queryClient = useQueryClient();
@@ -327,6 +328,7 @@ export default function Quotes() {
             <DialogHeader>
               <DialogTitle>Novo Orçamento</DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit}>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-2">

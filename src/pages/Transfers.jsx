@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { TruckIcon, Plus, ArrowRight, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function Transfers() {
   const queryClient = useQueryClient();
@@ -123,6 +124,7 @@ export default function Transfers() {
             <DialogHeader>
               <DialogTitle>Criar Transferência</DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Produto *</Label>

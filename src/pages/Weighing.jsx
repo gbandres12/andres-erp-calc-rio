@@ -12,6 +12,7 @@ import { Scale, Plus, TruckIcon, Printer, CheckCircle, RefreshCw } from "lucide-
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import WeighingTicket from "@/components/weighing/WeighingTicket";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function Weighing() {
   const queryClient = useQueryClient();
@@ -287,6 +288,7 @@ export default function Weighing() {
             <DialogHeader>
               <DialogTitle>Nova Pesagem</DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Monitor da Balança */}
               <Card className="bg-slate-900 text-white">

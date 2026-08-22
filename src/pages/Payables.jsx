@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { EXPENSE_CATEGORIES } from "@/components/utils/categories";
+import BranchBadge from "@/components/BranchBadge";
 import { subDays, isBefore, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 
@@ -694,6 +695,7 @@ export default function Payables() {
       <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Registrar Pagamento</DialogTitle></DialogHeader>
+          <BranchBadge className="mb-2" />
           <div className="space-y-4 py-4">
              <div className="grid grid-cols-2 gap-3">
                <div className="space-y-2">
@@ -786,6 +788,7 @@ export default function Payables() {
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Nova Conta a Pagar</DialogTitle></DialogHeader>
+          <BranchBadge className="mb-2" />
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Descrição</Label>
@@ -855,6 +858,7 @@ export default function Payables() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Editar Conta</DialogTitle></DialogHeader>
+          <BranchBadge className="mb-2" />
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Descrição</Label>

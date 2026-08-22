@@ -14,6 +14,7 @@ import { Plus, RepeatIcon, ArrowDownCircle, ArrowUpCircle, PlayCircle, Pencil, T
 import { toast } from "sonner";
 import { formatBRL } from "@/components/utils/formatters";
 import BoletoPaymentDialog from "@/components/recurrings/BoletoPaymentDialog";
+import BranchBadge from "@/components/BranchBadge";
 
 const FREQUENCY_LABELS = {
   diaria: "Diária",
@@ -304,6 +305,7 @@ export default function RecurringTransactions() {
           <DialogHeader>
             <DialogTitle>{editingId ? "Editar Recorrência" : "Nova Recorrência"}</DialogTitle>
           </DialogHeader>
+          <BranchBadge className="mb-2" />
           <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(formData); }} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1">

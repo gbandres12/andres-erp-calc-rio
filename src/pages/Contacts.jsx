@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
+import BranchBadge from "@/components/BranchBadge";
 
 export default function Contacts() {
   const queryClient = useQueryClient();
@@ -665,6 +666,7 @@ export default function Contacts() {
                   Filial: <span className="font-semibold">{currentCompany?.name}</span>
                 </p>
               </DialogHeader>
+              <BranchBadge className="mb-2" />
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 space-y-2">

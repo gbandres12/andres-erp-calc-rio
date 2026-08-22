@@ -11,6 +11,7 @@ import { formatBRL } from "@/components/utils/formatters";
 import PaymentReceipt from "@/components/receipts/PaymentReceipt";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import BranchBadge from "@/components/BranchBadge";
 
 const getTodayDate = () => new Date().toISOString().split("T")[0];
 
@@ -185,6 +186,8 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
             Registrar Pagamento — {sale.reference}
           </DialogTitle>
         </DialogHeader>
+
+        <BranchBadge className="mb-4" />
 
         {/* Resumo da venda */}
         <Card className="bg-slate-50 border-slate-200">

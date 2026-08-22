@@ -27,6 +27,7 @@ import SaleEditDialog from "@/components/sales/SaleEditDialog";
 import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
 import SaleAdjustDialog from "@/components/sales/SaleAdjustDialog";
 import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function Sales() {
   const queryClient = useQueryClient();
@@ -772,6 +773,7 @@ export default function Sales() {
             <DialogHeader>
               <DialogTitle>Nova Venda</DialogTitle>
             </DialogHeader>
+            <BranchBadge className="mb-2" />
             <form onSubmit={handleSubmit}>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-3">
@@ -1136,6 +1138,7 @@ export default function Sales() {
           <DialogHeader>
             <DialogTitle>Faturar Venda - Pagamentos Recebidos</DialogTitle>
           </DialogHeader>
+          <BranchBadge className="mb-2" />
           {saleToInvoice && (
             <div className="space-y-4">
               <Card className="bg-blue-50">
@@ -1408,6 +1411,7 @@ export default function Sales() {
           <DialogHeader>
             <DialogTitle>Cadastro Rápido de Cliente</DialogTitle>
           </DialogHeader>
+          <BranchBadge className="mb-2" />
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Nome Completo *</Label>

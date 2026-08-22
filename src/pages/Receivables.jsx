@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function Receivables() {
   const queryClient = useQueryClient();
@@ -379,6 +380,7 @@ export default function Receivables() {
               <DialogHeader>
                 <DialogTitle>Nova Conta a Receber</DialogTitle>
               </DialogHeader>
+              <BranchBadge className="mb-2" />
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label>Descrição</Label>
@@ -639,6 +641,7 @@ export default function Receivables() {
       <Dialog open={isReceiveOpen} onOpenChange={setIsReceiveOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Registrar Recebimento</DialogTitle></DialogHeader>
+          <BranchBadge className="mb-2" />
           <div className="space-y-4 py-4">
              <div className="grid grid-cols-2 gap-3">
                <div className="space-y-2">

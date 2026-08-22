@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatCurrency } from "@/components/utils/formatters";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function PaymentDialog({ order, accounts, open, onClose, payments = [] }) {
   const queryClient = useQueryClient();
@@ -110,6 +111,7 @@ export default function PaymentDialog({ order, accounts, open, onClose, payments
         <DialogHeader>
           <DialogTitle>Registrar Pagamento — {order.reference}</DialogTitle>
         </DialogHeader>
+        <BranchBadge className="mb-2" />
 
         {/* Resumo financeiro */}
         <div className="grid grid-cols-3 gap-3 mb-4">

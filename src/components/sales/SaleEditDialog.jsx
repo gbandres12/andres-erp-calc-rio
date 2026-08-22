@@ -11,6 +11,7 @@ import { formatBRL, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import BranchBadge from "@/components/BranchBadge";
 
 export default function SaleEditDialog({ sale, products, contacts, open, onClose, onSuccess }) {
   const [form, setForm] = useState(null);
@@ -140,6 +141,8 @@ export default function SaleEditDialog({ sale, products, contacts, open, onClose
             Editar Venda — {sale.reference}
           </DialogTitle>
         </DialogHeader>
+
+        <BranchBadge className="mb-4" />
 
         <div className="space-y-6">
           {/* Dados gerais */}
