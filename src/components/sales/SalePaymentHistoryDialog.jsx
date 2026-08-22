@@ -1,12 +1,14 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, DollarSign, Tag, Calendar, CreditCard, TrendingDown, Receipt, Pencil } from "lucide-react";
+import { History, DollarSign, Tag, Calendar, CreditCard, TrendingDown, Receipt, Pencil, Trash2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatBRL, formatDate } from "@/components/utils/formatters";
+import { toast } from "sonner";
 import SalePaymentDateEditDialog from "./SalePaymentDateEditDialog";
+import DeleteAuthDialog from "./DeleteAuthDialog";
 
 const METHOD_LABELS = {
   dinheiro: "💵 Dinheiro",
@@ -19,12 +21,87 @@ const METHOD_LABELS = {
 };
 
 export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
+  const queryClient = useQueryClient();
   const [editingPayment, setEditingPayment] = useState(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+
   const { data: payments = [] } = useQuery({
     queryKey: ["sale-payments-history", sale?.id],
     queryFn: () => base44.entities.SalePayment.filter({ sale_id: sale.id }, "payment_date"),
     enabled: !!open && !!sale?.id,
     initialData: []
+  });
+
+  // Exclui um pagamento/abatimento da venda de forma reversível:
+  // remove SalePayment + Transaction correspondente, recalcula a venda e o caixa.
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (payment) => {
+      const descSuffix = (payment.notes && payment.notes.trim()) || "Pagamento";
+      const expectedDesc = `${sale.reference} - ${descSuffix} - ${sale.client_name}`;
+
+      // Localizar a transação financeira gerada por este pagamento
+      const txs = await base44.entities.Transaction.filter(
+        { company_id: sale.company_id, type: "receita", description: expectedDesc },
+        undefined,
+        200
+      );
+      const match = txs.find(t =>
+        Math.abs((t.amount || 0) - (payment.amount || 0)) < 0.01 &&
+        (t.account_id || null) === (payment.account_id || null) &&
+        ((t.payment_date || t.due_date) || null) === (payment.payment_date || null)
+      );
+
+      // 1) Excluir o registro de pagamento da venda
+      await base44.entities.SalePayment.delete(payment.id);
+
+      // 2) Excluir a transação financeira (e eventuais TransactionPayments)
+      if (match) {
+        const tps = await base44.entities.TransactionPayment.filter({ transaction_id: match.id });
+        for (const tp of tps) {
+          await base44.entities.TransactionPayment.delete(tp.id);
+        }
+        await base44.entities.Transaction.delete(match.id);
+      }
+
+      // 3) Recalcular totais/status da venda
+      const fresh = await base44.entities.Sale.get(sale.id);
+      const newPaid = Math.max(0, (fresh.paid_amount || 0) - (payment.amount || 0));
+      const newDiscount = Math.max(0, (fresh.discount || 0) - (payment.discount || 0));
+      const newRem = Math.max(0, (fresh.total || 0) - newPaid - newDiscount);
+      let paymentStatus = "pendente";
+      if (newRem <= 0.01) paymentStatus = "pago";
+      else if (newPaid > 0.01) paymentStatus = "parcial";
+      let newStatus = fresh.status;
+      if (newRem <= 0.01) newStatus = "concluida";
+      else if (newStatus === "concluida") newStatus = "faturada";
+      await base44.entities.Sale.update(sale.id, {
+        paid_amount: newPaid,
+        remaining_amount: newRem,
+        payment_status: paymentStatus,
+        status: newStatus,
+        discount: newDiscount
+      });
+
+      // 4) Recalcular o saldo do caixa da filial
+      await base44.functions.invoke("recalculateBalance", { company_id: sale.company_id });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sale-payments-history", sale?.id] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["sale", sale?.id] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["receivables"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      toast.success("Pagamento excluído e saldos recalculados.");
+      setPendingDelete(null);
+      setAuthOpen(false);
+    },
+    onError: (err) => {
+      toast.error("Erro ao excluir pagamento: " + err.message);
+      setPendingDelete(null);
+      setAuthOpen(false);
+    }
   });
 
   if (!sale) return null;
@@ -33,6 +110,11 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
   const totalAbatimento = payments.reduce((s, p) => s + (p.discount || 0), 0);
   const abatimentos = payments.filter(p => (p.discount || 0) > 0);
   const pagamentos = payments.filter(p => (p.amount || 0) > 0);
+
+  const handleDeleteClick = (p) => {
+    setPendingDelete(p);
+    setAuthOpen(true);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -110,6 +192,15 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
                     </div>
                     {p.notes && <p className="text-xs text-slate-500 italic mt-1">{p.notes}</p>}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteClick(p)}
+                    disabled={deletePaymentMutation.isPending}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-100 p-1.5 rounded transition-colors flex-shrink-0"
+                    title="Excluir abatimento (requer senha)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))
             )}
@@ -158,6 +249,15 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
                     )}
                     {p.notes && <p className="text-xs text-slate-400 italic">{p.notes}</p>}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteClick(p)}
+                    disabled={deletePaymentMutation.isPending}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-100 p-1.5 rounded transition-colors flex-shrink-0"
+                    title="Excluir pagamento (requer senha)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))
             )}
@@ -176,6 +276,15 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
           saleId={sale.id}
           open={!!editingPayment}
           onClose={() => setEditingPayment(null)}
+        />
+
+        <DeleteAuthDialog
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          itemType="transação"
+          onSuccess={() => {
+            if (pendingDelete) deletePaymentMutation.mutate(pendingDelete);
+          }}
         />
       </DialogContent>
     </Dialog>

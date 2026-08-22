@@ -16,8 +16,8 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Filial não selecionada' }, { status: 400 });
         }
 
-        if (!password || !/^\d{5}$/.test(password)) {
-            return Response.json({ error: 'A senha deve ter exatamente 5 dígitos numéricos' }, { status: 400 });
+        if (!password || !/^\d{4,6}$/.test(password)) {
+            return Response.json({ error: 'A senha deve ter entre 4 e 6 dígitos numéricos' }, { status: 400 });
         }
 
         // Buscar senha existente para a filial

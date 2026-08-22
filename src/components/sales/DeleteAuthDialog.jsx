@@ -15,8 +15,8 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password || password.length !== 5) {
-      setError("Senha deve ter exatamente 5 dígitos");
+    if (!password || password.length < 4 || password.length > 6) {
+      setError("Senha deve ter entre 4 e 6 dígitos");
       return;
     }
 
@@ -65,14 +65,14 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="pwd">Senha de Autorização (5 dígitos) *</Label>
+            <Label htmlFor="pwd">Senha de Autorização (4 a 6 dígitos) *</Label>
             <Input
               id="pwd"
               type="password"
-              maxLength="5"
-              placeholder="00000"
+              maxLength="6"
+              placeholder="0000"
               value={password}
-              onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 5))}
+              onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
               className="text-center text-2xl tracking-widest font-mono"
             />
             <p className="text-xs text-slate-500">Apenas números</p>
@@ -91,7 +91,7 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
             <Button
               type="submit"
               className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={loading || password.length !== 5}
+              disabled={loading || password.length < 4 || password.length > 6}
             >
               {loading ? "Validando..." : "Deletar"}
             </Button>

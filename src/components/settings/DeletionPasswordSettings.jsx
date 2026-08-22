@@ -18,8 +18,8 @@ export default function DeletionPasswordSettings() {
     e.preventDefault();
     setError("");
 
-    if (!password || !/^\d{5}$/.test(password)) {
-      setError("A senha deve ter exatamente 5 dígitos numéricos");
+    if (!password || !/^\d{4,6}$/.test(password)) {
+      setError("A senha deve ter entre 4 e 6 dígitos numéricos");
       return;
     }
 
@@ -56,7 +56,7 @@ export default function DeletionPasswordSettings() {
         <div className="flex items-start gap-2">
           <Lock className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-amber-900">Senha de Exclusão (5 dígitos)</p>
+            <p className="text-sm font-semibold text-amber-900">Senha de Exclusão (4 a 6 dígitos)</p>
             <p className="text-xs text-amber-800 mt-1">
               Esta senha é exigida para excluir vendas e lançamentos financeiros.
               Ela é específica por filial. Configure uma sequência de 5 dígitos numéricos.
@@ -67,15 +67,15 @@ export default function DeletionPasswordSettings() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="del-pwd">Nova Senha (5 dígitos) *</Label>
+          <Label htmlFor="del-pwd">Nova Senha (4 a 6 dígitos) *</Label>
           <div className="relative">
             <Input
               id="del-pwd"
               type={showPassword ? "text" : "password"}
-              maxLength="5"
-              placeholder="00000"
+              maxLength="6"
+              placeholder="0000"
               value={password}
-              onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 5))}
+              onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
               className="text-center text-2xl tracking-widest font-mono pr-10"
             />
             <button
@@ -94,10 +94,10 @@ export default function DeletionPasswordSettings() {
           <Input
             id="del-pwd-confirm"
             type={showPassword ? "text" : "password"}
-            maxLength="5"
-            placeholder="00000"
+            maxLength="6"
+            placeholder="0000"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value.replace(/\D/g, '').slice(0, 5))}
+            onChange={(e) => setConfirmPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
             className="text-center text-2xl tracking-widest font-mono"
           />
         </div>
