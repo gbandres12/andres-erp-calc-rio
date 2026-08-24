@@ -1,8 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Sparkles, Loader2, Check } from "lucide-react";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/components/utils/categories";
+
+// Normaliza string (sem acento, minúscula) para comparação tolerante
+const normalize = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+// Casa a resposta livre da IA com uma categoria oficial (exata ou por similaridade)
+function matchCategory(raw, allowed) {
+  if (!raw) return null;
+  const norm = normalize(raw);
+  const exact = allowed.find((c) => normalize(c) === norm);
+  if (exact) return exact;
+  const sub = allowed.find((c) => normalize(c).includes(norm) || norm.includes(normalize(c)));
+  return sub || null;
+}
 
 export default function CategorySuggestion({ description, notes, type, transactions = [], onSuggest, currentCategory }) {
+  const allowedCategories = type === "despesa" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
   const [loading, setLoading] = useState(false);
   const [suggestion, setSuggestion] = useState(null);
   const debounceRef = useRef(null);
@@ -30,24 +45,26 @@ export default function CategorySuggestion({ description, notes, type, transacti
     setSuggestion(null);
     try {
       const history = transactions
-        .filter(t => t.type === type && t.category && t.description)
+        .filter(t => t.type === type && t.category && allowedCategories.includes(t.category) && t.description)
         .slice(0, 30)
         .map(t => `"${t.description}" → ${t.category}`)
         .join('\n');
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: `Você é um assistente de categorização financeira para uma empresa de mineração/calcário.
-Com base no histórico de lançamentos, na descrição e observações fornecidas, sugira a categoria mais adequada.
+Escolha a categoria mais adequada para o lançamento, usando OBRIGATORIAMENTE uma das categorias oficiais abaixo.
 
 TIPO: ${type === 'despesa' ? 'Saída (Despesa)' : 'Entrada (Receita)'}
 DESCRIÇÃO: "${description}"
 OBSERVAÇÕES: "${notes || 'Nenhuma'}"
 
+CATEGORIAS OFICIAIS (responda com o nome EXATO de uma delas):
+${allowedCategories.join(', ')}
+
 HISTÓRICO DE CATEGORIZAÇÕES (descrição → categoria):
 ${history || 'Sem histórico disponível.'}
 
-Responda APENAS com o nome da categoria em português, sem explicações adicionais.
-Exemplos válidos: Combustível, Folha de Pagamento, Venda de Calcário, Manutenção, Impostos, etc.`,
+Responda APENAS com o nome exato de uma das categorias oficiais, sem explicações adicionais.`,
         response_json_schema: {
           type: "object",
           properties: { category: { type: "string" } },
@@ -56,7 +73,8 @@ Exemplos válidos: Combustível, Folha de Pagamento, Venda de Calcário, Manuten
       });
 
       if (result?.category) {
-        setSuggestion(result.category);
+        const matched = matchCategory(result.category, allowedCategories);
+        if (matched) setSuggestion(matched);
       }
     } catch {
       // Silent fail for auto-suggest
