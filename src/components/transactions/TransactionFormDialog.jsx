@@ -60,17 +60,19 @@ export default function TransactionFormDialog({
         type: editingTransaction.type || "receita",
         category: editingTransaction.category || "",
         status: editingTransaction.status || "pendente",
-        due_date: editingTransaction.due_date || new Date().toISOString().split("T")[0],
-        payment_date: editingTransaction.payment_date || "",
+        due_date: editingTransaction.due_date || getTodayDate(),
+        payment_date: editingTransaction.payment_date || getTodayDate(),
         account_id: editingTransaction.account_id || "",
         contact_id: editingTransaction.contact_id || "",
         cost_center: editingTransaction.cost_center || "",
         notes: editingTransaction.notes || ""
       });
     } else if (initialData) {
-      setFormData({ ...emptyForm, ...initialData });
+      setFormData({ ...emptyForm, due_date: getTodayDate(), payment_date: getTodayDate(), ...initialData });
     } else {
-      setFormData(emptyForm);
+      // Sempre recalcula a data de hoje ao abrir um novo lançamento — emptyForm é
+      // constante de módulo e ficaria defasado se o app ficar aberto entre dias.
+      setFormData({ ...emptyForm, due_date: getTodayDate(), payment_date: getTodayDate() });
     }
   }, [open, editingTransaction, initialData]);
 
@@ -372,7 +374,11 @@ export default function TransactionFormDialog({
                 <Select
                   required
                   value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  onValueChange={(value) => setFormData({
+                    ...formData,
+                    status: value,
+                    payment_date: value === "pago" && !formData.payment_date ? getTodayDate() : formData.payment_date
+                  })}
                 >
                   <SelectTrigger>
                     <SelectValue />

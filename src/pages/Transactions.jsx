@@ -95,6 +95,7 @@ export default function Transactions() {
       const transaction = await base44.entities.Transaction.create({
         ...data,
         company_id: selectedCompanyId,
+        payment_date: data.status === 'pago' ? (data.payment_date || getTodayDate()) : data.payment_date,
         paid_amount: data.status === 'pago' ? data.amount : 0
       });
       if (data.status === 'pago' && data.account_id) {
@@ -129,7 +130,8 @@ export default function Transactions() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const oldTx = transactions.find(t => t.id === id);
-      const updated = await base44.entities.Transaction.update(id, data);
+      const updateData = { ...data, payment_date: data.status === 'pago' ? (data.payment_date || getTodayDate()) : data.payment_date };
+      const updated = await base44.entities.Transaction.update(id, updateData);
       const payments = await base44.entities.TransactionPayment.filter({ transaction_id: id });
       const wasPago = oldTx?.status === 'pago';
       const isPago = data.status === 'pago';
