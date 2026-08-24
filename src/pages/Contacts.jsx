@@ -39,6 +39,35 @@ export default function Contacts() {
     credit_balance: 0,
     notes: ""
   });
+  const [cepLoading, setCepLoading] = useState(false);
+
+  // Busca automática de endereço via ViaCEP ao digitar o CEP
+  const handleCepChange = async (rawCep) => {
+    const cep = rawCep.replace(/\D/g, "");
+    setFormData(prev => ({ ...prev, zip_code: rawCep }));
+
+    if (cep.length === 8) {
+      setCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setFormData(prev => ({
+            ...prev,
+            address: data.logradouro ? `${data.logradouro}${data.complemento ? " - " + data.complemento : ""}` : prev.address,
+            city: data.localidade || prev.city,
+            state: data.uf || prev.state
+          }));
+        } else {
+          toast.error("CEP não encontrado.");
+        }
+      } catch (err) {
+        console.error("Erro ao buscar CEP:", err);
+      } finally {
+        setCepLoading(false);
+      }
+    }
+  };
 
   // Query CORRIGIDA - removido initialData
   const { data: contacts = [], isLoading, isFetching, error } = useQuery({
@@ -738,11 +767,14 @@ export default function Contacts() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>CEP</Label>
+                    <Label>CEP {cepLoading && <Loader2 className="w-3 h-3 inline animate-spin text-blue-600" />}</Label>
                     <Input
                       value={formData.zip_code}
-                      onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      placeholder="00000-000"
+                      maxLength={9}
                     />
+                    <p className="text-xs text-slate-500">Digite o CEP para preencher endereço, cidade e estado automaticamente.</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Saldo de Crédito (R$)</Label>

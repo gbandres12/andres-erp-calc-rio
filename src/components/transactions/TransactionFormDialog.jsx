@@ -25,7 +25,7 @@ const emptyForm = {
   category: "",
   status: "pendente",
   due_date: getTodayDate(),
-  payment_date: "",
+  payment_date: getTodayDate(),
   account_id: "",
   contact_id: "",
   cost_center: "",
