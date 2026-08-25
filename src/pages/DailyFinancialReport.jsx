@@ -28,48 +28,70 @@ export default function DailyFinancialReport() {
     initialData: [],
   });
 
+  const { data: payments = [] } = useQuery({
+    queryKey: ["transaction-payments", selectedCompanyId],
+    queryFn: () => base44.entities.TransactionPayment.filter({ company_id: selectedCompanyId }),
+    initialData: [],
+  });
+
   const mainAccount = accounts[0];
 
-  // Transações PAGAS no dia selecionado
-  const dayTransactions = useMemo(() => {
-    return transactions.filter((t) => {
-      if (t.status !== "pago") return false;
-      const dateToCheck = t.payment_date || t.due_date;
-      return dateToCheck && dateToCheck.slice(0, 10) === selectedDate;
-    });
-  }, [transactions, selectedDate]);
-
-  const entradas = useMemo(
-    () => [...dayTransactions.filter((t) => t.type === "receita")].sort((a, b) => a.description.localeCompare(b.description, "pt-BR")),
-    [dayTransactions]
-  );
-
-  const saidas = useMemo(
-    () => [...dayTransactions.filter((t) => t.type === "despesa")].sort((a, b) => a.description.localeCompare(b.description, "pt-BR")),
-    [dayTransactions]
-  );
-
-  const totalEntradas = entradas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
-  const totalSaidas = saidas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
-
-  // Abatimentos do dia: somente lançamentos que SÃO abatimentos de fato —
-  // categoria de abatimento ou descrição explícita com "ABATIMENTO".
-  // Uma despesa comum que apenas teve um desconto aplicado NÃO é abatimento:
-  // o desconto já está embutido no valor líquido da saída, então listá-la
-  // novamente como abatimento duplicaria o valor no relatório.
+  // A movimentação diária é baseada nos PAGAMENTOS reais (TransactionPayment),
+  // que são a fonte da verdade do que entrou/saiu em cada dia. Assim pagamentos
+  // parciais aparecem no dia em que foram feitos, e lançamentos com vários
+  // pagamentos em dias diferentes aparecem em cada dia correto.
+  // Lançamentos antigos sem registro de pagamento (legado) entram pela data da
+  // transação, para não perder histórico.
   const ABATIMENTO_CATEGORIES = ["Abatimentos", "Devoluções / Abatimentos"];
-  const isAbatimento = (t) =>
+  const isAbatimentoTx = (t) =>
     ABATIMENTO_CATEGORIES.includes(t.category) ||
     (t.description || "").toLowerCase().includes("abatimento");
 
-  const abatimentoValue = (t) => t.paid_amount || t.amount || 0;
+  const txMap = useMemo(() => new Map(transactions.map((t) => [t.id, t])), [transactions]);
 
-  const abatimentos = useMemo(
-    () => [...dayTransactions.filter(isAbatimento)].sort((a, b) =>
-      a.description.localeCompare(b.description, "pt-BR")),
-    [dayTransactions]
-  );
-  const totalAbatimentos = abatimentos.reduce((sum, t) => sum + abatimentoValue(t), 0);
+  const movements = useMemo(() => {
+    const list = [];
+    const txIdsWithPayment = new Set(payments.map((p) => p.transaction_id));
+
+    payments
+      .filter((p) => p.payment_date && p.payment_date.slice(0, 10) === selectedDate)
+      .forEach((p) => {
+        const tx = txMap.get(p.transaction_id);
+        if (!tx) return;
+        list.push({
+          id: p.id,
+          description: tx.description,
+          category: tx.category,
+          type: tx.type,
+          value: p.amount || 0,
+          isAbatimento: isAbatimentoTx(tx),
+        });
+      });
+
+    transactions
+      .filter((t) => (t.status === "pago" || t.status === "parcial") && !txIdsWithPayment.has(t.id))
+      .forEach((t) => {
+        const d = (t.payment_date || t.due_date || "").slice(0, 10);
+        if (d !== selectedDate) return;
+        list.push({
+          id: `legacy-${t.id}`,
+          description: t.description,
+          category: t.category,
+          type: t.type,
+          value: t.paid_amount || t.amount || 0,
+          isAbatimento: isAbatimentoTx(t),
+        });
+      });
+
+    return list.sort((a, b) => a.description.localeCompare(b.description, "pt-BR"));
+  }, [transactions, payments, selectedDate, txMap]);
+
+  const entradas = movements.filter((m) => m.type === "receita" && !m.isAbatimento);
+  const saidas = movements.filter((m) => m.type === "despesa" && !m.isAbatimento);
+  const abatimentos = movements.filter((m) => m.isAbatimento);
+  const totalEntradas = entradas.reduce((s, m) => s + (m.value || 0), 0);
+  const totalSaidas = saidas.reduce((s, m) => s + (m.value || 0), 0);
+  const totalAbatimentos = abatimentos.reduce((s, m) => s + (m.value || 0), 0);
 
   // Saldo inicial = saldo da conta - entradas + saidas do dia selecionado
   const saldoFinal = mainAccount?.current_balance ?? 0;
@@ -81,20 +103,20 @@ export default function DailyFinancialReport() {
   const formattedDateLabel = format(parseISO(selectedDate), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
   const handlePrint = () => {
-    const entradasRows = entradas.map((t, i) => `
+    const entradasRows = entradas.map((m, i) => `
       <tr>
         <td>${String(i + 1).padStart(2, "0")}</td>
-        <td>${t.description}</td>
-        <td style="color:#16a34a;font-weight:bold;text-align:right">${formatBRL(t.paid_amount || t.amount)}</td>
+        <td>${m.description}</td>
+        <td style="color:#16a34a;font-weight:bold;text-align:right">${formatBRL(m.value)}</td>
         <td></td>
       </tr>`).join("");
 
-    const saidasRows = saidas.map((t, i) => `
+    const saidasRows = saidas.map((m, i) => `
       <tr>
         <td>${String(i + 1).padStart(2, "0")}</td>
-        <td>${t.description}</td>
+        <td>${m.description}</td>
         <td></td>
-        <td style="color:#dc2626;font-weight:bold;text-align:right">${formatBRL(t.paid_amount || t.amount)}</td>
+        <td style="color:#dc2626;font-weight:bold;text-align:right">${formatBRL(m.value)}</td>
       </tr>`).join("");
 
     const html = `<!DOCTYPE html>
@@ -175,12 +197,12 @@ export default function DailyFinancialReport() {
   <table>
     <thead><tr><th style="width:30px">#</th><th>Descrição</th><th style="width:80px">Origem</th><th style="width:120px;text-align:right">Abatimento</th></tr></thead>
     <tbody>
-      ${abatimentos.map((t, i) => `
+      ${abatimentos.map((m, i) => `
       <tr>
         <td>${String(i + 1).padStart(2, "0")}</td>
-        <td>${t.description}</td>
-        <td>${t.category || (t.type === "receita" ? "Venda" : "Compra")}</td>
-        <td style="color:#7c3aed;font-weight:bold;text-align:right">${formatBRL(abatimentoValue(t))}</td>
+        <td>${m.description}</td>
+        <td>${m.category || (m.type === "receita" ? "Venda" : "Compra")}</td>
+        <td style="color:#7c3aed;font-weight:bold;text-align:right">${formatBRL(m.value)}</td>
       </tr>`).join("")}
       <tr class="total-row">
         <td colspan="3" style="text-align:right">TOTAL ABATIMENTOS</td>
@@ -317,12 +339,12 @@ export default function DailyFinancialReport() {
                 </tr>
               </thead>
               <tbody>
-                {entradas.map((t, i) => (
-                  <tr key={t.id} className="border-b last:border-0 hover:bg-green-50/30">
+                {entradas.map((m, i) => (
+                  <tr key={m.id} className="border-b last:border-0 hover:bg-green-50/30">
                     <td className="py-2 px-4 text-slate-400 text-xs">{String(i + 1).padStart(2, "0")}</td>
-                    <td className="py-2 px-4 font-medium text-slate-800">{t.description}</td>
-                    <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">{t.category || "—"}</td>
-                    <td className="py-2 px-4 text-right font-bold text-green-600">{formatBRL(t.paid_amount || t.amount)}</td>
+                    <td className="py-2 px-4 font-medium text-slate-800">{m.description}</td>
+                    <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">{m.category || "—"}</td>
+                    <td className="py-2 px-4 text-right font-bold text-green-600">{formatBRL(m.value)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -364,12 +386,12 @@ export default function DailyFinancialReport() {
                 </tr>
               </thead>
               <tbody>
-                {saidas.map((t, i) => (
-                  <tr key={t.id} className="border-b last:border-0 hover:bg-red-50/30">
+                {saidas.map((m, i) => (
+                  <tr key={m.id} className="border-b last:border-0 hover:bg-red-50/30">
                     <td className="py-2 px-4 text-slate-400 text-xs">{String(i + 1).padStart(2, "0")}</td>
-                    <td className="py-2 px-4 font-medium text-slate-800">{t.description}</td>
-                    <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">{t.category || "—"}</td>
-                    <td className="py-2 px-4 text-right font-bold text-red-600">{formatBRL(t.paid_amount || t.amount)}</td>
+                    <td className="py-2 px-4 font-medium text-slate-800">{m.description}</td>
+                    <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">{m.category || "—"}</td>
+                    <td className="py-2 px-4 text-right font-bold text-red-600">{formatBRL(m.value)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -409,14 +431,14 @@ export default function DailyFinancialReport() {
                 </tr>
               </thead>
               <tbody>
-                {abatimentos.map((t, i) => (
-                  <tr key={t.id} className="border-b last:border-0 hover:bg-purple-50/30">
+                {abatimentos.map((m, i) => (
+                  <tr key={m.id} className="border-b last:border-0 hover:bg-purple-50/30">
                     <td className="py-2 px-4 text-slate-400 text-xs">{String(i + 1).padStart(2, "0")}</td>
-                    <td className="py-2 px-4 font-medium text-slate-800">{t.description}</td>
+                    <td className="py-2 px-4 font-medium text-slate-800">{m.description}</td>
                     <td className="py-2 px-4 text-slate-500 text-xs hidden md:table-cell">
-                      {t.category || (t.type === "receita" ? "Venda" : "Compra")}
+                      {m.category || (m.type === "receita" ? "Venda" : "Compra")}
                     </td>
-                    <td className="py-2 px-4 text-right font-bold text-purple-600">{formatBRL(abatimentoValue(t))}</td>
+                    <td className="py-2 px-4 text-right font-bold text-purple-600">{formatBRL(m.value)}</td>
                   </tr>
                 ))}
               </tbody>
