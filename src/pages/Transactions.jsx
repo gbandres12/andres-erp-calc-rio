@@ -271,46 +271,50 @@ export default function Transactions() {
 
   const quickEntryMutation = useMutation({
     mutationFn: async (data) => {
+      const hasValue = (data.amount || 0) > 0;
       const transaction = await base44.entities.Transaction.create({
         description: data.description,
-        amount: data.amount,
-        original_amount: data.amount,
+        amount: data.amount || 0,
+        original_amount: data.amount || 0,
         discount_type: "valor",
         discount_value: 0,
         type: data.type,
         category: data.category,
-        status: 'pago',
+        cost_center: data.cost_center || "",
+        notes: data.notes || 'Lançamento rápido',
+        status: hasValue ? 'pago' : 'pendente',
         due_date: getTodayDate(),
-        payment_date: getTodayDate(),
-        account_id: data.account_id,
+        payment_date: hasValue ? getTodayDate() : undefined,
+        account_id: data.account_id || "",
         company_id: selectedCompanyId,
-        paid_amount: data.amount,
-        notes: 'Lançamento rápido'
+        paid_amount: hasValue ? data.amount : 0
       });
-      const account = accounts.find(a => a.id === data.account_id);
-      if (account) {
-        const user = await base44.auth.me();
-        await base44.entities.TransactionPayment.create({
-          transaction_id: transaction.id,
-          transaction_reference: transaction.description,
-          amount: data.amount,
-          payment_date: getTodayDate(),
-          account_id: data.account_id,
-          account_name: account.name,
-          payment_method: 'dinheiro',
-          responsible: user?.full_name || user?.email || '',
-          notes: 'Lançamento rápido',
-          company_id: selectedCompanyId
-        });
+      if (hasValue) {
+        const account = accounts.find(a => a.id === data.account_id);
+        if (account) {
+          const user = await base44.auth.me();
+          await base44.entities.TransactionPayment.create({
+            transaction_id: transaction.id,
+            transaction_reference: transaction.description,
+            amount: data.amount,
+            payment_date: getTodayDate(),
+            account_id: data.account_id,
+            account_name: account.name,
+            payment_method: 'dinheiro',
+            responsible: user?.full_name || user?.email || '',
+            notes: 'Lançamento rápido',
+            company_id: selectedCompanyId
+          });
+        }
       }
       return transaction;
     },
-    onSuccess: () => {
+    onSuccess: (tx) => {
       base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       setIsQuickEntryOpen(false);
-      toast.success("✅ Lançamento rápido criado!");
+      toast.success(tx?.status === 'pendente' ? "Lançamento pendente criado! Defina o valor depois." : "✅ Lançamento rápido criado!");
     }
   });
 
@@ -665,6 +669,7 @@ export default function Transactions() {
         accounts={accounts}
         onSubmit={(data) => quickEntryMutation.mutate(data)}
         isSubmitting={quickEntryMutation.isPending}
+        transactions={transactions}
       />
       <ReceivePayDialog
         open={isReceivePayOpen}

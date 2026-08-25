@@ -8,11 +8,13 @@ import { Zap, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/components/utils/formatters";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/components/utils/categories";
+import CategorySuggestion from "@/components/transactions/CategorySuggestion";
+import CostCenterSuggestion from "@/components/transactions/CostCenterSuggestion";
 import BranchBadge from "@/components/BranchBadge";
 
-const empty = { description: "", amount: 0, type: "despesa", category: "", account_id: "" };
+const empty = { description: "", amount: "", type: "despesa", category: "", account_id: "", cost_center: "", notes: "" };
 
-export default function QuickEntryDialog({ open, onOpenChange, accounts, onSubmit, isSubmitting }) {
+export default function QuickEntryDialog({ open, onOpenChange, accounts, transactions = [], onSubmit, isSubmitting }) {
   const [formData, setFormData] = useState(empty);
 
   useEffect(() => {
@@ -22,11 +24,13 @@ export default function QuickEntryDialog({ open, onOpenChange, accounts, onSubmi
   const handleSubmit = (e) => {
     e.preventDefault();
     const amount = formData.amount === "" ? 0 : parseFloat(formData.amount);
-    if (!formData.description || !formData.account_id || amount <= 0) {
-      return;
-    }
+    if (!formData.description || amount < 0) return;
+    // Valor exige conta; sem valor, pode registrar como pendente sem conta
+    if (amount > 0 && !formData.account_id) return;
     onSubmit({ ...formData, amount });
   };
+
+  const hasValue = formData.amount !== "" && parseFloat(formData.amount) > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,15 +66,18 @@ export default function QuickEntryDialog({ open, onOpenChange, accounts, onSubmi
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Valor (R$) *</Label>
+              <Label>Valor (R$)</Label>
               <Input
                 type="number"
                 step="0.01"
-                required
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value === "" ? "" : e.target.value })}
                 autoFocus
+                placeholder="0,00"
               />
+              <p className="text-xs text-slate-500 -mt-1">
+                {hasValue ? "Será registrado como pago." : "Deixe em branco para registrar pendente e definir o valor/abatimento depois."}
+              </p>
             </div>
           </div>
 
@@ -81,6 +88,14 @@ export default function QuickEntryDialog({ open, onOpenChange, accounts, onSubmi
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Ex: Almoço, Combustível..."
+            />
+            <CategorySuggestion
+              description={formData.description}
+              notes={formData.notes}
+              type={formData.type}
+              transactions={transactions}
+              currentCategory={formData.category}
+              onSuggest={(cat) => setFormData(prev => ({ ...prev, category: cat }))}
             />
           </div>
 
@@ -103,24 +118,43 @@ export default function QuickEntryDialog({ open, onOpenChange, accounts, onSubmi
           </div>
 
           <div className="space-y-2">
-            <Label>Conta *</Label>
-            <Select
-              required
-              value={formData.account_id}
-              onValueChange={(value) => setFormData({ ...formData, account_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name} ({formatBRL(account.current_balance)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Centro de Custo</Label>
+            <Input
+              value={formData.cost_center}
+              onChange={e => setFormData({ ...formData, cost_center: e.target.value })}
+              placeholder="Ex: Administrativo, Frota, Obras, Vendas..."
+            />
+            <CostCenterSuggestion
+              description={formData.description}
+              category={formData.category}
+              notes={formData.notes}
+              transactions={transactions}
+              currentCostCenter={formData.cost_center}
+              onSuggest={(cc) => setFormData(prev => ({ ...prev, cost_center: cc }))}
+            />
           </div>
+
+          {hasValue && (
+            <div className="space-y-2">
+              <Label>Conta *</Label>
+              <Select
+                required
+                value={formData.account_id}
+                onValueChange={(value) => setFormData({ ...formData, account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} ({formatBRL(account.current_balance)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
@@ -128,7 +162,7 @@ export default function QuickEntryDialog({ open, onOpenChange, accounts, onSubmi
             </Button>
             <Button type="submit" disabled={isSubmitting} className="bg-purple-600 hover:bg-purple-700">
               <Zap className="w-4 h-4 mr-2" />
-              {isSubmitting ? "Criando..." : "Registrar Agora"}
+              {isSubmitting ? "Criando..." : (hasValue ? "Registrar Agora" : "Criar Pendente")}
             </Button>
           </div>
         </form>

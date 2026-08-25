@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatBRL, getTodayDate } from "@/components/utils/formatters";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/components/utils/categories";
 import CategorySuggestion from "@/components/transactions/CategorySuggestion";
+import CostCenterSuggestion from "@/components/transactions/CostCenterSuggestion";
 import BranchBadge from "@/components/BranchBadge";
 
 const emptyForm = {
@@ -344,6 +345,14 @@ export default function TransactionFormDialog({
                   value={formData.cost_center}
                   onChange={e => setFormData({ ...formData, cost_center: e.target.value })}
                   placeholder="Ex: Administrativo, Frota, Obras, Vendas..."
+                />
+                <CostCenterSuggestion
+                  description={formData.description}
+                  category={formData.category}
+                  notes={formData.notes}
+                  transactions={transactions}
+                  currentCostCenter={formData.cost_center}
+                  onSuggest={(cc) => setFormData(prev => ({ ...prev, cost_center: cc }))}
                 />
                 <p className="text-xs text-slate-500">Necessário para o extrato por centro de custo e abatimentos.</p>
               </div>
