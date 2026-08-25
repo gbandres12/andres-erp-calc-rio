@@ -52,15 +52,17 @@ export default function DailyFinancialReport() {
   const totalEntradas = entradas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
   const totalSaidas = saidas.reduce((sum, t) => sum + (t.paid_amount || t.amount || 0), 0);
 
-  // Abatimentos do dia: transações com desconto registrado (discount > 0) OU
-  // transações manuais cuja descrição contenha "ABATIMENTO" (forma como o usuário
-  // registra abatimentos diretamente na tela de Lançamentos).
+  // Abatimentos do dia: somente lançamentos que SÃO abatimentos de fato —
+  // categoria de abatimento ou descrição explícita com "ABATIMENTO".
+  // Uma despesa comum que apenas teve um desconto aplicado NÃO é abatimento:
+  // o desconto já está embutido no valor líquido da saída, então listá-la
+  // novamente como abatimento duplicaria o valor no relatório.
+  const ABATIMENTO_CATEGORIES = ["Abatimentos", "Devoluções / Abatimentos"];
   const isAbatimento = (t) =>
-    (t.discount || 0) > 0 ||
+    ABATIMENTO_CATEGORIES.includes(t.category) ||
     (t.description || "").toLowerCase().includes("abatimento");
 
-  const abatimentoValue = (t) =>
-    (t.discount || 0) > 0 ? (t.discount || 0) : (t.paid_amount || t.amount || 0);
+  const abatimentoValue = (t) => t.paid_amount || t.amount || 0;
 
   const abatimentos = useMemo(
     () => [...dayTransactions.filter(isAbatimento)].sort((a, b) =>
