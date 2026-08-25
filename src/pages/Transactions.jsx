@@ -116,12 +116,13 @@ export default function Transactions() {
           });
         }
       }
+      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return transaction;
     },
     onSuccess: () => {
-      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['transaction-payments']);
       closeFormDialog();
       toast.success("Lançamento criado com sucesso!");
     }
@@ -164,13 +165,14 @@ export default function Transactions() {
       } else if (wasPago && !isPago && payments.length === 1) {
         await base44.entities.TransactionPayment.delete(payments[0].id);
       }
+      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return updated;
     },
     onSuccess: () => {
-      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
+      queryClient.invalidateQueries(['transaction-payments']);
       closeFormDialog();
       toast.success("Lançamento atualizado!");
     }
@@ -240,13 +242,14 @@ export default function Transactions() {
         company_id: selectedCompanyId
       });
 
+      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return { transaction, newStatus, newPaidAmount, remainingAmount };
     },
     onSuccess: ({ newStatus, remainingAmount }) => {
-      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
+      queryClient.invalidateQueries(['transaction-payments']);
       setIsReceivePayOpen(false);
       setSelectedTransaction(null);
       if (newStatus === 'pago') toast.success("✅ Pagamento registrado e transação concluída!");
@@ -256,12 +259,15 @@ export default function Transactions() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Transaction.delete(id),
+    mutationFn: async (id) => {
+      await base44.entities.Transaction.delete(id);
+      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
+    },
     onSuccess: () => {
-      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
+      queryClient.invalidateQueries(['transaction-payments']);
       setIsDeleteAuthOpen(false);
       setPendingDeleteTransaction(null);
       toast.success("Lançamento excluído com sucesso!");
@@ -307,12 +313,13 @@ export default function Transactions() {
           });
         }
       }
+      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return transaction;
     },
     onSuccess: (tx) => {
-      base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
+      queryClient.invalidateQueries(['transaction-payments']);
       setIsQuickEntryOpen(false);
       toast.success(tx?.status === 'pendente' ? "Lançamento pendente criado! Defina o valor depois." : "✅ Lançamento rápido criado!");
     }
