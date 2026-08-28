@@ -49,15 +49,34 @@ export default function DailyFinancialReport() {
 
   const txMap = useMemo(() => new Map(transactions.map((t) => [t.id, t])), [transactions]);
 
+  // Converte um datetime (ISO) para o dia local YYYY-MM-DD. Strings já no
+  // formato de data (YYYY-MM-DD) retornam como estão. Usado para datar
+  // abatimentos pelo dia em que foram efetivamente registrados (created_date),
+  // e não pela data de pagamento atribuída — que pode ter sido retroajustada
+  // para o dia do pagamento parcial, fazendo o abatimento "voltar" no relatório.
+  const localDay = (v) => {
+    if (!v) return "";
+    const s = String(v);
+    if (s.length === 10) return s;
+    const d = new Date(s);
+    return isNaN(d) ? "" : d.toLocaleDateString("en-CA");
+  };
+
   const movements = useMemo(() => {
     const list = [];
     const txIdsWithPayment = new Set(payments.map((p) => p.transaction_id));
 
     payments
-      .filter((p) => p.payment_date && p.payment_date.slice(0, 10) === selectedDate)
+      .filter((p) => {
+        const tx = txMap.get(p.transaction_id);
+        if (!tx) return false;
+        // Abatimentos pelo dia em que foram efetivamente feitos (created_date);
+        // demais lançamentos pela data de pagamento informada.
+        const day = isAbatimentoTx(tx) ? localDay(p.created_date) : (p.payment_date || "").slice(0, 10);
+        return day === selectedDate;
+      })
       .forEach((p) => {
         const tx = txMap.get(p.transaction_id);
-        if (!tx) return;
         list.push({
           id: p.id,
           description: tx.description,
@@ -71,7 +90,7 @@ export default function DailyFinancialReport() {
     transactions
       .filter((t) => (t.status === "pago" || t.status === "parcial") && !txIdsWithPayment.has(t.id))
       .forEach((t) => {
-        const d = (t.payment_date || t.due_date || "").slice(0, 10);
+        const d = isAbatimentoTx(t) ? localDay(t.created_date) : (t.payment_date || t.due_date || "").slice(0, 10);
         if (d !== selectedDate) return;
         list.push({
           id: `legacy-${t.id}`,
