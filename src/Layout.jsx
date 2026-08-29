@@ -19,10 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-// Groups start collapsed and expand when selected.
 const DEFAULT_OPEN = new Set();
 
-// Fecha o menu lateral mobile ao trocar de página
 function MobileNavCloser() {
   const { setOpenMobile } = useSidebar();
   const location = useLocation();
@@ -69,7 +67,7 @@ export default function Layout({ children, currentPageName }) {
     });
   };
 
-  const filteredNavigation = React.useMemo(() => { // eslint-disable-line
+  const filteredNavigation = React.useMemo(() => {
     if (!user) return navigationGroups;
 
     if (user.custom_role === 'operator') {
@@ -103,7 +101,6 @@ export default function Layout({ children, currentPageName }) {
       }).filter(Boolean);
     }
 
-    // Perfil personalizado: mostra apenas os módulos marcados em custom_permissions
     if (user.custom_role === 'custom') {
       const allowed = new Set(user.custom_permissions || []);
       return navigationGroups.map(group => {
@@ -115,8 +112,6 @@ export default function Layout({ children, currentPageName }) {
     return navigationGroups;
   }, [user]);
 
-  // Perfil personalizado: expandir automaticamente os grupos com módulos permitidos,
-  // para que o usuário veja seus módulos sem precisar clicar em cada grupo.
   useEffect(() => {
     if (user?.custom_role === 'custom') {
       const allowed = new Set(user.custom_permissions || []);
@@ -132,7 +127,8 @@ export default function Layout({ children, currentPageName }) {
     queryFn: async () => {
       if (!user) return [];
       const all = await base44.entities.Company.filter({ is_active: true });
-      if (user.custom_role === 'operator' && user.allowed_companies?.length > 0) {
+      const isAdmin = user.role === 'admin' || user.custom_role === 'admin';
+      if (!isAdmin && user.allowed_companies?.length > 0) {
         return all.filter(c => user.allowed_companies.includes(c.id));
       }
       return all;
@@ -186,10 +182,8 @@ export default function Layout({ children, currentPageName }) {
     <SidebarProvider>
       <MobileNavCloser />
       <div className="min-h-screen flex w-full bg-slate-50">
-        {/* Sidebar */}
         <Sidebar>
           <div className="bg-white flex flex-col h-full w-full border-r border-slate-200">
-          {/* Header */}
           <div className="px-5 pt-6 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-9 h-9 bg-violet-600 rounded-lg flex items-center justify-center">
@@ -201,7 +195,6 @@ export default function Layout({ children, currentPageName }) {
               </div>
             </div>
 
-            {/* Refresh button */}
             <button
               onClick={handleRefreshData}
               disabled={isRefreshing}
@@ -211,7 +204,6 @@ export default function Layout({ children, currentPageName }) {
               {isRefreshing ? 'Atualizando...' : 'Atualizar Dados'}
             </button>
 
-            {/* Company selector */}
             <div>
               <p className="text-xs text-slate-700 mb-1 font-bold uppercase tracking-wide">Filial</p>
               <DropdownMenu>
@@ -239,7 +231,6 @@ export default function Layout({ children, currentPageName }) {
               </DropdownMenu>
             </div>
 
-            {/* Trocar Filial link */}
             <Link
               to={createPageUrl("CompanySelector")}
               className="mt-2 flex items-center gap-2 px-1 py-1.5 text-sm font-medium text-violet-700 hover:text-violet-900 transition-colors"
@@ -249,7 +240,6 @@ export default function Layout({ children, currentPageName }) {
             </Link>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-3 px-3">
             {filteredNavigation.map((group) => {
               const isOpen = openGroups.has(group.title);
@@ -258,7 +248,6 @@ export default function Layout({ children, currentPageName }) {
 
               return (
                 <div key={group.title} className="mb-1">
-                  {/* Group header */}
                   <button
                     onClick={() => toggleGroup(group.title)}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors border ${
@@ -275,7 +264,6 @@ export default function Layout({ children, currentPageName }) {
                     }
                   </button>
 
-                  {/* Group items */}
                   {isOpen && (
                     <div className="mt-0.5 ml-2">
                       {group.items.map((item) => {
@@ -303,7 +291,6 @@ export default function Layout({ children, currentPageName }) {
             })}
           </nav>
 
-          {/* Footer - User */}
           {user && (
             <div className="border-t border-slate-100 p-3">
               <DropdownMenu>
@@ -340,16 +327,13 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </Sidebar>
 
-        {/* Main content */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Mobile header */}
           <header className="bg-white border-b border-slate-200 px-4 py-3 md:hidden flex items-center gap-3 sticky top-0 z-10">
             <SidebarTrigger className="p-2 rounded-lg hover:bg-slate-100 transition-colors" />
             <h1 className="text-lg font-semibold text-slate-900">Andres Tech</h1>
           </header>
 
           <div className="flex-1 overflow-auto">
-            {/* Banner de Filial Ativa - alto contraste */}
             {selectedCompany && (
               <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between border-b-[3px] border-violet-500 sticky top-0 z-20">
                 <div className="flex items-center gap-2.5">
