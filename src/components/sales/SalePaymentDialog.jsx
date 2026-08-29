@@ -12,6 +12,7 @@ import PaymentReceipt from "@/components/receipts/PaymentReceipt";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import BranchBadge from "@/components/BranchBadge";
+import { createPaidTransaction } from "@/utils/saleFinance";
 
 const getTodayDate = () => new Date().toISOString().split("T")[0];
 
@@ -29,7 +30,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
     { description: "Pagamento", amount: "", date: getTodayDate(), account_id: "", payment_method: "pix", discount: 0 }
   ]);
   const [saving, setSaving] = useState(false);
-  const [receiptData, setReceiptData] = useState(null); // { payment, sale, previousPayments }
+  const [receiptData, setReceiptData] = useState(null);
 
   if (!sale) return null;
 
@@ -76,7 +77,6 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
         const disc = parseFloat(p.discount) || 0;
         if (amt <= 0) continue;
 
-        // Criar pagamento
         const salePayment = await base44.entities.SalePayment.create({
           sale_id: sale.id,
           sale_reference: sale.reference,
@@ -88,8 +88,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           company_id: sale.company_id,
           notes: p.description || ""
         });
-        // Criar transação financeira
-        await base44.entities.Transaction.create({
+        await createPaidTransaction(base44, {
           description: `${sale.reference} - ${p.description || "Pagamento"} - ${sale.client_name}`,
           amount: amt,
           original_amount: amt + disc,
@@ -106,12 +105,11 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           company_id: sale.company_id,
           paid_amount: amt,
           notes: `Venda: ${sale.reference}${disc > 0 ? ` | Abatimento: ${formatBRL(disc)}` : ""}`
-        });
+        }, { payment_method: p.payment_method });
 
         createdPayments.push({ ...salePayment, amount: amt, payment_date: p.date, payment_method: p.payment_method, notes: p.description });
       }
 
-      // Atualizar venda
       const newPaid = alreadyPaid + totalThisPayment;
       const newRem = Math.max(0, saleTotal - newPaid - totalAbatimento);
       let paymentStatus = "parcial";
@@ -189,7 +187,6 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
 
         <BranchBadge className="mb-4" />
 
-        {/* Resumo da venda */}
         <Card className="bg-slate-50 border-slate-200">
           <CardContent className="pt-4 pb-3">
             <div className="flex justify-between items-center">
@@ -206,7 +203,6 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           </CardContent>
         </Card>
 
-        {/* Payments */}
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <Label className="text-sm font-semibold">Pagamentos</Label>
@@ -308,7 +304,6 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           ))}
         </div>
 
-        {/* Resumo do lançamento */}
         <Card className={newRemaining <= 0.01 ? "bg-green-50 border-green-200" : "bg-orange-50 border-orange-200"}>
           <CardContent className="pt-3 pb-3">
             <div className="flex justify-between text-sm">
