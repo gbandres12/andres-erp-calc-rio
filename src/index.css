@@ -113,22 +113,22 @@ button:focus-visible {
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 0 0% 8%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 0 0% 8%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted-foreground: 0 0% 70%;
     --accent: 0 0% 14.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
     --ring: 0 0% 83.1%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -143,6 +143,7 @@ button:focus-visible {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    color-scheme: dark;
   }
 }
 
@@ -171,10 +172,18 @@ button:focus-visible {
 
 .dark .text-slate-900 { color: hsl(var(--foreground)); }
 .dark .text-slate-800 { color: hsl(var(--foreground)); }
-.dark .text-slate-700 { color: hsl(var(--muted-foreground)); }
+.dark .text-slate-700 { color: hsl(0 0% 88%); }
 .dark .text-slate-600 { color: hsl(var(--muted-foreground)); }
 .dark .text-slate-500 { color: hsl(var(--muted-foreground)); }
-.dark .text-slate-400 { color: hsl(0 0% 55%); }
+.dark .text-slate-400 { color: hsl(0 0% 65%); }
+
+.dark .text-gray-900, .dark .text-zinc-900, .dark .text-neutral-900, .dark .text-stone-900,
+.dark .text-gray-800, .dark .text-zinc-800, .dark .text-neutral-800, .dark .text-stone-800,
+.dark .text-black { color: hsl(var(--foreground)); }
+.dark .text-gray-700, .dark .text-zinc-700, .dark .text-neutral-700, .dark .text-stone-700 { color: hsl(0 0% 88%); }
+.dark .text-gray-600, .dark .text-zinc-600, .dark .text-neutral-600, .dark .text-stone-600,
+.dark .text-gray-500, .dark .text-zinc-500, .dark .text-neutral-500, .dark .text-stone-500 { color: hsl(var(--muted-foreground)); }
+.dark .text-gray-400, .dark .text-zinc-400, .dark .text-neutral-400, .dark .text-stone-400 { color: hsl(0 0% 65%); }
 
 .dark .border-slate-200 { border-color: hsl(var(--border)); }
 .dark .border-slate-100 { border-color: hsl(var(--border)); }
@@ -217,14 +226,19 @@ button:focus-visible {
 .dark .text-sky-700, .dark .text-sky-800, .dark .text-sky-900 { color: hsl(199 75% 70%); }
 .dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900 { color: hsl(38 80% 65%); }
 
-/* Números destacados -600 ficam mais claros no escuro */
-.dark .text-green-600 { color: hsl(142 60% 60%); }
-.dark .text-red-600 { color: hsl(0 70% 68%); }
-.dark .text-orange-600 { color: hsl(25 75% 62%); }
-.dark .text-blue-600 { color: hsl(200 80% 65%); }
-.dark .text-purple-600 { color: hsl(265 65% 72%); }
-.dark .text-violet-600 { color: hsl(262 65% 72%); }
-.dark .text-emerald-600 { color: hsl(152 60% 58%); }
+/* Números destacados -500/-600 ficam mais claros no escuro */
+.dark .text-green-600, .dark .text-green-500 { color: hsl(142 60% 62%); }
+.dark .text-red-600, .dark .text-red-500 { color: hsl(0 70% 68%); }
+.dark .text-orange-600, .dark .text-orange-500 { color: hsl(25 75% 62%); }
+.dark .text-blue-600, .dark .text-blue-500 { color: hsl(200 80% 65%); }
+.dark .text-purple-600, .dark .text-purple-500 { color: hsl(265 65% 72%); }
+.dark .text-violet-600, .dark .text-violet-500 { color: hsl(262 65% 72%); }
+.dark .text-emerald-600, .dark .text-emerald-500 { color: hsl(152 60% 58%); }
+.dark .text-yellow-600, .dark .text-yellow-500 { color: hsl(45 85% 62%); }
+.dark .text-amber-600, .dark .text-amber-500 { color: hsl(38 80% 62%); }
+.dark .text-sky-600, .dark .text-sky-500 { color: hsl(199 75% 65%); }
+.dark .text-indigo-600, .dark .text-indigo-500 { color: hsl(239 70% 72%); }
+.dark .text-pink-600, .dark .text-pink-500 { color: hsl(330 70% 70%); }
 
 /* Bordas tintas acompanham */
 .dark .border-blue-200 { border-color: hsl(217 50% 30%); }
@@ -243,3 +257,62 @@ button:focus-visible {
 .dark .hover\:bg-green-50:hover { background-color: hsl(142 60% 18% / 0.5); }
 .dark .hover\:bg-red-50:hover { background-color: hsl(0 60% 18% / 0.5); }
 .dark .hover\:bg-violet-50:hover { background-color: hsl(262 60% 18% / 0.5); }
+
+/* Tabelas e KPIs de relatório: números herdam cor clara */
+.dark table {
+  color: hsl(var(--foreground));
+}
+.dark th {
+  color: hsl(var(--muted-foreground));
+}
+.dark td {
+  color: hsl(var(--foreground));
+}
+
+/* Inputs nativos (datas, números, selects) — o browser pinta preto por padrão */
+.dark input,
+.dark select,
+.dark textarea {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--card));
+}
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="time"],
+.dark input[type="number"] {
+  color-scheme: dark;
+  color: hsl(var(--foreground));
+}
+.dark input[type="date"]::-webkit-datetime-edit,
+.dark input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.dark input[type="date"]::-webkit-datetime-edit-text,
+.dark input[type="date"]::-webkit-datetime-edit-month-field,
+.dark input[type="date"]::-webkit-datetime-edit-day-field,
+.dark input[type="date"]::-webkit-datetime-edit-year-field {
+  color: hsl(var(--foreground));
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Recharts: eixos, legendas e tooltip deixam de ficar pretos */
+.dark .recharts-cartesian-axis-tick text,
+.dark .recharts-text,
+.dark .recharts-label,
+.dark .recharts-legend-item-text {
+  fill: hsl(var(--muted-foreground)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+.dark .recharts-cartesian-grid line {
+  stroke: hsl(var(--border));
+}
+.dark .recharts-default-tooltip {
+  background: hsl(var(--popover)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.dark .recharts-tooltip-item,
+.dark .recharts-tooltip-label {
+  color: hsl(var(--foreground)) !important;
+}
