@@ -37,147 +37,49 @@
       "items": {
         "type": "object",
         "properties": {
-          "product_id": {
-            "type": "string"
-          },
-          "product_name": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number"
-          },
-          "quantity_withdrawn": {
-            "type": "number",
-            "default": 0
-          },
-          "unit": {
-            "type": "string"
-          },
-          "unit_price": {
-            "type": "number"
-          },
-          "discount": {
-            "type": "number",
-            "default": 0
-          },
-          "total": {
-            "type": "number"
-          }
+          "product_id": { "type": "string" },
+          "product_name": { "type": "string" },
+          "quantity": { "type": "number" },
+          "quantity_withdrawn": { "type": "number", "default": 0 },
+          "unit": { "type": "string" },
+          "unit_price": { "type": "number" },
+          "discount": { "type": "number", "default": 0 },
+          "total": { "type": "number" }
         }
       }
     },
-    "subtotal": {
-      "type": "number",
-      "description": "Subtotal"
-    },
-    "discount": {
-      "type": "number",
-      "default": 0,
-      "description": "Desconto total"
-    },
-    "shipping": {
-      "type": "number",
-      "default": 0,
-      "description": "Frete"
-    },
-    "total": {
-      "type": "number",
-      "description": "Valor total"
-    },
-    "paid_amount": {
-      "type": "number",
-      "default": 0,
-      "description": "Valor pago (entrada + parcelas pagas)"
-    },
-    "remaining_amount": {
-      "type": "number",
-      "default": 0,
-      "description": "Valor restante a pagar"
-    },
-    "payment_method": {
-      "type": "string",
-      "description": "Forma de pagamento principal"
-    },
+    "subtotal": { "type": "number", "description": "Subtotal" },
+    "discount": { "type": "number", "default": 0, "description": "Desconto total" },
+    "shipping": { "type": "number", "default": 0, "description": "Frete" },
+    "total": { "type": "number", "description": "Valor total" },
+    "paid_amount": { "type": "number", "default": 0, "description": "Valor pago (entrada + parcelas pagas)" },
+    "remaining_amount": { "type": "number", "default": 0, "description": "Valor restante a pagar" },
+    "payment_method": { "type": "string", "description": "Forma de pagamento principal" },
     "status": {
       "type": "string",
-      "enum": [
-        "rascunho",
-        "faturada",
-        "concluida",
-        "cancelada"
-      ],
+      "enum": ["rascunho", "faturada", "concluida", "cancelada"],
       "default": "rascunho",
       "description": "Status da venda"
     },
     "payment_status": {
       "type": "string",
-      "enum": [
-        "pendente",
-        "parcial",
-        "pago"
-      ],
+      "enum": ["pendente", "parcial", "pago"],
       "default": "pendente",
       "description": "Status do pagamento"
     },
     "withdrawal_status": {
       "type": "string",
-      "enum": [
-        "aguardando",
-        "parcial",
-        "total"
-      ],
+      "enum": ["aguardando", "parcial", "total"],
       "default": "aguardando",
       "description": "Status da retirada"
     },
-    "notes": {
-      "type": "string",
-      "description": "Observa\u00e7\u00f5es"
-    }
+    "notes": { "type": "string", "description": "Observa\u00e7\u00f5es" }
   },
-  "required": [
-    "reference",
-    "client_id",
-    "items",
-    "total"
-  ],
+  "required": ["reference", "client_id", "items", "total", "company_id"],
   "rls": {
-    "create": {
-      "data.company_id": {
-        "$in": "{{user.data.allowed_companies}}"
-      }
-    },
-    "read": {
-      "$or": [
-        {
-          "data.company_id": {
-            "$in": "{{user.data.allowed_companies}}"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "update": {
-      "$or": [
-        {
-          "data.company_id": {
-            "$in": "{{user.data.allowed_companies}}"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
-    }
+    "create": { "data.company_id": { "$in": "{{user.data.allowed_companies}}" } },
+    "read": { "$or": [ { "data.company_id": { "$in": "{{user.data.allowed_companies}}" } }, { "user_condition": { "role": "admin" } } ] },
+    "update": { "$or": [ { "data.company_id": { "$in": "{{user.data.allowed_companies}}" } }, { "user_condition": { "role": "admin" } } ] },
+    "delete": { "$or": [ { "user_condition": { "role": "admin" } }, { "user_condition": { "custom_role": "admin" } } ] }
   }
 }
