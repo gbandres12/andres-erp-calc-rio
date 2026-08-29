@@ -26,7 +26,7 @@ import SalePaymentHistoryDialog from "@/components/sales/SalePaymentHistoryDialo
 import SaleEditDialog from "@/components/sales/SaleEditDialog";
 import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
 import SaleAdjustDialog from "@/components/sales/SaleAdjustDialog";
-import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
+import SaleDeleteButton from "@/components/sales/SaleDeleteButton";
 import BranchBadge from "@/components/BranchBadge";
 
 export default function Sales() {
@@ -372,9 +372,6 @@ export default function Sales() {
 
   const [isAdjustDialogOpen, setIsAdjustDialogOpen] = useState(false);
   const [saleToAdjust, setSaleToAdjust] = useState(null);
-
-  const [isDeleteAuthOpen, setIsDeleteAuthOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null);
 
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
   const [saleToInvoice, setSaleToInvoice] = useState(null);
@@ -1518,26 +1515,6 @@ export default function Sales() {
         onSuccess={() => { queryClient.invalidateQueries(['sales']); queryClient.invalidateQueries(['transactions']); queryClient.invalidateQueries(['accounts']); }}
       />
 
-      {/* Dialog Autenticação para Deletar */}
-      <DeleteAuthDialog
-        open={isDeleteAuthOpen}
-        onClose={() => { setIsDeleteAuthOpen(false); setPendingDelete(null); }}
-        onSuccess={async () => {
-          if (pendingDelete?.type === 'sale') {
-            try {
-              await base44.entities.Sale.delete(pendingDelete.id);
-              queryClient.invalidateQueries(['sales']);
-              toast.success('Venda excluída com sucesso.');
-            } catch (err) {
-              toast.error('Erro ao excluir venda: ' + err.message);
-            }
-          }
-          setIsDeleteAuthOpen(false);
-          setPendingDelete(null);
-        }}
-        itemType={pendingDelete?.type === 'sale' ? 'venda' : 'lançamento'}
-      />
-
       {/* Dialog Editar Venda */}
       <SaleEditDialog
         sale={saleToEdit}
@@ -1875,6 +1852,16 @@ export default function Sales() {
                           Cancelar
                         </Button>
                       )}
+
+                      <SaleDeleteButton
+                        sale={sale}
+                        selectedCompanyId={selectedCompanyId}
+                        onDeleted={() => {
+                          queryClient.invalidateQueries(['sales']);
+                          queryClient.invalidateQueries(['transactions']);
+                          queryClient.invalidateQueries(['accounts']);
+                        }}
+                      />
 
                       {sale.status === 'faturada' && (
                         <Popover>

@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, AlertCircle, History, Upload, Lock, ScanLine, FileText, Zap, Badge as BadgeIcon } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, AlertCircle, History, Upload, ScanLine, FileText, Zap, Badge as BadgeIcon } from "lucide-react";
 import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
+import EditAuthDialog from "@/components/transactions/EditAuthDialog";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { isSameDay, isSameWeek, isSameMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -38,7 +39,6 @@ export default function Transactions() {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
   const [pendingEditTransaction, setPendingEditTransaction] = useState(null);
 
   const [isDeleteAuthOpen, setIsDeleteAuthOpen] = useState(false);
@@ -344,22 +344,7 @@ export default function Transactions() {
 
   const initiateEdit = (transaction) => {
     setPendingEditTransaction(transaction);
-    setPasswordInput("");
     setIsPasswordDialogOpen(true);
-  };
-
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    if (passwordInput === "1234") {
-      setIsPasswordDialogOpen(false);
-      setEditingTransaction(pendingEditTransaction);
-      setFormInitialData(null);
-      setIsDialogOpen(true);
-      setPendingEditTransaction(null);
-      toast.success("Acesso autorizado!");
-    } else {
-      toast.error("Senha incorreta!");
-    }
   };
 
   const initiateDelete = (transaction) => {
@@ -696,21 +681,17 @@ export default function Transactions() {
       />
 
       {/* Senha para Edição */}
-      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Lock className="w-4 h-4" /> Autorização Necessária</DialogTitle></DialogHeader>
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Senha de Administrador</Label>
-              <Input type="password" placeholder="Digite a senha..." value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} autoFocus />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setIsPasswordDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit">Confirmar</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditAuthDialog
+        open={isPasswordDialogOpen}
+        onClose={() => setIsPasswordDialogOpen(false)}
+        selectedCompanyId={selectedCompanyId}
+        onSuccess={() => {
+          setEditingTransaction(pendingEditTransaction);
+          setFormInitialData(null);
+          setIsDialogOpen(true);
+          setPendingEditTransaction(null);
+        }}
+      />
 
       {/* Histórico de Pagamentos */}
       <Dialog open={isPaymentHistoryOpen} onOpenChange={setIsPaymentHistoryOpen}>
