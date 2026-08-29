@@ -2,8 +2,21 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { usePostHog } from '@posthog/react';
 
 const AuthContext = createContext();
+
+function identifyUser(posthog, currentUser) {
+  if (!posthog || !currentUser) return;
+  const id = currentUser.email || currentUser.id;
+  if (!id) return;
+  posthog.identify(id, {
+    email: currentUser.email,
+    name: currentUser.full_name,
+    role: currentUser.role,
+    custom_role: currentUser.custom_role,
+  });
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -12,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
+  const posthog = usePostHog?.() ?? null;
 
   useEffect(() => {
     checkAppState();
@@ -95,6 +109,7 @@ export const AuthProvider = ({ children }) => {
       document.documentElement.classList.toggle('dark', Boolean(currentUser.dark_mode));
       setUser(currentUser);
       setIsAuthenticated(true);
+      identifyUser(posthog, currentUser);
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
@@ -114,6 +129,7 @@ export const AuthProvider = ({ children }) => {
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+    try { posthog?.reset(); } catch (_) {}
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
