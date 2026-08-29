@@ -3,14 +3,14 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { base44 } from '@/api/base44Client';
 import { pagesConfig } from '@/pages.config';
-import { usePostHog } from '@posthog/react';
+import { useAppPostHog } from '@/lib/posthog';
 
 export default function NavigationTracker() {
     const location = useLocation();
     const { isAuthenticated } = useAuth();
     const { Pages, mainPage } = pagesConfig;
     const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-    const posthog = usePostHog?.() ?? null;
+    const posthog = useAppPostHog();
 
     // Post navigation changes to parent window
     useEffect(() => {

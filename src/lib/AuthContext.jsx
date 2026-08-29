@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
-import { usePostHog } from '@posthog/react';
+import { useAppPostHog } from '@/lib/posthog';
 
 const AuthContext = createContext();
 
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
-  const posthog = usePostHog?.() ?? null;
+  const posthog = useAppPostHog();
 
   useEffect(() => {
     checkAppState();
@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }) => {
       if (error.status === 401 || error.status === 403) {
         setAuthError({
           type: 'auth_required',
-          message: 'Authentication required'
+              message: 'Authentication required'
         });
       }
     }
