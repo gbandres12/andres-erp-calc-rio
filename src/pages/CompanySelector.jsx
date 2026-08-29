@@ -46,7 +46,8 @@ export default function CompanySelector() {
     queryKey: ['companies', user?.id],
     queryFn: async () => {
       const companies = await base44.entities.Company.filter({ is_active: true }, '-created_date');
-      if (user?.custom_role === 'operator' && user?.allowed_companies?.length > 0) {
+      const isAdmin = user?.role === 'admin' || user?.custom_role === 'admin';
+      if (!isAdmin && user?.allowed_companies?.length > 0) {
         return companies.filter(c => user.allowed_companies.includes(c.id));
       }
       return companies;
@@ -55,16 +56,7 @@ export default function CompanySelector() {
     enabled: !!user
   });
 
-  const companies = React.useMemo(() => {
-    const uniqueCompanies = new Map();
-    allCompanies.forEach(company => {
-      if (!uniqueCompanies.has(company.code) || 
-          new Date(company.created_date) > new Date(uniqueCompanies.get(company.code).created_date)) {
-        uniqueCompanies.set(company.code, company);
-      }
-    });
-    return Array.from(uniqueCompanies.values());
-  }, [allCompanies]);
+  const companies = allCompanies;
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Company.create(data),
@@ -150,7 +142,6 @@ export default function CompanySelector() {
     <div className="min-h-screen bg-slate-50">
       <div className="flex items-center justify-center min-h-screen p-6">
         <div className="w-full max-w-5xl">
-          {/* Header */}
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-14 h-14 bg-slate-800 rounded-xl mb-5">
               <Building2 className="w-7 h-7 text-white" />
@@ -160,7 +151,6 @@ export default function CompanySelector() {
             </h1>
             <p className="text-sm text-slate-600 font-medium mb-6">Sistema de Gestão Empresarial</p>
 
-            {/* User Info */}
             {user && (
               <div className="inline-flex items-center gap-3 bg-white border-2 border-slate-300 px-5 py-3 rounded-lg shadow-sm">
                 <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
@@ -174,7 +164,7 @@ export default function CompanySelector() {
                   <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 hover:text-slate-700 h-7 w-7 p-0">
                     <LogOut className="w-4 h-4" />
                   </Button>
-                  {user?.role === 'admin' && (
+                  {(user?.role === 'admin' || user?.custom_role === 'admin') && (
                     <Button variant="ghost" size="sm" onClick={() => window.location.href = createPageUrl('Settings')} className="text-slate-500 hover:text-slate-700 h-7 w-7 p-0">
                       <Settings className="w-4 h-4" />
                     </Button>
@@ -184,8 +174,7 @@ export default function CompanySelector() {
             )}
           </div>
 
-          {/* Botão Nova Filial */}
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.custom_role === 'admin') && (
             <div className="flex justify-end mb-5">
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
@@ -243,7 +232,6 @@ export default function CompanySelector() {
             </div>
           )}
 
-          {/* Lista de Filiais */}
           {companies.length === 0 ? (
             <Card className="border-2 border-slate-300">
               <CardContent className="py-16 text-center">
@@ -252,7 +240,7 @@ export default function CompanySelector() {
                 </div>
                 <h3 className="text-lg font-bold text-slate-800 mb-2">Nenhuma filial cadastrada</h3>
                 <p className="text-sm text-slate-600 mb-6">Crie sua primeira filial para começar a usar o sistema</p>
-                {user?.role === 'admin' && (
+                {(user?.role === 'admin' || user?.custom_role === 'admin') && (
                   <Button onClick={() => setIsDialogOpen(true)} className="bg-slate-800 hover:bg-slate-700 text-white">
                     <Plus className="w-4 h-4 mr-2" />
                     Cadastrar Primeira Filial
@@ -309,7 +297,7 @@ export default function CompanySelector() {
                       >
                         Acessar
                       </Button>
-                      {user?.role === 'admin' && (
+                      {(user?.role === 'admin' || user?.custom_role === 'admin') && (
                         <Button
                           variant="outline"
                           size="icon"
