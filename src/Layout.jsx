@@ -21,6 +21,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const DEFAULT_OPEN = new Set();
 
+function isAppAdmin(user) {
+  return Boolean(user && (user.custom_role === 'admin' || user.role === 'admin'));
+}
+
 function MobileNavCloser() {
   const { setOpenMobile } = useSidebar();
   const location = useLocation();
@@ -70,8 +74,16 @@ export default function Layout({ children, currentPageName }) {
   const filteredNavigation = React.useMemo(() => {
     if (!user) return navigationGroups;
 
+    const hideUsersUnlessAdmin = (groups) => {
+      if (isAppAdmin(user)) return groups;
+      return groups.map(group => {
+        const items = group.items.filter(i => i.url !== 'Users');
+        return items.length ? { ...group, items } : null;
+      }).filter(Boolean);
+    };
+
     if (user.custom_role === 'operator') {
-      return navigationGroups.map(group => {
+      return hideUsersUnlessAdmin(navigationGroups.map(group => {
         if (group.title === "Financeiro") {
           const items = group.items.filter(i => i.url === 'Contacts');
           return items.length ? { ...group, items } : null;
@@ -84,7 +96,7 @@ export default function Layout({ children, currentPageName }) {
         const forbidden = ['ActivityLogs', 'Settings', 'Users', 'Dashboard', 'SupplierQuotes', 'SalesForecast', 'CRM'];
         const items = group.items.filter(i => !forbidden.includes(i.url));
         return items.length ? { ...group, items } : null;
-      }).filter(Boolean);
+      }).filter(Boolean));
     }
 
     if (user.custom_role === 'scale_operator') {
@@ -93,23 +105,23 @@ export default function Layout({ children, currentPageName }) {
         "Logística": ['Vehicles', 'Weighing'],
         "Comercial": ['Sales', 'SaleWithdrawals'],
       };
-      return navigationGroups.map(group => {
+      return hideUsersUnlessAdmin(navigationGroups.map(group => {
         const allowedItems = allowed[group.title];
         if (!allowedItems) return null;
         const items = group.items.filter(i => allowedItems.includes(i.url));
         return items.length ? { ...group, items } : null;
-      }).filter(Boolean);
+      }).filter(Boolean));
     }
 
     if (user.custom_role === 'custom') {
       const allowed = new Set(user.custom_permissions || []);
-      return navigationGroups.map(group => {
+      return hideUsersUnlessAdmin(navigationGroups.map(group => {
         const items = group.items.filter(i => allowed.has(i.url));
         return items.length ? { ...group, items } : null;
-      }).filter(Boolean);
+      }).filter(Boolean));
     }
 
-    return navigationGroups;
+    return hideUsersUnlessAdmin(navigationGroups);
   }, [user]);
 
   useEffect(() => {
@@ -303,7 +315,7 @@ export default function Layout({ children, currentPageName }) {
                     </Avatar>
                     <div className="flex-1 text-left min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">{user.full_name || user.email}</p>
-                      <p className="text-xs text-slate-400 truncate">{user.role}</p>
+                      <p className="text-xs text-slate-400 truncate">{user.custom_role || user.role}</p>
                     </div>
                     <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   </button>
