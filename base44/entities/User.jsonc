@@ -17,8 +17,8 @@
         "scale_operator",
         "custom"
       ],
-      "default": "admin",
-      "description": "Perfil de acesso"
+      "default": "operator",
+      "description": "Perfil de acesso do ERP (não confundir com role admin/user do Base44)"
     },
     "custom_permissions": {
       "type": "array",
@@ -26,16 +26,16 @@
         "type": "string"
       },
       "default": [],
-      "description": "M\u00f3dulos (urls) permitidos quando custom_role = 'custom'"
+      "description": "Módulos (urls) permitidos quando custom_role = 'custom'"
     },
     "dark_mode": {
       "type": "boolean",
       "default": false,
-      "description": "Prefer\u00eancia individual de tema escuro"
+      "description": "Preferência individual de tema escuro"
     },
     "settings": {
       "type": "object",
-      "description": "Prefer\u00eancias individuais do usu\u00e1rio"
+      "description": "Preferências individuais do usuário"
     }
   },
   "required": [
