@@ -259,9 +259,15 @@ export default function Transactions() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id) => {
-      await base44.entities.Transaction.delete(id);
-      await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
+    mutationFn: async ({ id, password }) => {
+      const res = await base44.functions.invoke('deleteProtectedRecord', {
+        kind: 'transaction',
+        id,
+        password,
+        company_id: selectedCompanyId
+      });
+      const data = res?.data ?? res;
+      if (!data?.success) throw new Error(data?.error || 'Falha ao excluir lançamento');
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions']);
@@ -352,8 +358,8 @@ export default function Transactions() {
     setIsDeleteAuthOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (pendingDeleteTransaction) deleteMutation.mutate(pendingDeleteTransaction.id);
+  const confirmDelete = (pin) => {
+    if (pendingDeleteTransaction) deleteMutation.mutate({ id: pendingDeleteTransaction.id, password: pin });
   };
 
   const handleReceivePay = (transaction) => {
