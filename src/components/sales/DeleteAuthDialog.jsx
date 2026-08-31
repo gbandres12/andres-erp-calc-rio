@@ -8,6 +8,13 @@ import { AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 
+function invokeOk(res) {
+  const data = res?.data ?? res;
+  if (data?.error) return { ok: false, error: data.error };
+  if (data?.success) return { ok: true, data };
+  return { ok: false, error: "Senha incorreta" };
+}
+
 export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = "venda" }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,18 +33,18 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
     try {
       const result = await base44.functions.invoke("validateDeletionPassword", {
         company_id: localStorage.getItem("selectedCompanyId"),
-        password
+        password,
       });
-
-      if (result?.data?.success) {
-        toast.success("Autenticado!");
-        setPassword("");
-        setError("");
-        onClose();
-        onSuccess();
-      } else {
-        setError("Senha incorreta");
+      const parsed = invokeOk(result);
+      if (!parsed.ok) {
+        setError(parsed.error);
+        return;
       }
+      toast.success("Autenticado");
+      const pin = password;
+      setPassword("");
+      onClose();
+      await onSuccess(pin);
     } catch (err) {
       const apiError = err?.response?.data?.error || err?.message;
       setError(apiError || "Senha incorreta");
@@ -52,30 +59,29 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-600">
             <Lock className="w-5 h-5" />
-            Autenticação Necessária
+            Autenticação necessária
           </DialogTitle>
         </DialogHeader>
 
         <Alert className="border-red-200 bg-red-50">
           <AlertTriangle className="h-4 w-4 text-red-600" />
           <AlertDescription className="text-red-800 text-sm">
-            Você está prestes a deletar esta {itemType}. Esta ação não pode ser desfeita.
+            Você vai excluir esta {itemType}. Não dá para desfazer.
           </AlertDescription>
         </Alert>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="pwd">Senha de Autorização (4 a 6 dígitos) *</Label>
+            <Label htmlFor="pwd">Senha de autorização (4 a 6 dígitos) *</Label>
             <Input
               id="pwd"
               type="password"
               maxLength="6"
               placeholder="0000"
               value={password}
-              onChange={(e) => setPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(e) => setPassword(e.target.value.replace(/\D/g, "").slice(0, 6))}
               className="text-center text-2xl tracking-widest font-mono"
             />
-            <p className="text-xs text-slate-500">Apenas números</p>
           </div>
 
           {error && (
@@ -91,9 +97,9 @@ export default function DeleteAuthDialog({ open, onClose, onSuccess, itemType = 
             <Button
               type="submit"
               className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={loading || password.length < 4 || password.length > 6}
+              disabled={loading || password.length < 4}
             >
-              {loading ? "Validando..." : "Deletar"}
+              {loading ? "Validando..." : "Confirmar"}
             </Button>
           </div>
         </form>

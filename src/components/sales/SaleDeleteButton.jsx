@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
-import { deleteSaleFinancials } from "@/utils/saleFinance";
+import { deleteProtectedRecord } from "@/utils/protectedDelete";
 
 export default function SaleDeleteButton({ sale, selectedCompanyId, onDeleted }) {
   const [open, setOpen] = useState(false);
@@ -25,14 +24,14 @@ export default function SaleDeleteButton({ sale, selectedCompanyId, onDeleted })
         open={open}
         onClose={() => setOpen(false)}
         itemType="venda"
-        onSuccess={async () => {
+        onSuccess={async (password) => {
           try {
-            await deleteSaleFinancials(base44, {
+            await deleteProtectedRecord({
+              kind: "sale",
               id: sale.id,
-              reference: sale.reference,
+              password,
               company_id: sale.company_id || selectedCompanyId,
             });
-            await base44.entities.Sale.delete(sale.id);
             toast.success("Venda excluída e caixa estornado.");
             onDeleted?.();
           } catch (err) {
