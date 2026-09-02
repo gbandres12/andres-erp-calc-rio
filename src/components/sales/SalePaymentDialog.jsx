@@ -12,7 +12,7 @@ import PaymentReceipt from "@/components/receipts/PaymentReceipt";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import BranchBadge from "@/components/BranchBadge";
-import { createPaidTransaction } from "@/utils/saleFinance";
+import { createPaidTransaction, reconcileSaleInstallments } from "@/utils/saleFinance";
 
 const getTodayDate = () => new Date().toISOString().split("T")[0];
 
@@ -123,6 +123,9 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
         status: newRem <= 0.01 ? "concluida" : sale.status,
         discount: (sale.discount || 0) + totalAbatimento
       });
+
+      // Quitar parcelas cobertas pelos pagamentos registrados
+      await reconcileSaleInstallments(base44, sale.id, saleTotal - newRem);
 
       await base44.functions.invoke("recalculateBalance", { company_id: sale.company_id });
 

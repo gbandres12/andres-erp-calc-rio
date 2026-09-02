@@ -69,10 +69,35 @@ async function deleteSalePayment(svc, paymentId) {
       status,
       discount: newDiscount,
     });
+    await reconcileInstallments(svc, sale.id, Number(sale.total || 0) - newRem);
   }
 
   if (companyId) await recalc(svc, companyId);
   return { kind: 'sale_payment', id: paymentId, company_id: companyId };
+}
+
+// Quita/reabre as parcelas da venda conforme o total pago (cobertura sequencial)
+async function reconcileInstallments(svc, saleId, paidTotal) {
+  const insts = await svc.entities.SaleInstallment.filter({ sale_id: saleId });
+  if (!insts || !insts.length) return;
+  const sorted = [...insts].sort((a, b) => (a.installment_number || 0) - (b.installment_number || 0));
+  const today = new Date().toISOString().split('T')[0];
+  let budget = Number(paidTotal || 0);
+  for (const inst of sorted) {
+    const amt = Number(inst.amount || 0);
+    if (budget + 0.01 >= amt) {
+      budget -= amt;
+      if (inst.status !== 'pago' || !inst.payment_date) {
+        await svc.entities.SaleInstallment.update(inst.id, {
+          status: 'pago',
+          paid_amount: amt,
+          payment_date: inst.payment_date || today,
+        });
+      }
+    } else if (inst.status === 'pago') {
+      await svc.entities.SaleInstallment.update(inst.id, { status: 'pendente', paid_amount: 0, payment_date: null });
+    }
+  }
 }
 
 async function deleteTransactionPayment(svc, paymentId) {

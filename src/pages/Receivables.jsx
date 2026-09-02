@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import BranchBadge from "@/components/BranchBadge";
+import { mirrorReceivingToSale } from "@/utils/saleFinance";
 
 export default function Receivables() {
   const queryClient = useQueryClient();
@@ -165,10 +166,23 @@ export default function Receivables() {
         account_id: accountId || transaction.account_id
       });
 
+      // Espelha na venda vinculada (se for um "Saldo a Receber" de venda)
+      const mirror = await mirrorReceivingToSale(base44, {
+        transaction,
+        companyId: selectedCompanyId,
+        amount,
+        discount: abatimento,
+        date,
+        accountId,
+        paymentMethod,
+        notes
+      });
+
       // Create Payment Record
       const account = accounts.find(a => a.id === accountId);
       const user = await base44.auth.me();
 
+      const baseNotes = abatimento > 0 ? `Abatimento: ${formatBRL(abatimento)}${notes ? ' | ' + notes : ''}` : notes;
       await base44.entities.TransactionPayment.create({
         transaction_id: id,
         transaction_reference: transaction.description,
@@ -179,18 +193,19 @@ export default function Receivables() {
         account_name: account?.name || '',
         payment_method: paymentMethod,
         responsible: user?.full_name || user?.email,
-        notes: abatimento > 0 ? `Abatimento: ${formatBRL(abatimento)}${notes ? ' | ' + notes : ''}` : notes,
+        notes: mirror ? `${baseNotes} | sale_id:${mirror.saleId}` : baseNotes,
         company_id: selectedCompanyId
       });
 
       // O saldo da conta é recalculado pelo recalculateBalance (source of truth)
-      return { newStatus, remaining };
+      return { newStatus, remaining, mirror };
     },
-    onSuccess: ({ newStatus, remaining }) => {
+    onSuccess: ({ newStatus, remaining, mirror }) => {
       base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       queryClient.invalidateQueries(['receivables']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
+      queryClient.invalidateQueries(['sales']);
       setIsReceiveOpen(false);
       setSelectedTransaction(null);
       setPaymentForm({
@@ -202,6 +217,7 @@ export default function Receivables() {
         notes: ""
       });
       toast.success(newStatus === 'pago' ? "Recebimento concluído!" : `Recebimento parcial registrado. Restante: ${formatBRL(remaining)}`);
+      if (mirror) toast.info(`Venda ${mirror.saleRef} atualizada para ${mirror.paymentStatus}.`);
     },
     onError: (err) => toast.error("Erro ao registrar recebimento: " + err.message)
   });

@@ -19,6 +19,7 @@ import TransactionFormDialog from "@/components/transactions/TransactionFormDial
 import QuickEntryDialog from "@/components/transactions/QuickEntryDialog";
 import ReceivePayDialog from "@/components/transactions/ReceivePayDialog";
 import TransactionRow from "@/components/transactions/TransactionRow";
+import { mirrorReceivingToSale } from "@/utils/saleFinance";
 
 export default function Transactions() {
   const queryClient = useQueryClient();
@@ -242,17 +243,31 @@ export default function Transactions() {
         company_id: selectedCompanyId
       });
 
+      // Espelha na venda vinculada (se for um "Saldo a Receber" de venda)
+      const mirror = await mirrorReceivingToSale(base44, {
+        transaction,
+        companyId: selectedCompanyId,
+        amount,
+        discount: discount || 0,
+        date,
+        accountId,
+        paymentMethod: paymentMethod || 'dinheiro',
+        notes
+      });
+
       await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
-      return { transaction, newStatus, newPaidAmount, remainingAmount };
+      return { transaction, newStatus, newPaidAmount, remainingAmount, mirror };
     },
-    onSuccess: ({ newStatus, remainingAmount }) => {
+    onSuccess: ({ newStatus, remainingAmount, mirror }) => {
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['payment-history']);
       queryClient.invalidateQueries(['transaction-payments']);
+      queryClient.invalidateQueries(['sales']);
       setIsReceivePayOpen(false);
       setSelectedTransaction(null);
       if (newStatus === 'pago') toast.success("✅ Pagamento registrado e transação concluída!");
+      if (mirror) toast.info(`Venda ${mirror.saleRef} atualizada para ${mirror.paymentStatus}.`);
       else toast.success(`💰 Abatimento registrado! Saldo restante: ${formatBRL(remainingAmount)}`);
     },
     onError: (error) => toast.error("Erro ao registrar pagamento: " + error.message)

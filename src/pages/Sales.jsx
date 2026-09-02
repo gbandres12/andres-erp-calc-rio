@@ -28,6 +28,7 @@ import SaleCancelDialog from "@/components/sales/SaleCancelDialog";
 import SaleAdjustDialog from "@/components/sales/SaleAdjustDialog";
 import SaleDeleteButton from "@/components/sales/SaleDeleteButton";
 import BranchBadge from "@/components/BranchBadge";
+import { createPaidTransaction, reconcileSaleInstallments } from "@/utils/saleFinance";
 
 export default function Sales() {
   const queryClient = useQueryClient();
@@ -251,7 +252,7 @@ export default function Sales() {
         // Se a venda foi quitada na entrada, faturar automaticamente
         // e criar a Transaction para o valor entrar no caixa
         if (paymentStatus === 'pago') {
-          await base44.entities.Transaction.create({
+          await createPaidTransaction(base44, {
             description: `${newRef} - Entrada - ${data.client_name}`,
             amount: paidAmount,
             type: 'receita',
@@ -265,7 +266,7 @@ export default function Sales() {
             company_id: selectedCompanyId,
             paid_amount: paidAmount,
             notes: `entrada:${salePayment.id}`
-          });
+          }, { sale_id: sale.id, payment_method: data.payment_method });
         }
       }
 
@@ -390,9 +391,9 @@ export default function Sales() {
       if (entradaJaPaga > 0 && existingPayments.length > 0) {
         for (const ep of existingPayments) {
           // Idempotência: verificar se Transaction já foi criada para este pagamento
-          const existing = await base44.entities.Transaction.filter({ notes: `entrada:${ep.id}` });
-          if (existing.length > 0) continue;
-          await base44.entities.Transaction.create({
+          const existing = await base44.entities.Transaction.filter({ company_id: selectedCompanyId }, undefined, 10000);
+          if (existing.some(t => (t.notes || '').includes(`entrada:${ep.id}`))) continue;
+          await createPaidTransaction(base44, {
             description: `${sale.reference} - Entrada - ${sale.client_name}`,
             amount: ep.amount,
             type: 'receita',
@@ -406,7 +407,7 @@ export default function Sales() {
             company_id: selectedCompanyId,
             paid_amount: ep.amount,
             notes: `entrada:${ep.id}`
-          });
+          }, { sale_id: sale.id, payment_method: ep.payment_method || 'dinheiro' });
         }
       }
 
@@ -425,7 +426,7 @@ export default function Sales() {
       totalPaidNow = 0;
       for (const payment of payments) {
         if (payment.amount > 0) {
-          await base44.entities.Transaction.create({
+          await createPaidTransaction(base44, {
             description: `${sale.reference} - ${payment.description || 'Pagamento'} - ${sale.client_name}`,
             amount: payment.amount,
             type: 'receita',
@@ -439,7 +440,7 @@ export default function Sales() {
             company_id: selectedCompanyId,
             paid_amount: payment.amount,
             notes: `Venda: ${sale.reference} - ${payment.payment_method}`
-          });
+          }, { sale_id: sale.id, payment_method: payment.payment_method });
 
           await base44.entities.SalePayment.create({
             sale_id: sale.id,
@@ -472,7 +473,7 @@ export default function Sales() {
           contact_name: sale.client_name,
           company_id: selectedCompanyId,
           paid_amount: 0,
-          notes: `Venda: ${sale.reference}`
+          notes: `Venda: ${sale.reference} | sale_id:${sale.id}`
         });
       }
 
@@ -486,6 +487,9 @@ export default function Sales() {
         remaining_amount: Math.max(0, newRemainingAmount),
         payment_status: paymentStatus
       });
+
+      // Quitar parcelas cobertas pelos pagamentos registrados
+      await reconcileSaleInstallments(base44, sale.id, (sale.total || 0) - Math.max(0, newRemainingAmount));
 
       return sale;
     },
