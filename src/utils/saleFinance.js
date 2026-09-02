@@ -6,7 +6,13 @@ export async function deleteLinkedPayments(base44, transactionId) {
 }
 
 export async function createPaidTransaction(base44, payload, extras = {}) {
-  const tx = await base44.entities.Transaction.create(payload);
+  // Tag do ID da venda em notes: permite que a exclusão da venda apague
+  // apenas os lançamentos dela, mesmo quando há referências duplicadas.
+  const saleTag = extras.sale_id ? ` | sale_id:${extras.sale_id}` : "";
+  const tx = await base44.entities.Transaction.create({
+    ...payload,
+    notes: `${payload.notes || ""}${saleTag}`,
+  });
   const amount = Number(payload.paid_amount || payload.amount || 0);
   if (payload.status === "pago" && payload.account_id && amount > 0) {
     await base44.entities.TransactionPayment.create({

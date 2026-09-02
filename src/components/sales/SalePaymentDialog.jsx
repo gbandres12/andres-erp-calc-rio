@@ -105,7 +105,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           company_id: sale.company_id,
           paid_amount: amt,
           notes: `Venda: ${sale.reference}${disc > 0 ? ` | Abatimento: ${formatBRL(disc)}` : ""}`
-        }, { payment_method: p.payment_method });
+        }, { payment_method: p.payment_method, sale_id: sale.id });
 
         createdPayments.push({ ...salePayment, amount: amt, payment_date: p.date, payment_method: p.payment_method, notes: p.description });
       }

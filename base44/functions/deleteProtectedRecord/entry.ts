@@ -36,12 +36,14 @@ async function deleteSalePayment(svc, paymentId) {
 
   const txs = await svc.entities.Transaction.filter({ company_id: companyId, type: 'receita' }, undefined, 2000);
   const ref = sale?.reference || payment.sale_reference || '';
+  const refIsUnique = await isRefUnique(svc, companyId, ref, payment.sale_id);
   const matches = (txs || []).filter((t) => {
     const blob = `${t.description || ''} ${t.notes || ''}`;
     const hasRef = ref && blob.includes(ref);
     const sameAmt = near(t.paid_amount || t.amount, payment.amount);
     const notesLink = (t.notes || '').includes(payment.id);
-    return notesLink || (hasRef && sameAmt);
+    const idTagged = payment.sale_id && blob.includes(`sale_id:${payment.sale_id}`);
+    return notesLink || idTagged || (hasRef && sameAmt && refIsUnique);
   });
   for (const t of matches) {
     await deleteTxCascade(svc, t.id);
@@ -106,16 +108,30 @@ async function deleteTransaction(svc, id) {
   return { kind: 'transaction', id, company_id: tx.company_id };
 }
 
+// Referências de venda podem se duplicar (vendas históricas). Casar
+// transações por texto da referência é inseguro nesse caso: apaga
+// lançamentos financeiros de OUTRA venda com a mesma referência.
+// Quando a referência não é única na filial, só apagamos lançamentos
+// marcados com o ID desta venda (tag "sale_id:<id>" em notes).
+async function isRefUnique(svc, companyId, ref, saleId) {
+  if (!ref) return false;
+  const salesWithRef = await svc.entities.Sale.filter({ company_id: companyId, reference: ref });
+  return !(salesWithRef || []).some((s) => s.id !== saleId);
+}
+
 async function deleteSale(svc, id) {
   const sale = await svc.entities.Sale.get(id);
   if (!sale) throw Object.assign(new Error('Venda não encontrada'), { status: 404 });
   const companyId = sale.company_id;
   const ref = sale.reference || '';
+  const refIsUnique = await isRefUnique(svc, companyId, ref, id);
 
   const txs = await svc.entities.Transaction.filter({ company_id: companyId }, undefined, 10000);
   for (const t of txs || []) {
     const blob = `${t.description || ''} ${t.notes || ''}`;
-    if (ref && blob.includes(ref)) await deleteTxCascade(svc, t.id);
+    const idTagged = blob.includes(`sale_id:${id}`);
+    const refMatch = ref && blob.includes(ref);
+    if (idTagged || (refMatch && refIsUnique)) await deleteTxCascade(svc, t.id);
   }
 
   const pays = await svc.entities.SalePayment.filter({ sale_id: id });
