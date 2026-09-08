@@ -42,7 +42,7 @@ export default function DailyFinancialReport() {
   // pagamentos em dias diferentes aparecem em cada dia correto.
   // Lançamentos antigos sem registro de pagamento (legado) entram pela data da
   // transação, para não perder histórico.
-  const ABATIMENTO_CATEGORIES = ["Abatimentos", "Devoluções / Abatimentos"];
+  const ABATIMENTO_CATEGORIES = ["Abatimentos", "Devoluções / Abatimentos", "Abatimentos Vendas"];
   const isAbatimentoTx = (t) =>
     ABATIMENTO_CATEGORIES.includes(t.category) ||
     (t.description || "").toLowerCase().includes("abatimento");
@@ -77,14 +77,32 @@ export default function DailyFinancialReport() {
       })
       .forEach((p) => {
         const tx = txMap.get(p.transaction_id);
-        list.push({
-          id: p.id,
-          description: tx.description,
-          category: tx.category,
-          type: tx.type,
-          value: p.amount || 0,
-          isAbatimento: isAbatimentoTx(tx),
-        });
+        const txIsAbatimento = isAbatimentoTx(tx);
+        if ((p.amount || 0) > 0) {
+          list.push({
+            id: p.id,
+            description: tx.description,
+            category: tx.category,
+            type: tx.type,
+            value: p.amount,
+            isAbatimento: txIsAbatimento,
+          });
+        }
+        // Abatimento fracionado embutido no pagamento (venda faturada ou
+        // compra alta quitada em partes): o dinheiro real entra em
+        // Entradas/Saídas e o abatimento aparece na seção de Abatimentos,
+        // no mesmo dia do pagamento.
+        const disc = Number(p.discount || 0);
+        if (!txIsAbatimento && disc > 0) {
+          list.push({
+            id: `${p.id}-abat`,
+            description: `${tx.description} (abatimento)`,
+            category: tx.category,
+            type: tx.type,
+            value: disc,
+            isAbatimento: true,
+          });
+        }
       });
 
     transactions
@@ -100,6 +118,18 @@ export default function DailyFinancialReport() {
           value: t.paid_amount || t.amount || 0,
           isAbatimento: isAbatimentoTx(t),
         });
+        // Abatimento acumulado em lançamento legado (sem pagamentos
+        // granulares registrados): aparece como abatimento do dia.
+        if (!isAbatimentoTx(t) && Number(t.discount || 0) > 0) {
+          list.push({
+            id: `legacy-${t.id}-abat`,
+            description: `${t.description} (abatimento)`,
+            category: t.category,
+            type: t.type,
+            value: Number(t.discount),
+            isAbatimento: true,
+          });
+        }
       });
 
     return list.sort((a, b) => a.description.localeCompare(b.description, "pt-BR"));
