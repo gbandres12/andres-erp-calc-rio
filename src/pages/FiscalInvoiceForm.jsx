@@ -293,6 +293,7 @@ export default function FiscalInvoiceForm() {
           logradouro = parts[0];
         }
       }
+      const contactUf = (contact.state || "").toUpperCase();
       setForm(prev => ({
         ...prev,
         recipient_id: contact.id,
@@ -304,9 +305,19 @@ export default function FiscalInvoiceForm() {
           numero: numero || "S/N",
           bairro,
           municipio: contact.city || "",
-          uf: contact.state || "",
+          uf: contactUf,
           cep: contact.zip_code || ""
-        }
+        },
+        // Ajusta o CFOP dos itens conforme a UF do destinatário (interna x interestadual)
+        items: prev.items.map(item => {
+          const product = products.find(p => p.id === item.product_id);
+          if (!product) return item;
+          if (prev.operation_type === "devolucao") return { ...item, cfop: devolucaoCfopFor(product, config, contactUf) };
+          const cfop = (!contactUf || !config?.uf || contactUf === config.uf
+            ? product.cfop_internal
+            : product.cfop_interstate) || product.cfop || "";
+          return cfop ? { ...item, cfop } : item;
+        })
       }));
     }
   };
@@ -521,7 +532,25 @@ export default function FiscalInvoiceForm() {
                     <Input value={item.product_name} readOnly className="h-9 text-sm bg-slate-50" />
                   </td>
                   <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-9 text-sm" placeholder="00000000" /></td>
-                  <td className="px-3 py-2"><Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-9 text-sm" /></td>
+                  <td className="px-3 py-2">
+                    <Input value={item.cfop} onChange={e => updateItem(idx, "cfop", e.target.value)} className="h-9 text-sm font-mono" placeholder="0000" />
+                    {form.operation_type !== "devolucao" && (() => {
+                      const product = products.find(p => p.id === item.product_id);
+                      const options = [product?.cfop_internal, product?.cfop_interstate].filter(Boolean).filter(v => v !== item.cfop);
+                      if (!options.length) return null;
+                      return (
+                        <div className="flex gap-1 mt-1">
+                          {options.map(v => (
+                            <button key={v} type="button" title={`Usar CFOP ${v}`}
+                              onClick={() => updateItem(idx, "cfop", v)}
+                              className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-200 text-slate-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700">
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2"><Input value={(config?.crt === 1 ? item.csosn : item.cst) || ""} readOnly className="h-9 text-sm bg-slate-50" placeholder={config?.crt === 1 ? "CSOSN" : "CST"} /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-9 text-sm text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-9 text-sm text-right" /></td>

@@ -141,10 +141,12 @@ function validateProduct(product, config, invoice, index) {
   if (!product.accountant_approved || !product.fiscal_review_date) return `Produto ${product.name} sem aprovação fiscal do contador`;
   if (!product.fiscal_description) return `Descrição fiscal ausente no produto ${product.name}`;
   if (!/^\d{8}$/.test(String(product.ncm || '').replace(/\D/g, ''))) return `NCM inválido no produto ${product.name}`;
-  const internal = config.uf === invoice.recipient_address?.uf;
   if (invoice.operation_type !== 'devolucao') {
-    const cfop = internal ? product.cfop_internal : product.cfop_interstate;
-    if (!/^\d{4}$/.test(String(cfop || '').replace(/\D/g, ''))) return `CFOP ${internal ? 'interno' : 'interestadual'} inválido no produto ${product.name}`;
+    const cfop = effectiveCfop(invoice.items[index], product, config, invoice);
+    if (!/^\d{4}$/.test(cfop)) {
+      const internal = config.uf === invoice.recipient_address?.uf;
+      return `CFOP ${internal ? 'interno' : 'interestadual'} inválido no produto ${product.name}: informe o CFOP na nota ou configure o cadastro do produto`;
+    }
   }
   if (!product.tax_classification) return `Classificação fiscal ausente no produto ${product.name}`;
   const crt = Number(config.crt);
@@ -180,8 +182,17 @@ function devolucaoCfop(item, product, config, invoice) {
   return producaoPropria ? '2201' : '2202';
 }
 
-function snapshotItem(item, product, config, invoice) {
+// CFOP de venda: o CFOP informado no item da nota prevalece (permite trocar o
+// CFOP na emissão, ex. venda interestadual); sem CFOP válido, usa o cadastro
+// do produto conforme a UF do destinatário.
+function effectiveCfop(item, product, config, invoice) {
+  const provided = String(item?.cfop || '').replace(/\D/g, '');
+  if (/^\d{4}$/.test(provided)) return provided;
   const internal = config.uf === invoice.recipient_address?.uf;
+  return String((internal ? product.cfop_internal : product.cfop_interstate) || product.cfop || '').replace(/\D/g, '');
+}
+
+function snapshotItem(item, product, config, invoice) {
   const quantity = Number(item.quantity);
   const unitPrice = Number(item.unit_price);
   const discount = Number(item.discount || 0);
@@ -197,7 +208,7 @@ function snapshotItem(item, product, config, invoice) {
     cest: product.cest || '',
     cfop: invoice.operation_type === 'devolucao'
       ? devolucaoCfop(item, product, config, invoice)
-      : String(internal ? product.cfop_internal : product.cfop_interstate).replace(/\D/g, ''),
+      : effectiveCfop(item, product, config, invoice),
     unit: product.unit,
     tax_classification: product.tax_classification,
     cst: crt === 1 ? '' : product.icms_cst,
