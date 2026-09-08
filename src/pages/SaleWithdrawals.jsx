@@ -27,10 +27,12 @@ import {
   Clock
 } from "lucide-react";
 import { format } from "date-fns";
+import RegisterWithdrawalDialog from "@/components/sales/RegisterWithdrawalDialog";
 
 export default function SaleWithdrawals() {
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [searchTerm, setSearchTerm] = useState("");
+  const [withdrawTarget, setWithdrawTarget] = useState(null);
 
   // Buscar vendas para calcular totais e pendências
   const { data: sales = [] } = useQuery({
@@ -246,7 +248,8 @@ export default function SaleWithdrawals() {
                         <TableHead className="text-right">Qtd. Vendida</TableHead>
                         <TableHead className="text-right">Qtd. Entregue</TableHead>
                         <TableHead className="text-right">Saldo</TableHead>
-                      </TableRow>
+                        <TableHead className="text-right">Ação</TableHead>
+                        </TableRow>
                     </TableHeader>
                     <TableBody>
                       {client.sales.map((sale) => (
@@ -271,6 +274,15 @@ export default function SaleWithdrawals() {
                             </TableCell>
                             <TableCell className="text-right font-bold text-red-600 bg-red-50/30">
                               {(item.quantity - (item.quantity_withdrawn || 0)).toFixed(2)} {item.unit}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                onClick={() => setWithdrawTarget({ sale, item })}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                              >
+                                Registrar Retirada
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -340,6 +352,13 @@ export default function SaleWithdrawals() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <RegisterWithdrawalDialog
+        open={!!withdrawTarget}
+        onOpenChange={(o) => { if (!o) setWithdrawTarget(null); }}
+        sale={withdrawTarget?.sale}
+        item={withdrawTarget?.item}
+      />
     </div>
   );
 }

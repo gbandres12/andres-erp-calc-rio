@@ -1,5 +1,16 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+// Serializa recálculos simultâneos por empresa: chamadas concorrentes
+// esperam a anterior terminar antes de rodar, evitando saldos calculados
+// com dados parcialmente gravados.
+const locks = new Map();
+async function withCompanyLock(key, fn) {
+    const prev = locks.get(key) || Promise.resolve();
+    const task = prev.then(fn, fn);
+    locks.set(key, task.catch(() => {}));
+    return task;
+}
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -15,6 +26,8 @@ Deno.serve(async (req) => {
         if (!company_id) {
              return Response.json({ error: 'Company ID required' }, { status: 400 });
         }
+
+        return withCompanyLock(`recalc:${company_id}`, async () => {
 
         // Se account_id for fornecido, recalcula só aquela conta.
         // Se não, recalcula todas as contas da empresa.
@@ -98,6 +111,8 @@ Deno.serve(async (req) => {
             success: true,
             message: `Recalculated ${results.length} accounts`,
             results
+        });
+
         });
 
     } catch (error) {

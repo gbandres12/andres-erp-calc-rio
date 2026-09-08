@@ -12,6 +12,7 @@ import { Scale, Plus, TruckIcon, Printer, CheckCircle, RefreshCw } from "lucide-
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import WeighingTicket from "@/components/weighing/WeighingTicket";
+import { applyWithdrawal } from "@/utils/saleWithdrawal";
 import BranchBadge from "@/components/BranchBadge";
 
 export default function Weighing() {
@@ -168,7 +169,7 @@ export default function Weighing() {
       
       const clientName = data.client_id ? contacts.find(c => c.id === data.client_id)?.name || '' : '';
 
-      return base44.entities.Weighing.create({
+      const created = await base44.entities.Weighing.create({
         ...data,
         reference: newRef,
         ticket_number: ticket,
@@ -181,13 +182,42 @@ export default function Weighing() {
         gross_datetime: data.exit_time || new Date().toISOString(),
         status: data.gross > 0 ? 'concluida' : 'aguardando_bruto'
       });
+
+      // Baixa automática na venda quando a pesagem é de saída vinculada
+      let withdrawal = null;
+      let withdrawalError = null;
+      if (data.purpose === 'saida_venda' && data.sale_id && net > 0) {
+        try {
+          withdrawal = await applyWithdrawal(base44, {
+            saleId: data.sale_id,
+            productName: data.product,
+            quantityKg: net,
+            withdrawalDate: created.gross_datetime,
+            responsible: data.operator,
+            vehiclePlate: plateToUse.toUpperCase(),
+            weighingId: created.id,
+            notes: `Retirada automática via pesagem ${created.reference}`
+          });
+        } catch (e) {
+          withdrawalError = e.message;
+          console.error("Falha ao dar baixa na retirada:", e);
+        }
+      }
+      return { weighing: created, withdrawal, withdrawalError };
     },
-    onSuccess: () => {
+    onSuccess: ({ withdrawal, withdrawalError }) => {
       queryClient.invalidateQueries(['weighings']);
+      queryClient.invalidateQueries(['sales']);
       setIsDialogOpen(false);
       resetForm();
       toast.success("Pesagem registrada com sucesso!");
-    }
+      if (withdrawal) {
+        toast.info(`Retirada aplicada na venda ${withdrawal.saleRef} (${withdrawal.withdrawal_status === 'total' ? 'retirada total' : 'retirada parcial'}).`);
+      } else if (withdrawalError) {
+        toast.warning(`A pesagem foi registrada, mas a baixa na venda falhou: ${withdrawalError}. Registre a retirada em Saídas e Retiradas.`);
+      }
+    },
+    onError: (err) => toast.error("Erro ao registrar pesagem: " + err.message)
   });
 
   const updateMutation = useMutation({
@@ -235,6 +265,10 @@ export default function Weighing() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (formData.tare > 0 && formData.gross > 0 && (formData.gross - formData.tare) <= 0) {
+      toast.error("Peso bruto deve ser maior que a tara.");
+      return;
+    }
     createMutation.mutate(formData);
   };
 

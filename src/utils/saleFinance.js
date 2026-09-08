@@ -118,9 +118,18 @@ export async function mirrorReceivingToSale(base44, { transaction, companyId, am
 export async function deleteSaleFinancials(base44, sale) {
   const companyId = sale.company_id;
   const allTx = await base44.entities.Transaction.filter({ company_id: companyId }, undefined, 10000);
-  const saleTx = allTx.filter(
-    (t) => t.notes?.includes(sale.reference) || t.description?.includes(sale.reference)
-  );
+  // Vínculo exato: prioriza a tag sale_id (à prova de referências duplicadas).
+  // A referência só é usada como fallback quando é única na filial e o
+  // lançamento não pertence a outra venda (nenhuma tag presente).
+  const allSales = await base44.entities.Sale.filter({ company_id: companyId }, undefined, 10000);
+  const refDuplicada = allSales.filter(s => s.reference === sale.reference).length > 1;
+  const saleTag = `sale_id:${sale.id}`;
+  const saleTx = allTx.filter(t => {
+    const notes = t.notes || "";
+    if (notes.includes(saleTag)) return true;
+    if (refDuplicada || /sale_id:/.test(notes)) return false;
+    return notes.includes(sale.reference) || (t.description || "").includes(sale.reference);
+  });
   for (const t of saleTx) {
     await deleteLinkedPayments(base44, t.id);
     await base44.entities.Transaction.delete(t.id);

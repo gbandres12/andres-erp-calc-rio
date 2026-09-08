@@ -148,57 +148,79 @@ export default function Receivables() {
       const transaction = receivables.find(t => t.id === id);
       if (!transaction) throw new Error("Transação não encontrada");
 
-      const abatimento = parseFloat(discount) || 0;
-      const currentPaid = transaction.paid_amount || 0;
-      let newPaid = currentPaid + amount;
-      const newDiscountTotal = (transaction.discount || 0) + abatimento;
-      if (newPaid > transaction.amount - newDiscountTotal) newPaid = transaction.amount - newDiscountTotal;
+      // Validações antes de gravar qualquer coisa
+      const valorRecebido = Number(amount) || 0;
+      const abatimento = Number(discount) || 0;
+      const saldoRestante = transaction.amount - (transaction.paid_amount || 0) - (transaction.discount || 0);
+      if (valorRecebido <= 0 && abatimento <= 0) throw new Error("Informe o valor recebido ou um abatimento");
+      if (valorRecebido > 0 && !accountId) throw new Error("Selecione a conta de destino do recebimento");
+      if (valorRecebido > saldoRestante + 0.005) throw new Error(`Valor recebido excede o saldo restante (${formatBRL(Math.max(0, saldoRestante))})`);
 
-      const remaining = transaction.amount - newPaid - newDiscountTotal;
-      let newStatus = remaining <= 0.005 ? 'pago' : 'parcial';
-
-      // Update Transaction
-      await base44.entities.Transaction.update(id, {
-        paid_amount: newPaid,
-        discount: newDiscountTotal,
-        status: newStatus,
-        payment_date: newStatus === 'pago' ? date : transaction.payment_date,
-        account_id: accountId || transaction.account_id
-      });
-
-      // Espelha na venda vinculada (se for um "Saldo a Receber" de venda)
-      const mirror = await mirrorReceivingToSale(base44, {
-        transaction,
-        companyId: selectedCompanyId,
-        amount,
-        discount: abatimento,
-        date,
-        accountId,
-        paymentMethod,
-        notes
-      });
-
-      // Create Payment Record
+      const prevPaid = transaction.paid_amount || 0;
+      const prevDiscount = transaction.discount || 0;
       const account = accounts.find(a => a.id === accountId);
       const user = await base44.auth.me();
-
       const baseNotes = abatimento > 0 ? `Abatimento: ${formatBRL(abatimento)}${notes ? ' | ' + notes : ''}` : notes;
-      await base44.entities.TransactionPayment.create({
-        transaction_id: id,
-        transaction_reference: transaction.description,
-        amount: amount,
-        discount: abatimento,
-        payment_date: date,
-        account_id: accountId,
-        account_name: account?.name || '',
-        payment_method: paymentMethod,
-        responsible: user?.full_name || user?.email,
-        notes: mirror ? `${baseNotes} | sale_id:${mirror.saleId}` : baseNotes,
-        company_id: selectedCompanyId
-      });
 
-      // O saldo da conta é recalculado pelo recalculateBalance (source of truth)
-      return { newStatus, remaining, mirror };
+      let paymentId = null;
+      try {
+        // 1) Pagamento granular primeiro (fonte da verdade do caixa)
+        paymentId = (await base44.entities.TransactionPayment.create({
+          transaction_id: id,
+          transaction_reference: transaction.description,
+          amount: valorRecebido,
+          discount: abatimento,
+          payment_date: date,
+          account_id: accountId,
+          account_name: account?.name || '',
+          payment_method: paymentMethod,
+          responsible: user?.full_name || user?.email,
+          notes: baseNotes,
+          company_id: selectedCompanyId
+        })).id;
+
+        // 2) Atualiza a transação
+        let newPaid = prevPaid + valorRecebido;
+        const newDiscountTotal = prevDiscount + abatimento;
+        if (newPaid > transaction.amount - newDiscountTotal) newPaid = transaction.amount - newDiscountTotal;
+        const remaining = transaction.amount - newPaid - newDiscountTotal;
+        const newStatus = remaining <= 0.005 ? 'pago' : 'parcial';
+        await base44.entities.Transaction.update(id, {
+          paid_amount: newPaid,
+          discount: newDiscountTotal,
+          status: newStatus,
+          payment_date: newStatus === 'pago' ? date : transaction.payment_date,
+          account_id: accountId || transaction.account_id
+        });
+
+        // 3) Espelha na venda vinculada (se for um "Saldo a Receber" de venda)
+        const mirror = await mirrorReceivingToSale(base44, {
+          transaction,
+          companyId: selectedCompanyId,
+          amount: valorRecebido,
+          discount: abatimento,
+          date,
+          accountId,
+          paymentMethod,
+          notes
+        });
+        if (mirror && paymentId) {
+          await base44.entities.TransactionPayment.update(paymentId, { notes: `${baseNotes} | sale_id:${mirror.saleId}` });
+        }
+
+        // O saldo da conta é recalculado pelo recalculateBalance (source of truth)
+        return { newStatus, remaining, mirror };
+      } catch (error) {
+        // Reverte o que já foi gravado para não deixar o caixa inconsistente
+        if (paymentId) await base44.entities.TransactionPayment.delete(paymentId).catch(() => {});
+        await base44.entities.Transaction.update(id, {
+          paid_amount: prevPaid,
+          discount: prevDiscount,
+          status: transaction.status,
+          payment_date: transaction.payment_date
+        }).catch(() => {});
+        throw error;
+      }
     },
     onSuccess: ({ newStatus, remaining, mirror }) => {
       base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
@@ -364,6 +386,11 @@ export default function Receivables() {
       pending: filteredReceivables.reduce((acc, t) => acc + (t.amount - (t.paid_amount || 0) - (t.discount || 0)), 0)
     };
   }, [filteredReceivables]);
+
+  const receiveAmount = Number(paymentForm.amount) || 0;
+  const receiveDiscount = Number(paymentForm.discount) || 0;
+  const receiveInvalid = receiveAmount <= 0 && receiveDiscount <= 0;
+  const receiveMissingAccount = receiveAmount > 0 && !paymentForm.account_id;
 
   const openReceiveDialog = (t) => {
     setSelectedTransaction(t);
@@ -710,7 +737,10 @@ export default function Receivables() {
                  </SelectContent>
                </Select>
              </div>
-             <Button className="w-full" onClick={() => receiveMutation.mutate({ ...paymentForm, id: selectedTransaction.id })} disabled={receiveMutation.isPending}>
+             <Button className="w-full" onClick={() => receiveMutation.mutate({ ...paymentForm, id: selectedTransaction.id })} disabled={receiveMutation.isPending || receiveInvalid || receiveMissingAccount}>
+                {receiveInvalid && "Informe o valor ou abatimento"}
+                {!receiveInvalid && receiveMissingAccount && "Selecione a conta de destino"}
+                {!receiveInvalid && !receiveMissingAccount && "Confirmar Recebimento"}
                {receiveMutation.isPending ? 'Processando...' : 'Confirmar Recebimento'}
              </Button>
           </div>
