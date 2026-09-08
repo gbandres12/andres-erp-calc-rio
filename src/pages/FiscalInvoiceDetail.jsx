@@ -11,6 +11,7 @@ import { emitFiscalInvoice } from "@/functions/emitFiscalInvoice";
 import { queryFiscalStatus } from "@/functions/queryFiscalStatus";
 import { cancelFiscalInvoice } from "@/functions/cancelFiscalInvoice";
 import { sendCorrectionLetter } from "@/functions/sendCorrectionLetter";
+import { downloadFiscalDocument } from "@/functions/downloadFiscalDocument";
 import { toast } from "sonner";
 import CancelFiscalDialog from "@/components/fiscal/CancelFiscalDialog";
 import CorrectionLetterDialog from "@/components/fiscal/CorrectionLetterDialog";
@@ -32,6 +33,32 @@ export default function FiscalInvoiceDetail() {
   const invoiceId = urlParams.get("id");
   const [showCancel, setShowCancel] = useState(false);
   const [showCorrection, setShowCorrection] = useState(false);
+  const [downloading, setDownloading] = useState(null); // 'xml' | 'danfe'
+
+  // XML/DANFE são baixados via servidor (os links da NotaAs exigem a chave de API)
+  const handleDownload = async (doc) => {
+    setDownloading(doc);
+    try {
+      const res = await downloadFiscalDocument({ invoice_id: invoiceId, doc });
+      if (res.data?.error) { toast.error(res.data.error); return; }
+      const binary = atob(res.data.data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: res.data.content_type }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = res.data.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`${res.data.filename} baixado`);
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.message || "Erro ao baixar documento");
+    } finally {
+      setDownloading(null);
+    }
+  };
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -202,15 +229,17 @@ export default function FiscalInvoiceDetail() {
         )}
         {invoice.status === "autorizada" && (
           <>
-            {invoice.xml_url && (
-              <Button variant="outline" asChild>
-                <a href={invoice.xml_url} target="_blank" rel="noreferrer"><Download className="w-4 h-4 mr-1" /> XML</a>
-              </Button>
-            )}
-            {invoice.pdf_url && (
-              <Button variant="outline" asChild>
-                <a href={invoice.pdf_url} target="_blank" rel="noreferrer"><ExternalLink className="w-4 h-4 mr-1" /> DANFE</a>
-              </Button>
+            {invoice.api_reference && (
+              <>
+                <Button variant="outline" onClick={() => handleDownload("xml")} disabled={downloading === "xml"}>
+                  {downloading === "xml" ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+                  Baixar XML
+                </Button>
+                <Button variant="outline" onClick={() => handleDownload("danfe")} disabled={downloading === "danfe"}>
+                  {downloading === "danfe" ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <ExternalLink className="w-4 h-4 mr-1" />}
+                  DANFE
+                </Button>
+              </>
             )}
             {invoice.document_type === "nfe" && (
               <>
