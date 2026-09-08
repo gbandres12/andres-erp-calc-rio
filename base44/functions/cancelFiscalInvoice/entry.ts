@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     let newStatus = invoice.status;
     let eventStatus = 'sucesso';
     let errorMsg = null;
+    let pending = false;
 
     if (response.ok && String(data.status || '').toLowerCase().includes('cancel')) {
       newStatus = 'cancelada';
@@ -51,6 +52,14 @@ Deno.serve(async (req) => {
         status: 'cancelada',
         cancel_reason: reason,
         cancel_date: new Date().toISOString()
+      });
+    } else if (response.ok) {
+      // HTTP 202 / enfileirado: o webhook nfe.cancelled finaliza o cancelamento
+      pending = true;
+      eventStatus = 'pendente';
+      await base44.asServiceRole.entities.FiscalInvoice.update(invoice_id, {
+        api_status: String(data.status || 'cancelamento_solicitado'),
+        last_status_check: new Date().toISOString()
       });
     } else {
       eventStatus = 'erro';
@@ -67,7 +76,7 @@ Deno.serve(async (req) => {
       triggered_by: user.id
     });
 
-    return Response.json({ success: newStatus === 'cancelada', status: newStatus, error: errorMsg });
+    return Response.json({ success: newStatus === 'cancelada' || pending, pending, status: newStatus, error: errorMsg });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

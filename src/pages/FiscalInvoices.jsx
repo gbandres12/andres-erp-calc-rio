@@ -150,6 +150,11 @@ export default function FiscalInvoices() {
                       <span className="text-xs font-medium text-violet-700 bg-violet-50 px-2 py-0.5 rounded">
                         {DOC_TYPES[inv.document_type] || inv.document_type}
                       </span>
+                      {inv.operation_type === "devolucao" && (
+                        <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                          Devolução
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-700">{inv.recipient_name || "—"}</td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(inv.issue_date)}</td>

@@ -48,6 +48,32 @@
       ],
       "default": "homologacao"
     },
+    "operation_type": {
+      "type": "string",
+      "enum": [
+        "venda",
+        "devolucao"
+      ],
+      "default": "venda",
+      "description": "Tipo da opera\u00e7\u00e3o: venda normal ou devolu\u00e7\u00e3o de mercadoria"
+    },
+    "referenced_access_key": {
+      "type": "string",
+      "description": "Chave de acesso (44 d\u00edgitos) da NF-e original referenciada em devolu\u00e7\u00f5es"
+    },
+    "referenced_invoice_id": {
+      "type": "string",
+      "description": "ID da nota original no sistema (devolu\u00e7\u00e3o)"
+    },
+    "correction_letter": {
+      "type": "string",
+      "description": "Texto da \u00faltima Carta de Corre\u00e7\u00e3o enviada \u00e0 SEFAZ"
+    },
+    "correction_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da \u00faltima Carta de Corre\u00e7\u00e3o enviada"
+    },
     "issue_date": {
       "type": "string",
       "format": "date"

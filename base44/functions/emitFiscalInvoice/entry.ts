@@ -124,6 +124,11 @@ function validateInvoice(invoice) {
   if (!invoice.recipient_name || !invoice.recipient_cpf_cnpj) return 'Informe o destinatário completo';
   if (!address.logradouro || !address.bairro || !address.municipio || !address.uf || !address.cep) return 'Complete o endereço do destinatário';
   if (!/^\d{7}$/.test(String(address.codigoMunicipio || ''))) return 'Código IBGE do destinatário inválido';
+  if (invoice.operation_type === 'devolucao') {
+    if (invoice.document_type !== 'nfe') return 'Nota de devolução deve ser NF-e (modelo 55)';
+    const key = String(invoice.referenced_access_key || '').replace(/\D/g, '');
+    if (key.length !== 44) return 'Informe a chave de acesso (44 dígitos) da NF-e original referenciada';
+  }
   if (!invoice.items?.length) return 'Adicione ao menos um item';
   if (!(Number(invoice.total) > 0)) return 'O total deve ser maior que zero';
   return null;
@@ -137,8 +142,10 @@ function validateProduct(product, config, invoice, index) {
   if (!product.fiscal_description) return `Descrição fiscal ausente no produto ${product.name}`;
   if (!/^\d{8}$/.test(String(product.ncm || '').replace(/\D/g, ''))) return `NCM inválido no produto ${product.name}`;
   const internal = config.uf === invoice.recipient_address?.uf;
-  const cfop = internal ? product.cfop_internal : product.cfop_interstate;
-  if (!/^\d{4}$/.test(String(cfop || '').replace(/\D/g, ''))) return `CFOP ${internal ? 'interno' : 'interestadual'} inválido no produto ${product.name}`;
+  if (invoice.operation_type !== 'devolucao') {
+    const cfop = internal ? product.cfop_internal : product.cfop_interstate;
+    if (!/^\d{4}$/.test(String(cfop || '').replace(/\D/g, ''))) return `CFOP ${internal ? 'interno' : 'interestadual'} inválido no produto ${product.name}`;
+  }
   if (!product.tax_classification) return `Classificação fiscal ausente no produto ${product.name}`;
   const crt = Number(config.crt);
   const code = crt === 1 ? product.icms_csosn : product.icms_cst;
@@ -164,6 +171,15 @@ function classificationMatches(classification, code, crt) {
   return (crt === 1 ? csosn : cst)[classification]?.includes(String(code)) || false;
 }
 
+function devolucaoCfop(item, product, config, invoice) {
+  const provided = String(item.cfop || '').replace(/\D/g, '');
+  if (/^\d{4}$/.test(provided)) return provided;
+  const internal = config.uf === invoice.recipient_address?.uf;
+  const producaoPropria = ['bruto', 'processado'].includes(product.material_type);
+  if (internal) return producaoPropria ? '1201' : '1202';
+  return producaoPropria ? '2201' : '2202';
+}
+
 function snapshotItem(item, product, config, invoice) {
   const internal = config.uf === invoice.recipient_address?.uf;
   const quantity = Number(item.quantity);
@@ -179,7 +195,9 @@ function snapshotItem(item, product, config, invoice) {
     product_code: product.code,
     ncm: String(product.ncm).replace(/\D/g, ''),
     cest: product.cest || '',
-    cfop: String(internal ? product.cfop_internal : product.cfop_interstate).replace(/\D/g, ''),
+    cfop: invoice.operation_type === 'devolucao'
+      ? devolucaoCfop(item, product, config, invoice)
+      : String(internal ? product.cfop_internal : product.cfop_interstate).replace(/\D/g, ''),
     unit: product.unit,
     tax_classification: product.tax_classification,
     cst: crt === 1 ? '' : product.icms_cst,
@@ -238,8 +256,11 @@ function buildPayload(invoice, config) {
     modelo: invoice.document_type === 'nfce' ? 65 : 55,
     naturezaOperacao: invoice.nature_operation,
     destinoOperacao: config.uf !== address.uf ? 2 : 1,
-    tipoOperacao: 1,
-    finalidade: 1,
+    tipoOperacao: invoice.operation_type === 'devolucao' ? 0 : 1,
+    finalidade: invoice.operation_type === 'devolucao' ? 4 : 1,
+    ...(invoice.operation_type === 'devolucao' && invoice.referenced_access_key
+      ? { nfesReferenciadas: [String(invoice.referenced_access_key).replace(/\D/g, '')] }
+      : {}),
     consumidorFinal: invoice.recipient_ie ? 0 : 1,
     presencaComprador: 1,
     dest,

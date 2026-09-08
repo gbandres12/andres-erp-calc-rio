@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
 import ContactCombobox from "@/components/fiscal/ContactCombobox";
 import TransportSection from "@/components/fiscal/TransportSection";
 import { fetchIbgeCode } from "@/components/fiscal/ibge";
+import useCepLookup from "@/hooks/useCepLookup";
 
 const PAYMENT_METHODS = [
   { value: "01", label: "Dinheiro" },
@@ -25,6 +26,13 @@ const PAYMENT_METHODS = [
 ];
 
 const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "", cst: "", csosn: "", unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
+
+// CFOP de devolução de venda: 1.201/2.201 produção própria, 1.202/2.202 adquirido de terceiros
+const devolucaoCfopFor = (product, config, uf) => {
+  const internal = !uf || !config?.uf || uf === config.uf;
+  const producaoPropria = ["bruto", "processado"].includes(product?.material_type);
+  return (internal ? "1" : "2") + (producaoPropria ? "201" : "202");
+};
 
 const fiscalSnapshot = (product, config, recipientUf) => {
   if (!product) return {};
@@ -59,6 +67,7 @@ export default function FiscalInvoiceForm() {
     document_type: "nfe",
     serie: "1",
     status: "rascunho",
+    operation_type: "venda",
     origin: saleId ? "from_sale" : "manual",
     ...(saleId ? { sale_id: saleId } : {}),
     issue_date: new Date().toISOString().split("T")[0],
@@ -106,6 +115,12 @@ export default function FiscalInvoiceForm() {
         if (!product) return item;
         return { ...item, ...fiscalSnapshot(product, config, draft.recipient_address?.uf) };
       });
+      if (draft.operation_type === "devolucao") {
+        draft.items = draft.items.map(item => {
+          const product = products.find(p => p.id === item.product_id);
+          return product ? { ...item, cfop: devolucaoCfopFor(product, config, draft.recipient_address?.uf) } : item;
+        });
+      }
     } else if (refreshedRef.current) {
       return; // já carregado e atualizado; não sobrescrever edições do usuário
     }
@@ -174,6 +189,42 @@ export default function FiscalInvoiceForm() {
 
   const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
+  const handleOperationTypeChange = (value) => {
+    setForm(prev => {
+      const items = value === "devolucao"
+        ? prev.items.map(item => {
+            const product = products.find(p => p.id === item.product_id);
+            return product ? { ...item, cfop: devolucaoCfopFor(product, config, prev.recipient_address?.uf) } : item;
+          })
+        : prev.items;
+      return {
+        ...prev,
+        operation_type: value,
+        document_type: value === "devolucao" ? "nfe" : prev.document_type,
+        items,
+        nature_operation: value === "devolucao" && (prev.nature_operation || "") === "Venda de produto" ? "Devolução de venda" : prev.nature_operation,
+        payment_method: value === "devolucao" ? "90" : prev.payment_method
+      };
+    });
+  };
+
+  // Busca automática de endereço via ViaCEP no CEP do destinatário
+  const { cepLoading, handleCepChange } = useCepLookup((data) => {
+    setForm(prev => {
+      const addr = prev.recipient_address || {};
+      return {
+        ...prev,
+        recipient_address: {
+          ...addr,
+          logradouro: data.logradouro || addr.logradouro || "",
+          bairro: data.bairro || addr.bairro || "",
+          municipio: data.localidade || addr.municipio || "",
+          uf: data.uf || addr.uf || ""
+        }
+      };
+    });
+  });
+
   const updateItem = (idx, field, value) => {
     setForm(prev => {
       const items = [...prev.items];
@@ -202,6 +253,9 @@ export default function FiscalInvoiceForm() {
         ...items[idx],
         ...fiscalSnapshot(product, config, prev.recipient_address?.uf)
       };
+      if (prev.operation_type === "devolucao") {
+        items[idx].cfop = devolucaoCfopFor(product, config, prev.recipient_address?.uf);
+      }
       return { ...prev, items };
     });
   };
@@ -286,7 +340,8 @@ export default function FiscalInvoiceForm() {
     onError: (e) => toast.error(e.message)
   });
 
-  const isValid = form.recipient_cpf_cnpj && form.items.length > 0 && form.total > 0;
+  const isValid = form.recipient_cpf_cnpj && form.items.length > 0 && form.total > 0
+    && (form.operation_type !== "devolucao" || (form.referenced_access_key || "").replace(/\D/g, "").length === 44);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -308,6 +363,16 @@ export default function FiscalInvoiceForm() {
 
       {/* Tipo e ambiente */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 grid md:grid-cols-3 gap-4">
+        <div className="space-y-1">
+          <Label>Tipo de Operação</Label>
+          <Select value={form.operation_type || "venda"} onValueChange={handleOperationTypeChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="venda">Venda</SelectItem>
+              <SelectItem value="devolucao">Devolução de venda</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1">
           <Label>Tipo de Documento</Label>
           <Select value={form.document_type} onValueChange={v => setField("document_type", v)}>
@@ -339,6 +404,21 @@ export default function FiscalInvoiceForm() {
             </SelectContent>
           </Select>
         </div>
+        {form.operation_type === "devolucao" && (
+          <div className="space-y-1 md:col-span-3">
+            <Label>Chave de acesso da NF-e original *</Label>
+            <Input
+              value={form.referenced_access_key || ""}
+              onChange={e => setField("referenced_access_key", e.target.value.replace(/\D/g, ""))}
+              placeholder="44 dígitos da nota original"
+              className="font-mono text-xs"
+              maxLength={44}
+            />
+            <p className="text-xs text-slate-500">
+              Obrigatório em devoluções. Use o botão "Nota de Devolução" em uma nota autorizada para preencher automaticamente.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Destinatário */}
@@ -392,8 +472,14 @@ export default function FiscalInvoiceForm() {
             <Input maxLength={2} value={form.recipient_address?.uf || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), uf: e.target.value.toUpperCase() })} />
           </div>
           <div className="space-y-1">
-            <Label>CEP *</Label>
-            <Input value={form.recipient_address?.cep || ""} onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), cep: e.target.value })} />
+            <Label>CEP * {cepLoading && <Loader2 className="w-3 h-3 inline animate-spin text-violet-600" />}</Label>
+            <Input
+              value={form.recipient_address?.cep || ""}
+              onChange={e => setField("recipient_address", { ...(form.recipient_address || {}), cep: handleCepChange(e.target.value) })}
+              placeholder="00000-000"
+              maxLength={9}
+            />
+            <p className="text-xs text-slate-500">Digite o CEP para preencher o endereço automaticamente.</p>
           </div>
         </div>
       </div>

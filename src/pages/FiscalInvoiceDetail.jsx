@@ -3,15 +3,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, XCircle, Download, ExternalLink, CheckCircle, AlertCircle, Clock, Pencil, Copy } from "lucide-react";
+import { ArrowLeft, RefreshCw, XCircle, Download, ExternalLink, CheckCircle, AlertCircle, Clock, Pencil, Copy, Undo2, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { formatCurrency, formatDate, formatDateTime } from "@/components/utils/formatters";
 import { emitFiscalInvoice } from "@/functions/emitFiscalInvoice";
 import { queryFiscalStatus } from "@/functions/queryFiscalStatus";
 import { cancelFiscalInvoice } from "@/functions/cancelFiscalInvoice";
+import { sendCorrectionLetter } from "@/functions/sendCorrectionLetter";
 import { toast } from "sonner";
 import CancelFiscalDialog from "@/components/fiscal/CancelFiscalDialog";
+import CorrectionLetterDialog from "@/components/fiscal/CorrectionLetterDialog";
 
 const STATUS_CONFIG = {
   rascunho:        { label: "Rascunho",         color: "bg-slate-100 text-slate-700",   icon: Clock },
@@ -29,6 +31,7 @@ export default function FiscalInvoiceDetail() {
   const urlParams = new URLSearchParams(window.location.search);
   const invoiceId = urlParams.get("id");
   const [showCancel, setShowCancel] = useState(false);
+  const [showCorrection, setShowCorrection] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -89,11 +92,51 @@ export default function FiscalInvoiceDetail() {
     onError: (e) => toast.error(e.message || "Não foi possível duplicar a nota")
   });
 
+  const correctMutation = useMutation({
+    mutationFn: (correction) => sendCorrectionLetter({ invoice_id: invoiceId, correction }),
+    onSuccess: (res) => {
+      if (res.data?.error) { toast.error(res.data.error); return; }
+      toast.success("Carta de Correção enviada à SEFAZ");
+      queryClient.invalidateQueries(["fiscal_invoice", invoiceId]);
+      queryClient.invalidateQueries(["fiscal_events", invoiceId]);
+    },
+    onError: (e) => toast.error(e.response?.data?.error || e.message || "Erro ao enviar correção")
+  });
+
+  const devolucaoMutation = useMutation({
+    mutationFn: async () => {
+      const invoices = await base44.entities.FiscalInvoice.filter({ company_id: invoice.company_id });
+      const maxNumber = invoices.reduce((max, item) => Math.max(max, Number(item.reference?.match(/^NF-(\d+)$/)?.[1]) || 0), 0);
+      const reference = `NF-${String(maxNumber + 1).padStart(6, "0")}`;
+      const { id, created_date, updated_date, created_by_id, reference: _ref, number, status, api_reference, api_status, api_protocol, api_access_key, xml_url, pdf_url, cancel_reason, cancel_date, error_message, error_code, retry_count, last_status_check, idempotency_key, issue_date, sale_id, correction_letter, correction_date, ...draft } = invoice;
+      return base44.entities.FiscalInvoice.create({
+        ...draft,
+        reference,
+        operation_type: "devolucao",
+        nature_operation: "Devolução de venda",
+        referenced_access_key: invoice.api_access_key || "",
+        referenced_invoice_id: invoice.id,
+        payment_method: "90",
+        status: "rascunho",
+        issue_date: new Date().toISOString().split("T")[0],
+        retry_count: 0,
+        idempotency_key: `${invoice.company_id}-${invoice.document_type}-${invoice.serie}-${reference}`
+      });
+    },
+    onSuccess: (draft) => {
+      toast.success("Rascunho de devolução criado. Revise as quantidades antes de emitir.");
+      queryClient.invalidateQueries(["fiscal_invoices", invoice.company_id]);
+      navigate(`${createPageUrl("FiscalInvoiceForm")}?id=${draft.id}`);
+    },
+    onError: (e) => toast.error(e.message || "Não foi possível criar a devolução")
+  });
+
   const handleCancel = async (reason) => {
     const res = await cancelFiscalInvoice({ invoice_id: invoiceId, reason });
     if (res.data?.success) {
-      toast.success("Nota cancelada com sucesso");
+      toast.success(res.data.pending ? "Cancelamento solicitado — aguardando confirmação da SEFAZ" : "Nota cancelada com sucesso");
       queryClient.invalidateQueries(["fiscal_invoice", invoiceId]);
+      queryClient.invalidateQueries(["fiscal_events", invoiceId]);
     } else {
       toast.error(res.data?.error || "Erro ao cancelar");
     }
@@ -169,6 +212,18 @@ export default function FiscalInvoiceDetail() {
                 <a href={invoice.pdf_url} target="_blank" rel="noreferrer"><ExternalLink className="w-4 h-4 mr-1" /> DANFE</a>
               </Button>
             )}
+            {invoice.document_type === "nfe" && (
+              <>
+                <Button variant="outline" onClick={() => setShowCorrection(true)} className="text-violet-700 border-violet-200 hover:bg-violet-50">
+                  <FileText className="w-4 h-4 mr-1" /> Carta de Correção
+                </Button>
+                <Button variant="outline" onClick={() => devolucaoMutation.mutate()} disabled={devolucaoMutation.isPending}
+                  className="text-amber-700 border-amber-200 hover:bg-amber-50">
+                  {devolucaoMutation.isPending ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Undo2 className="w-4 h-4 mr-1" />}
+                  Nota de Devolução
+                </Button>
+              </>
+            )}
             <Button variant="outline" onClick={() => setShowCancel(true)} className="text-red-600 border-red-200 hover:bg-red-50">
               <XCircle className="w-4 h-4 mr-1" /> Cancelar Nota
             </Button>
@@ -203,6 +258,18 @@ export default function FiscalInvoiceDetail() {
               <div className="pt-1">
                 <p className="text-slate-500 text-xs">Chave de Acesso:</p>
                 <p className="font-mono text-xs text-slate-700 break-all">{invoice.api_access_key}</p>
+              </div>
+            )}
+            {invoice.operation_type === "devolucao" && invoice.referenced_access_key && (
+              <div className="pt-1">
+                <p className="text-slate-500 text-xs">NF-e Original (Devolução):</p>
+                <p className="font-mono text-xs text-slate-700 break-all">{invoice.referenced_access_key}</p>
+              </div>
+            )}
+            {invoice.correction_letter && (
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-slate-500 text-xs">Última Carta de Correção {invoice.correction_date ? `(${formatDateTime(invoice.correction_date)})` : ""}:</p>
+                <p className="text-xs text-slate-700 mt-0.5">{invoice.correction_letter}</p>
               </div>
             )}
           </div>
@@ -276,6 +343,7 @@ export default function FiscalInvoiceDetail() {
       )}
 
       <CancelFiscalDialog open={showCancel} onClose={() => setShowCancel(false)} onConfirm={handleCancel} />
+      <CorrectionLetterDialog open={showCorrection} onClose={() => setShowCorrection(false)} onConfirm={(text) => { correctMutation.mutate(text); setShowCorrection(false); }} />
     </div>
   );
 }

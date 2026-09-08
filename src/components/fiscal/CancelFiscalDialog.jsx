@@ -29,7 +29,7 @@ export default function CancelFiscalDialog({ open, onClose, onConfirm }) {
         <div className="space-y-4 py-2">
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
             <p className="font-medium">Atenção: Esta ação não pode ser desfeita.</p>
-            <p className="mt-1">O cancelamento só é permitido em até 24 horas após a autorização (NF-e) e será comunicado à SEFAZ.</p>
+            <p className="mt-1">O cancelamento da NF-e é permitido em até 24 horas após a autorização; na NFC-e o prazo varia por estado. A ação será comunicada à SEFAZ.</p>
           </div>
           <div className="space-y-2">
             <Label>Justificativa de cancelamento *</Label>
