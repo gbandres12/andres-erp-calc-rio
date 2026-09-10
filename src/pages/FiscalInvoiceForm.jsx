@@ -139,6 +139,36 @@ export default function FiscalInvoiceForm() {
     }
   }, [config]);
 
+  // Informações Complementares automáticas: observações padrão da filial +
+  // observação fiscal de cada produto distinto presente na nota (sem duplicar).
+  // Só preenche sozinho enquanto o usuário não editar o campo manualmente.
+  const notesTouchedRef = React.useRef(false);
+  const buildComplementaryNotes = (items) => {
+    const seen = new Set();
+    const texts = [];
+    const push = (text) => {
+      const t = (text || "").trim();
+      if (!t) return;
+      const key = t.replace(/\s+/g, " ").toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      texts.push(t);
+    };
+    push(config?.default_notes);
+    (items || []).forEach(item => {
+      push(products.find(p => p.id === item.product_id)?.observacao_fiscal);
+    });
+    return texts.join(" ").slice(0, 5000);
+  };
+
+  const itemsProductKey = form.items.map(i => i.product_id || "").join(",");
+  useEffect(() => {
+    if (notesTouchedRef.current) return;
+    if (invoiceId && (form.notes || "").trim()) return; // nota já salva com texto: preserva
+    const auto = buildComplementaryNotes(form.items);
+    setForm(prev => (prev.notes === auto ? prev : { ...prev, notes: auto }));
+  }, [itemsProductKey, products, config]);
+
   // Preenche o código IBGE automaticamente a partir do município + UF
   const municipio = form.recipient_address?.municipio;
   const recipientUf = form.recipient_address?.uf;
@@ -607,8 +637,18 @@ export default function FiscalInvoiceForm() {
 
       {/* Observações */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-2">
-        <Label>Observações (informações adicionais na nota)</Label>
-        <Textarea value={form.notes || ""} onChange={e => setField("notes", e.target.value)} rows={3} />
+        <div>
+          <Label>Observações (informações adicionais na nota)</Label>
+          <p className="text-xs text-slate-500 mb-2">
+            Preenchido automaticamente com as observações padrão da filial + a observação fiscal de cada produto da nota. Edite livremente — o texto digitado não será sobrescrito.
+          </p>
+        </div>
+        <Textarea
+          value={form.notes || ""}
+          onChange={e => { notesTouchedRef.current = true; setField("notes", e.target.value); }}
+          rows={3}
+          maxLength={5000}
+        />
       </div>
 
       <div className="flex gap-3">
