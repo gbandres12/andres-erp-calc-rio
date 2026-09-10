@@ -11,6 +11,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
 import ContactCombobox from "@/components/fiscal/ContactCombobox";
+import ProductCombobox from "@/components/fiscal/ProductCombobox";
 import TransportSection from "@/components/fiscal/TransportSection";
 import { fetchIbgeCode } from "@/components/fiscal/ibge";
 import useCepLookup from "@/hooks/useCepLookup";
@@ -555,10 +556,7 @@ export default function FiscalInvoiceForm() {
                 <tr key={idx}>
                   <td className="px-3 py-2 text-slate-400">{item.sequence}</td>
                   <td className="px-3 py-2 space-y-1">
-                    <Select value={item.product_id || ""} onValueChange={value => selectProduct(idx, value)}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecionar produto" /></SelectTrigger>
-                      <SelectContent>{products.map(product => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <ProductCombobox products={products} value={item.product_id} onSelect={productId => selectProduct(idx, productId)} />
                     <Input value={item.product_name} readOnly className="h-9 text-sm bg-slate-50" />
                   </td>
                   <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-9 text-sm" placeholder="00000000" /></td>
