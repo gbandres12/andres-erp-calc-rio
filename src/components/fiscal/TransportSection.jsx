@@ -37,6 +37,11 @@ export default function TransportSection({ value, onChange }) {
             {MODALIDADES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        {(modalidade === "3" || modalidade === "4") && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 leading-relaxed">
+            Transporte próprio exige que o veículo e o CNPJ/CPF do transportador sejam do próprio {modalidade === "3" ? "remetente (sua empresa)" : "destinatário (comprador)"} — a SEFAZ rejeita se forem diferentes (cStat 848). Para caminhoneiro contratado, use FOB (comprador paga o frete), CIF (vendedor paga) ou Por conta de terceiros.
+          </p>
+        )}
       </div>
 
       {!semFrete && (
