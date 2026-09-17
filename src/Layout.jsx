@@ -102,7 +102,7 @@ export default function Layout({ children, currentPageName }) {
     if (user.custom_role === 'scale_operator') {
       const allowed = {
         "Gestão de Materiais": ['Products'],
-        "Logística": ['Vehicles', 'Weighing'],
+        "Logística": ['Vehicles', 'Weighing', 'Cubage'],
         "Comercial": ['Sales', 'SaleWithdrawals'],
       };
       return hideUsersUnlessAdmin(navigationGroups.map(group => {

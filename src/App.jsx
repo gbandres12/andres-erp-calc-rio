@@ -8,6 +8,7 @@ import FiscalSettings from './pages/FiscalSettings';
 import FiscalImport from './pages/FiscalImport';
 import CostCenterReport from './pages/CostCenterReport';
 import ClientDeliveries from './pages/ClientDeliveries';
+import Cubage from './pages/Cubage';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
@@ -75,6 +76,7 @@ const AuthenticatedApp = () => {
       <Route path="/FiscalImport" element={<LayoutWrapper currentPageName="FiscalImport"><FiscalImport /></LayoutWrapper>} />
       <Route path="/CostCenterReport" element={<LayoutWrapper currentPageName="CostCenterReport"><CostCenterReport /></LayoutWrapper>} />
       <Route path="/ClientDeliveries" element={<LayoutWrapper currentPageName="ClientDeliveries"><ClientDeliveries /></LayoutWrapper>} />
+      <Route path="/Cubage" element={<LayoutWrapper currentPageName="Cubage"><Cubage /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

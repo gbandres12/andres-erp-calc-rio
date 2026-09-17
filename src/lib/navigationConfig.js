@@ -1,5 +1,5 @@
 import {
-  Building2, Package, Warehouse, TruckIcon, Scale, Fuel,
+  Building2, Package, Warehouse, TruckIcon, Scale, Fuel, Camera,
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
   BarChart3, Settings, FileText, History, PackageCheck,
   ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
@@ -26,6 +26,7 @@ export const navigationGroups = [
     items: [
       { title: "Veículos", url: "Vehicles", icon: TruckIcon },
       { title: "Pesagens", url: "Weighing", icon: Scale },
+      { title: "Cubagem", url: "Cubage", icon: Camera },
       { title: "Combustível", url: "Fuel", icon: Fuel }
     ]
   },

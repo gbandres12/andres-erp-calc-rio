@@ -42,9 +42,42 @@
       "type": "string",
       "description": "Nome do motorista"
     },
+    "driver_cpf": {
+      "type": "string",
+      "description": "CPF do motorista"
+    },
     "driver_license": {
       "type": "string",
-      "description": "CNH do motorista"
+      "description": "N\u00famero da CNH do motorista"
+    },
+    "cnh_category": {
+      "type": "string",
+      "description": "Categoria da CNH (A, B, C, D, E ou combina\u00e7\u00e3o)"
+    },
+    "cnh_valid_until": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de validade da CNH"
+    },
+    "cnh_photo_url": {
+      "type": "string",
+      "description": "Foto da CNH (storage p\u00fablico)"
+    },
+    "truck_photo_url": {
+      "type": "string",
+      "description": "Foto do caminh\u00e3o (storage p\u00fablico)"
+    },
+    "bed_length_m": {
+      "type": "number",
+      "description": "Comprimento interno da ca\u00e7amba (m)"
+    },
+    "bed_width_m": {
+      "type": "number",
+      "description": "Largura interna da ca\u00e7amba (m)"
+    },
+    "bed_edge_height_m": {
+      "type": "number",
+      "description": "Altura da borda da ca\u00e7amba em rela\u00e7\u00e3o ao piso da ca\u00e7amba (m)"
     },
     "cost_center": {
       "type": "string",

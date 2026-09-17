@@ -1,0 +1,27 @@
+{
+  "name": "CubageConfig",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa (1:1)"
+    },
+    "tolerance_percent": {
+      "type": "number",
+      "default": 5,
+      "description": "Toler\u00e2ncia de diverg\u00eancia cubagem \u00d7 balan\u00e7a (%)"
+    },
+    "default_factor_t_m3": {
+      "type": "number",
+      "default": 1.5,
+      "description": "Fator t/m\u00b3 padr\u00e3o quando o produto n\u00e3o tem fator cadastrado"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "company_id"
+  ]
+}

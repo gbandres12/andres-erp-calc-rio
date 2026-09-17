@@ -63,6 +63,14 @@
     "sale_price": {
       "type": "number"
     },
+    "density_t_m3": {
+      "type": "number",
+      "description": "Densidade aparente (t/m\u00b3) usada na cubagem por foto"
+    },
+    "density_wet_t_m3": {
+      "type": "number",
+      "description": "Densidade aparente do produto \u00famido (t/m\u00b3) \u2014 variante para p\u00f3 com umidade"
+    },
     "profit_margin": {
       "type": "number"
     },

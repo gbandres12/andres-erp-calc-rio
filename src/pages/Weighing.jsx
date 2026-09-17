@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Scale, Plus, TruckIcon, Printer, CheckCircle, RefreshCw } from "lucide-react";
+import { Scale, Plus, TruckIcon, Printer, CheckCircle, RefreshCw, Ruler } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import WeighingTicket from "@/components/weighing/WeighingTicket";
@@ -17,6 +18,7 @@ import BranchBadge from "@/components/BranchBadge";
 
 export default function Weighing() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCompanyId] = useState(localStorage.getItem('selectedCompanyId'));
   const [currentWeight, setCurrentWeight] = useState(0);
@@ -919,6 +921,16 @@ export default function Weighing() {
                                 🚢 {weighing.barge_name}
                             </Badge>
                         )}
+                        {weighing.weight_source === 'cubagem' && (
+                            <Badge variant="outline" className="ml-2 border-violet-200 text-violet-700">
+                                📐 Cubagem
+                            </Badge>
+                        )}
+                        {weighing.cubage_alert && (
+                            <Badge variant="outline" className="ml-2 border-red-200 text-red-700">
+                                ⚠ Divergência
+                            </Badge>
+                        )}
                         {weighing.purchase_order_id && (
                             <Badge variant="outline" className="ml-2 border-purple-200 text-purple-700">
                                 📋 OC Vinculada
@@ -950,14 +962,25 @@ export default function Weighing() {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => printTicket(weighing)}
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Imprimir
-                    </Button>
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-violet-300 text-violet-700 hover:bg-violet-50"
+                        onClick={() => navigate(`/Cubage?weighing_id=${weighing.id}`)}
+                      >
+                        <Ruler className="w-4 h-4 mr-2" />
+                        Cubagem
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printTicket(weighing)}
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Imprimir
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))

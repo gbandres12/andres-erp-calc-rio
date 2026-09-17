@@ -123,7 +123,74 @@
         "concluida",
         "cancelada"
       ],
-      "default": "aguardando_tara"
+      "default": "aguardando_tara",
+      "description": "Status da pesagem"
+    },
+    "weight_source": {
+      "type": "string",
+      "enum": [
+        "balanca",
+        "cubagem"
+      ],
+      "default": "balanca",
+      "description": "Origem do peso l\u00edquido: balan\u00e7a f\u00edsica ou cubagem por foto"
+    },
+    "cubage_method": {
+      "type": "string",
+      "description": "M\u00e9todo da cubagem (ex: foto_ia)"
+    },
+    "cubage_height_m": {
+      "type": "number",
+      "description": "Altura m\u00e9dia estimada da carga a partir do piso da ca\u00e7amba (m)"
+    },
+    "cubage_volume_m3": {
+      "type": "number",
+      "description": "Volume estimado da carga (m\u00b3)"
+    },
+    "cubage_factor_t_m3": {
+      "type": "number",
+      "description": "Fator de convers\u00e3o t/m\u00b3 aplicado na cubagem"
+    },
+    "cubage_estimated_tons": {
+      "type": "number",
+      "description": "Toneladas estimadas por cubagem"
+    },
+    "cubage_margin_percent": {
+      "type": "number",
+      "description": "Margem de erro da estimativa (%)"
+    },
+    "cubage_diff_percent": {
+      "type": "number",
+      "description": "Diverg\u00eancia da cubagem vs peso da balan\u00e7a (%)"
+    },
+    "cubage_alert": {
+      "type": "boolean",
+      "default": false,
+      "description": "Diverg\u00eancia acima da toler\u00e2ncia configurada"
+    },
+    "cubage_photos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URLs das fotos usadas na cubagem"
+    },
+    "cubage_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da cubagem"
+    },
+    "cubage_operator": {
+      "type": "string",
+      "description": "Operador que realizou a cubagem"
+    },
+    "cubage_product_name": {
+      "type": "string",
+      "description": "Produto usado na cubagem (cache)"
+    },
+    "cubage_notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es da cubagem (qualidade das fotos, forma da carga)"
     },
     "notes": {
       "type": "string"
