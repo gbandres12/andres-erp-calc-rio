@@ -1,0 +1,47 @@
+{
+  "name": "Relat\u00f3rio de Saldo no Telegram \u2014 Fechamento",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 18 * * *",
+      "one_time_date": null,
+      "timezone": "America/Santarem",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "relatorio_saldo_fechamento",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "enviar_relatorio_fechamento": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "sendScheduledBalanceReport",
+            "args": {
+              "period": "evening"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Enviar relat\u00f3rio de fechamento",
+            "description": "Saldo final do dia + movimenta\u00e7\u00f5es de hoje"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Envia \u00e0s 18:00 o fechamento do caixa de cada filial com as movimenta\u00e7\u00f5es do dia"
+}

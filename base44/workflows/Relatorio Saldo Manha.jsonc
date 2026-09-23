@@ -1,0 +1,47 @@
+{
+  "name": "Relat\u00f3rio de Saldo no Telegram \u2014 Manh\u00e3",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "50 7 * * *",
+      "one_time_date": null,
+      "timezone": "America/Santarem",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "relatorio_saldo_manha",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "enviar_relatorio_manha": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "sendScheduledBalanceReport",
+            "args": {
+              "period": "morning"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Enviar relat\u00f3rio da manh\u00e3",
+            "description": "Saldo de abertura + movimenta\u00e7\u00f5es de ontem"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Envia \u00e0s 07:50 o saldo de abertura do caixa de cada filial com as movimenta\u00e7\u00f5es do dia anterior"
+}
