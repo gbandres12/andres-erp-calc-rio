@@ -16,6 +16,14 @@ Deno.serve(async (req) => {
 
     const reject = async (message) => {
       await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, { error_message: message, error_code: 'VALIDACAO' });
+      await base44.asServiceRole.entities.FiscalEvent.create({
+        invoice_id: invoiceId,
+        company_id: invoice.company_id,
+        event_type: 'validacao',
+        status: 'erro',
+        error_message: message,
+        triggered_by: user.id
+      });
       return Response.json({ error: message }, { status: 400 });
     };
 
@@ -34,7 +42,7 @@ Deno.serve(async (req) => {
       : null));
     const items = [];
     for (let index = 0; index < invoice.items.length; index += 1) {
-      const error = validateProduct(products[index], config, invoice, index);
+      const error = validateProduct(products[index], invoice, index);
       if (error) return await reject(error);
       items.push(snapshotItem(invoice.items[index], products[index], config, invoice));
     }
@@ -134,43 +142,14 @@ function validateInvoice(invoice) {
   return null;
 }
 
-function validateProduct(product, config, invoice, index) {
+// Valida apenas o que impede de montar o XML. Todo o resto (NCM, CFOP,
+// CST/CSOSN, alíquotas, classificação, aprovação do contador) a NotaAs/SEFAZ
+// valida e devolve a rejeição com código e motivo.
+function validateProduct(product, invoice, index) {
   const position = index + 1;
   if (!product) return `Selecione um produto cadastrado no item ${position}`;
   if (product.company_id !== invoice.company_id) return `Produto do item ${position} pertence a outra empresa`;
-  if (!product.accountant_approved || !product.fiscal_review_date) return `Produto ${product.name} sem aprovação fiscal do contador`;
-  if (!product.fiscal_description) return `Descrição fiscal ausente no produto ${product.name}`;
-  if (!/^\d{8}$/.test(String(product.ncm || '').replace(/\D/g, ''))) return `NCM inválido no produto ${product.name}`;
-  if (invoice.operation_type !== 'devolucao') {
-    const cfop = effectiveCfop(invoice.items[index], product, config, invoice);
-    if (!/^\d{4}$/.test(cfop)) {
-      const internal = config.uf === invoice.recipient_address?.uf;
-      return `CFOP ${internal ? 'interno' : 'interestadual'} inválido no produto ${product.name}: informe o CFOP na nota ou configure o cadastro do produto`;
-    }
-  }
-  if (!product.tax_classification) return `Classificação fiscal ausente no produto ${product.name}`;
-  const crt = Number(config.crt);
-  const code = crt === 1 ? product.icms_csosn : product.icms_cst;
-  if (crt === 1 && !/^\d{3}$/.test(String(code || ''))) return `CSOSN inválido no produto ${product.name}`;
-  if (crt !== 1 && !/^\d{2}$/.test(String(code || ''))) return `CST inválido no produto ${product.name}`;
-  if (!classificationMatches(product.tax_classification, code, crt)) return `CST/CSOSN incompatível com a classificação do produto ${product.name}`;
-  if (!product.icms_aliquota_configurada) return `Configure a alíquota de ICMS do produto ${product.name}, inclusive quando for 0%`;
-  if (!product.pis_cst || !product.pis_aliquota_configurada) return `Configure CST e alíquota de PIS do produto ${product.name}`;
-  if (!product.cofins_cst || !product.cofins_aliquota_configurada) return `Configure CST e alíquota de COFINS do produto ${product.name}`;
   return null;
-}
-
-function classificationMatches(classification, code, crt) {
-  const cst = {
-    tributada_integralmente: ['00'], isenta: ['40'], nao_tributada: ['41'], diferida: ['51'], suspensa: ['50'],
-    icms_cobrado_anteriormente: ['60'], substituicao_tributaria: ['10', '30', '60', '70'],
-    outra: ['00', '10', '20', '30', '40', '41', '50', '51', '60', '70', '90']
-  };
-  const csosn = {
-    tributada_integralmente: ['101', '102', '201', '202'], isenta: ['103'], nao_tributada: ['300', '400'],
-    icms_cobrado_anteriormente: ['500'], substituicao_tributaria: ['201', '202', '203', '500'], outra: ['900']
-  };
-  return (crt === 1 ? csosn : cst)[classification]?.includes(String(code)) || false;
 }
 
 function devolucaoCfop(item, product, config, invoice) {
@@ -202,7 +181,7 @@ function snapshotItem(item, product, config, invoice) {
   return {
     ...item,
     product_id: product.id,
-    product_name: product.fiscal_description,
+    product_name: product.fiscal_description || product.name,
     product_code: product.code,
     ncm: String(product.ncm).replace(/\D/g, ''),
     cest: product.cest || '',
