@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, FileDown } from "lucide-react";
 import { jsPDF } from "jspdf";
+import ThermalWeighingButton from "@/components/weighing/ThermalWeighingPrint";
 
 const formatDateTime = (dt) => {
   if (!dt) return "__/__/____ __:__";
@@ -184,6 +185,7 @@ export default function WeighingTicket({ weighing, company, onClose }) {
   return (
     <div>
       <div className="flex justify-end gap-2 mb-4">
+        <ThermalWeighingButton weighing={weighing} company={company} />
         <Button onClick={handleGeneratePdf} variant="outline" className="gap-2">
           <FileDown className="w-4 h-4" />
           Gerar PDF (WhatsApp)
