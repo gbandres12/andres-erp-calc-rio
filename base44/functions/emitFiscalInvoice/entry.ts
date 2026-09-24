@@ -345,9 +345,12 @@ function sanitize(value) {
   return text || undefined;
 }
 function extractError(data, status) {
-  if (typeof data?.message === 'string') return data.message;
-  if (typeof data?.error === 'string') return data.error;
-  if (typeof data?.error?.message === 'string') return data.error.message;
+  const error = typeof data?.message === 'string' ? data.message
+    : typeof data?.error === 'string' ? data.error
+      : typeof data?.error?.message === 'string' ? data.error.message : null;
+  const detalhe = [data?.detail, Array.isArray(data?.campos) && data.campos.length ? `Campos: ${data.campos.join(', ')}` : null].filter(Boolean).join(' ');
+  if (error && detalhe) return `${error} — ${detalhe}`;
+  if (error) return error;
   if (Array.isArray(data?.errors)) return data.errors.map((item) => item.message || item.msg).filter(Boolean).join('; ');
   return `A NotaAs recusou a emissão (HTTP ${status})`;
 }
