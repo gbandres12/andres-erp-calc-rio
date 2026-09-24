@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 
-const WIDTH = 48;
+const WIDTH = 46;
 
 const center = (text, width = WIDTH) => {
   const padding = Math.max(0, Math.floor((width - text.length) / 2));
@@ -94,29 +94,49 @@ export function printThermalWeighing(weighing, company) {
   <meta charset="utf-8"/>
   <title>Ticket ${weighing.ticket_number || weighing.reference}</title>
   <style>
-    @page { size: 80mm auto; margin: 2mm; }
-    body { margin: 0; padding: 0; }
+    @page { size: 80mm auto; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      width: 80mm;
+      background: #fff;
+    }
     pre {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 700;
       line-height: 1.4;
       color: #000;
-      margin: 0 0 8mm 0;
+      margin: 0;
+      padding: 2mm;
       white-space: pre;
     }
+    .vias { display: block; }
   </style>
 </head>
 <body>
-  <pre>${via1}</pre>
-  <pre>${via2}</pre>
-  <script>window.onload = function(){ window.print(); }<\/script>
+  <div class="vias">
+    <pre>${via1}</pre>
+    <pre>${via2}</pre>
+  </div>
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "width=380,height=700");
-  win.document.write(html);
-  win.document.close();
+  // imprime por iframe oculto — sem pop-up (não é bloqueado) e com página 80mm real
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } finally {
+      setTimeout(() => iframe.remove(), 60000);
+    }
+  };
+  iframe.srcdoc = html;
 }
 
 export default function ThermalWeighingButton({ weighing, company }) {
