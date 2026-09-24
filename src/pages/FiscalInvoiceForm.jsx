@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Loader2, UserPlus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
 import ContactCombobox from "@/components/fiscal/ContactCombobox";
 import ProductCombobox from "@/components/fiscal/ProductCombobox";
 import TransportSection from "@/components/fiscal/TransportSection";
+import NewClientDialog from "@/components/fiscal/NewClientDialog";
+import { maskCpfCnpj } from "@/components/fiscal/cpfCnpj";
 import { fetchIbgeCode } from "@/components/fiscal/ibge";
 import useCepLookup from "@/hooks/useCepLookup";
 
@@ -97,6 +99,8 @@ export default function FiscalInvoiceForm() {
   });
 
   const config = configs[0];
+  const queryClient = useQueryClient();
+  const [showNewClient, setShowNewClient] = useState(false);
 
   const { data: existingInvoice } = useQuery({
     queryKey: ["fiscal_invoice_edit", invoiceId],
@@ -306,8 +310,14 @@ export default function FiscalInvoiceForm() {
     });
   };
 
-  const handleContactSelect = (contactId) => {
-    const contact = contacts.find(c => c.id === contactId);
+  const handleClientCreated = (contact) => {
+    queryClient.invalidateQueries({ queryKey: ["contacts_active", companyId] });
+    applyContact(contact);
+  };
+
+  const handleContactSelect = (contactId) => applyContact(contacts.find(c => c.id === contactId));
+
+  const applyContact = (contact) => {
     if (contact) {
       // Contatos importados guardam "LOGRADOURO, NUMERO, BAIRRO" num campo só
       let logradouro = contact.address || "";
@@ -331,6 +341,7 @@ export default function FiscalInvoiceForm() {
         recipient_name: contact.name,
         recipient_cpf_cnpj: contact.cpf_cnpj || contact.document,
         recipient_email: contact.email,
+        recipient_ie: contact.ie || "",
         recipient_address: {
           logradouro,
           numero: numero || "S/N",
@@ -467,7 +478,12 @@ export default function FiscalInvoiceForm() {
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
         <h3 className="font-semibold text-slate-800">Destinatário</h3>
         <div className="space-y-1">
-          <Label>Selecionar Cliente Cadastrado ({contacts.length} disponíveis)</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Selecionar Cliente Cadastrado ({contacts.length} disponíveis)</Label>
+            <Button variant="outline" size="sm" onClick={() => setShowNewClient(true)}>
+              <UserPlus className="w-4 h-4 mr-1" /> Novo Cliente
+            </Button>
+          </div>
           <ContactCombobox contacts={contacts} value={form.recipient_id} onSelect={handleContactSelect} />
         </div>
         <div className="grid md:grid-cols-2 gap-4">
@@ -477,16 +493,22 @@ export default function FiscalInvoiceForm() {
           </div>
           <div className="space-y-1">
             <Label>CPF / CNPJ *</Label>
-            <Input value={form.recipient_cpf_cnpj || ""} onChange={e => setField("recipient_cpf_cnpj", e.target.value)} />
+            <Input
+              value={form.recipient_cpf_cnpj || ""}
+              onChange={e => setField("recipient_cpf_cnpj", maskCpfCnpj(e.target.value))}
+              placeholder="Formata CPF ou CNPJ automaticamente"
+            />
           </div>
           <div className="space-y-1">
             <Label>Email</Label>
             <Input type="email" value={form.recipient_email || ""} onChange={e => setField("recipient_email", e.target.value)} />
           </div>
-          <div className="space-y-1">
-            <Label>IE Destinatário</Label>
-            <Input value={form.recipient_ie || ""} onChange={e => setField("recipient_ie", e.target.value)} />
-          </div>
+          {(form.recipient_cpf_cnpj || "").replace(/\D/g, "").length > 11 && (
+            <div className="space-y-1">
+              <Label>IE Destinatário</Label>
+              <Input value={form.recipient_ie || ""} onChange={e => setField("recipient_ie", e.target.value)} placeholder="ISENTO se isento" />
+            </div>
+          )}
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="space-y-1 md:col-span-2">
@@ -648,6 +670,13 @@ export default function FiscalInvoiceForm() {
           maxLength={5000}
         />
       </div>
+
+      <NewClientDialog
+        open={showNewClient}
+        onOpenChange={setShowNewClient}
+        companyId={companyId}
+        onClientCreated={handleClientCreated}
+      />
 
       <div className="flex gap-3">
         <Button variant="outline" asChild className="flex-1">
