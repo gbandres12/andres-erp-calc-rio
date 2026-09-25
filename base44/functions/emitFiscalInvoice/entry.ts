@@ -130,6 +130,10 @@ function validateConfig(config, invoice) {
 function validateInvoice(invoice) {
   const address = invoice.recipient_address || {};
   if (!invoice.recipient_name || !invoice.recipient_cpf_cnpj) return 'Informe o destinatário completo';
+  const doc = String(invoice.recipient_cpf_cnpj || '').replace(/\D/g, '');
+  if (invoice.document_type === 'nfe' && doc.length === 14 && !String(invoice.recipient_ie || '').trim()) {
+    return 'Destinatário CNPJ exige Inscrição Estadual: informe a IE ou digite ISENTO no campo IE Destinatário';
+  }
   if (!address.logradouro || !address.bairro || !address.municipio || !address.uf || !address.cep) return 'Complete o endereço do destinatário';
   if (!/^\d{7}$/.test(String(address.codigoMunicipio || ''))) return 'Código IBGE do destinatário inválido';
   if (invoice.operation_type === 'devolucao') {
@@ -239,8 +243,18 @@ function buildPayload(invoice, config) {
     }
   };
   dest[document.length === 14 ? 'cnpj' : 'cpf'] = document;
-  dest.indicadorIE = invoice.recipient_ie ? 1 : 9;
-  if (invoice.recipient_ie) dest.ie = invoice.recipient_ie;
+  const ie = String(invoice.recipient_ie || '').trim();
+  const ieIsento = /^isento$/i.test(ie);
+  if (ie && !ieIsento) {
+    // Contribuinte: envia a IE real com indicador 1
+    dest.indicadorIE = 1;
+    dest.ie = ie;
+  } else {
+    // Isento de IE: indicador 2, sem enviar a palavra "ISENTO" como se fosse
+    // inscrição (a SEFAZ rejeita). Sem IE: CPF é não contribuinte (9); CNPJ sem
+    // IE é barrado antes na validação com mensagem clara.
+    dest.indicadorIE = ieIsento ? 2 : 9;
+  }
   if (invoice.recipient_email) dest.email = invoice.recipient_email;
   return {
     modelo: invoice.document_type === 'nfce' ? 65 : 55,
@@ -251,7 +265,7 @@ function buildPayload(invoice, config) {
     ...(invoice.operation_type === 'devolucao' && invoice.referenced_access_key
       ? { nfesReferenciadas: [String(invoice.referenced_access_key).replace(/\D/g, '')] }
       : {}),
-    consumidorFinal: invoice.recipient_ie ? 0 : 1,
+    consumidorFinal: ie && !ieIsento ? 0 : 1,
     presencaComprador: 1,
     dest,
     items: invoice.items.map((item) => {
