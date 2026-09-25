@@ -246,9 +246,10 @@ function buildPayload(invoice, config) {
   const ie = String(invoice.recipient_ie || '').trim();
   const ieIsento = /^isento$/i.test(ie);
   if (ie && !ieIsento) {
-    // Contribuinte: envia a IE real com indicador 1
+    // Contribuinte: envia a IE real com indicador 1 — apenas dígitos,
+    // pois o schema da SEFAZ recusa pontos/hífens da máscara (15.933.540-0)
     dest.indicadorIE = 1;
-    dest.ie = ie;
+    dest.ie = ie.replace(/\D/g, '');
   } else {
     // Isento de IE: indicador 2, sem enviar a palavra "ISENTO" como se fosse
     // inscrição (a SEFAZ rejeita). Sem IE: CPF é não contribuinte (9); CNPJ sem
