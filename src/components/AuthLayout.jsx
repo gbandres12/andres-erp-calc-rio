@@ -1,7 +1,7 @@
 import React from "react";
 
 const BACKGROUND_URL =
-  "https://media.base44.com/images/public/68ea91a66a9614db4a82043d/0674c4953_ChatGPTImage25desetde202611_35_04.png";
+  "https://media.base44.com/images/public/68ea91a66a9614db4a82043d/f5c114651_ChatGPTImage25desetde202611_41_41.png";
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
