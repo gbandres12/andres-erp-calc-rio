@@ -9,6 +9,7 @@ import { Loader2, UserPlus, User, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import useCepLookup from "@/hooks/useCepLookup";
+import useCnpjLookup from "@/hooks/useCnpjLookup";
 import { maskCpfCnpj } from "@/components/fiscal/cpfCnpj";
 
 const EMPTY_CLIENT = {
@@ -32,6 +33,28 @@ export default function NewClientDialog({ open, onOpenChange, companyId, onClien
       uf: data.uf || prev.uf || ""
     }));
   });
+
+  // Consulta automática de CNPJ na base pública (preenche só campos vazios)
+  const handleCnpjResult = (data) => {
+    setClient(prev => ({
+      ...prev,
+      name: prev.name?.trim() ? prev.name : (data.razao_social || ""),
+      cep: prev.cep?.trim() ? prev.cep : (data.cep || ""),
+      logradouro: prev.logradouro?.trim() ? prev.logradouro : (data.logradouro || ""),
+      numero: prev.numero?.trim() ? prev.numero : (data.numero || ""),
+      bairro: prev.bairro?.trim() ? prev.bairro : (data.bairro || ""),
+      municipio: prev.municipio?.trim() ? prev.municipio : (data.municipio || ""),
+      uf: prev.uf?.trim() ? prev.uf : (data.uf || ""),
+      email: prev.email?.trim() ? prev.email : (data.email || ""),
+      phone: prev.phone?.trim() ? prev.phone : (data.phone || "")
+    }));
+    if (data.situacao_cadastral && data.situacao_cadastral.toLowerCase() !== "ativa") {
+      toast.warning(`Atenção: situação cadastral deste CNPJ: ${data.situacao_cadastral}.`);
+    } else {
+      toast.success("Dados da empresa preenchidos a partir do CNPJ.");
+    }
+  };
+  const { cnpjLoading, lookupCnpj } = useCnpjLookup(handleCnpjResult);
 
   const isPj = personType === "pj";
   const docDigits = (client.document || "").replace(/\D/g, "");
@@ -111,14 +134,21 @@ export default function NewClientDialog({ open, onOpenChange, companyId, onClien
             <Input id="nc-name" value={client.name || ""} onChange={e => setField("name", e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="nc-document">{isPj ? "CNPJ *" : "CPF *"}</Label>
+            <Label htmlFor="nc-document">
+              {isPj ? "CNPJ *" : "CPF *"} {cnpjLoading && <Loader2 className="w-3 h-3 inline animate-spin text-violet-600" />}
+            </Label>
             <Input
               id="nc-document"
               value={client.document || ""}
-              onChange={e => setField("document", maskCpfCnpj(e.target.value))}
+              onChange={e => {
+                const masked = maskCpfCnpj(e.target.value);
+                setField("document", masked);
+                if (isPj) lookupCnpj(masked);
+              }}
               placeholder={isPj ? "00.000.000/0000-00" : "000.000.000-00"}
               inputMode="numeric"
             />
+            {isPj && <p className="text-xs text-slate-500">Digite o CNPJ para preencher os dados automaticamente.</p>}
           </div>
           {isPj && (
             <div className="space-y-1">
