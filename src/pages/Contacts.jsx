@@ -16,6 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton component
 import BranchBadge from "@/components/BranchBadge";
 import useCepLookup from "@/hooks/useCepLookup";
+import useCnpjLookup from "@/hooks/useCnpjLookup";
+import { maskCpfCnpj } from "@/components/fiscal/cpfCnpj";
 
 export default function Contacts() {
   const queryClient = useQueryClient();
@@ -48,6 +50,25 @@ export default function Contacts() {
       city: data.localidade || prev.city,
       state: data.uf || prev.state
     }));
+  });
+
+  // Consulta automática de CNPJ na base pública (preenche só campos vazios)
+  const { cnpjLoading, lookupCnpj } = useCnpjLookup((data) => {
+    setFormData(prev => ({
+      ...prev,
+      name: prev.name?.trim() ? prev.name : (data.razao_social || ""),
+      address: prev.address?.trim() ? prev.address : [data.logradouro, data.numero, data.bairro].filter(Boolean).join(", "),
+      city: prev.city?.trim() ? prev.city : (data.municipio || ""),
+      state: prev.state?.trim() ? prev.state : (data.uf || ""),
+      zip_code: prev.zip_code?.trim() ? prev.zip_code : (data.cep || ""),
+      email: prev.email?.trim() ? prev.email : (data.email || ""),
+      phone: prev.phone?.trim() ? prev.phone : (data.phone || "")
+    }));
+    if (data.situacao_cadastral && data.situacao_cadastral.toLowerCase() !== "ativa") {
+      toast.warning(`Atenção: situação cadastral deste CNPJ: ${data.situacao_cadastral}.`);
+    } else {
+      toast.success("Dados da empresa preenchidos a partir do CNPJ.");
+    }
   });
 
   // Query CORRIGIDA - removido initialData
@@ -130,6 +151,7 @@ export default function Contacts() {
     
     const dataToSubmit = {
         ...formData,
+        document: (formData.document || '').replace(/\D/g, ''),
         credit_balance: formData.credit_balance === '' ? 0 : parseFloat(formData.credit_balance)
     };
 
@@ -704,11 +726,18 @@ export default function Contacts() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>CPF/CNPJ</Label>
+                    <Label>CPF/CNPJ {cnpjLoading && <Loader2 className="w-3 h-3 inline animate-spin text-blue-600" />}</Label>
                     <Input
                       value={formData.document}
-                      onChange={(e) => setFormData({ ...formData, document: e.target.value })}
+                      onChange={(e) => {
+                        const masked = maskCpfCnpj(e.target.value);
+                        setFormData({ ...formData, document: masked });
+                        lookupCnpj(masked);
+                      }}
+                      placeholder="CPF ou CNPJ"
+                      inputMode="numeric"
                     />
+                    <p className="text-xs text-slate-500">Digite o CNPJ para preencher os dados automaticamente.</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Telefone</Label>
