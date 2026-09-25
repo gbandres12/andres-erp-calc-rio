@@ -17,7 +17,7 @@ export default function ImportUploader({ title, description, jsonSchema, columns
     setRows([]);
     setDone(0);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
       const result = await base44.integrations.Core.ExtractDataFromUploadedFile({ file_url, json_schema: jsonSchema });
       if (result.status !== "success") throw new Error(result.details || "Falha ao ler o arquivo");
       const raw = Array.isArray(result.output) ? result.output : [result.output].filter(Boolean);

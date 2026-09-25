@@ -22,7 +22,7 @@ export default function BoletoPaymentDialog({ companyId, onCreated }) {
     if (!file) return toast.error("Selecione o boleto ou a nota em PDF");
     setReading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
       const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
         file_url,
         json_schema: {

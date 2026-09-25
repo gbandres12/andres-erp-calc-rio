@@ -160,6 +160,9 @@ export default function Layout({ children, currentPageName }) {
       const company = companies.find(c => c.id === savedCompanyId);
       if (company) {
         setSelectedCompany(company);
+        // mantém o estado em sync com o localStorage: sem isso, páginas ficam
+        // em branco quando a montagem ocorre antes da filial estar salva
+        if (selectedCompanyId !== savedCompanyId) setSelectedCompanyId(savedCompanyId);
       } else {
         localStorage.removeItem('selectedCompanyId');
         localStorage.removeItem('selectedCompanyName');

@@ -132,20 +132,33 @@ export default function Transactions() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       const oldTx = transactions.find(t => t.id === id);
-      const updateData = { ...data, payment_date: data.status === 'pago' ? (data.payment_date || getTodayDate()) : data.payment_date };
-      const updated = await base44.entities.Transaction.update(id, updateData);
       const payments = await base44.entities.TransactionPayment.filter({ transaction_id: id });
       const wasPago = oldTx?.status === 'pago';
       const isPago = data.status === 'pago';
       const account = accounts.find(a => a.id === data.account_id);
 
+      // Com pagamentos granulares, paid_amount/discount são derivados deles
+      // (fonte da verdade do caixa) — sobrescrever pelo formulário desajusta o saldo.
+      const updateData = { ...data };
+      if (payments.length > 0) {
+        delete updateData.paid_amount;
+        delete updateData.discount;
+      }
+      updateData.payment_date = isPago ? (data.payment_date || getTodayDate()) : data.payment_date;
+      const updated = await base44.entities.Transaction.update(id, updateData);
+
       if (isPago) {
-        if (payments.length === 0 && account) {
-          const user = await base44.auth.me();
+        const paidFromPayments = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const discountFromPayments = payments.reduce((s, p) => s + Number(p.discount || 0), 0);
+        // Dinheiro que deve constar na conta: valor final MENOS abatimentos
+        const target = Math.max(0, Number(data.amount || 0) - discountFromPayments);
+        const user = await base44.auth.me();
+
+        if (payments.length === 0 && account && target > 0) {
           await base44.entities.TransactionPayment.create({
             transaction_id: id,
             transaction_reference: data.description,
-            amount: data.amount,
+            amount: target,
             payment_date: data.payment_date || getTodayDate(),
             account_id: data.account_id,
             account_name: account.name,
@@ -156,15 +169,29 @@ export default function Transactions() {
           });
         } else if (payments.length === 1) {
           await base44.entities.TransactionPayment.update(payments[0].id, {
-            amount: data.amount,
+            amount: target,
             account_id: data.account_id,
             account_name: account?.name || payments[0].account_name,
             payment_date: data.payment_date || payments[0].payment_date,
             transaction_reference: data.description
           });
+        } else if (payments.length > 1) {
+          // Vários abatimentos: ajusta só a diferença no último pagamento
+          const diff = target - paidFromPayments;
+          if (Math.abs(diff) > 0.005) {
+            const last = payments[payments.length - 1];
+            await base44.entities.TransactionPayment.update(last.id, {
+              amount: Math.max(0, Number(last.amount || 0) + diff)
+            });
+          }
         }
-      } else if (wasPago && !isPago && payments.length === 1) {
-        await base44.entities.TransactionPayment.delete(payments[0].id);
+      } else if (wasPago && !isPago) {
+        // Voltou de pago para pendente: remove TODOS os pagamentos e zera o
+        // acumulado — senão o recálculo de saldo segue contando o valor pago
+        for (const p of payments) {
+          await base44.entities.TransactionPayment.delete(p.id);
+        }
+        await base44.entities.Transaction.update(id, { paid_amount: 0, discount: 0, payment_date: null });
       }
       await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return updated;
@@ -229,11 +256,15 @@ export default function Transactions() {
 
       const account = accounts.find(a => a.id === accountId);
       const user = await base44.auth.me();
+      // Registra o pagamento pelo valor EFETIVAMENTE aplicado (após o corte no
+      // total da transação) — o registro granular é a fonte da verdade do saldo
+      const effectiveAmount = Math.max(0, newPaidAmount - currentPaidAmount);
+      const effectiveDiscount = Math.max(0, newDiscount - currentDiscount);
       await base44.entities.TransactionPayment.create({
         transaction_id: id,
         transaction_reference: transaction.description,
-        amount: amount,
-        discount: discount || 0,
+        amount: effectiveAmount,
+        discount: effectiveDiscount,
         payment_date: date,
         account_id: accountId,
         account_name: account?.name || '',
@@ -247,8 +278,8 @@ export default function Transactions() {
       const mirror = await mirrorReceivingToSale(base44, {
         transaction,
         companyId: selectedCompanyId,
-        amount,
-        discount: discount || 0,
+        amount: effectiveAmount,
+        discount: effectiveDiscount,
         date,
         accountId,
         paymentMethod: paymentMethod || 'dinheiro',
@@ -391,7 +422,7 @@ export default function Transactions() {
     if (!receiptFile) { toast.error("Selecione uma imagem ou PDF do comprovante"); return; }
     setIsReadingReceipt(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: receiptFile });
+      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: receiptFile });
       const extractionSchema = {
         type: "object",
         properties: {
@@ -467,7 +498,13 @@ export default function Transactions() {
           const row = {};
           headers.forEach((header, index) => { row[header] = values[index]; });
           const description = row['descricao'] || row['descrição'] || 'Importado via CSV';
-          const amount = parseFloat((row['valor'] || '0').replace('R$', '').replace('.', '').replace(',', '.'));
+          // Aceita "150.00" (decimal ponto) e "1.150,00" (brasileiro).
+          // O parse antigo removia o ponto: "150.00" virava 15000.
+          const rawValue = String(row['valor'] || '0').replace('R$', '').replace(/\s/g, '');
+          const normalized = rawValue.includes(',')
+            ? rawValue.replace(/\./g, '').replace(',', '.')
+            : rawValue;
+          const amount = parseFloat(normalized);
           const validAmount = isNaN(amount) ? 0 : amount;
           const type = importType;
           const category = row['categoria'] || 'Geral';
@@ -531,8 +568,8 @@ export default function Transactions() {
     for (const t of transactions) {
       if (t.type === 'receita' && t.status === 'pago') totalReceita += (t.paid_amount || 0);
       else if (t.type === 'despesa' && t.status === 'pago') totalDespesa += (t.paid_amount || 0);
-      if (t.type === 'receita' && t.status !== 'pago') pendingReceivables += (t.amount - (t.paid_amount || 0));
-      else if (t.type === 'despesa' && t.status !== 'pago') pendingPayables += (t.amount - (t.paid_amount || 0));
+      if (t.type === 'receita' && t.status !== 'pago') pendingReceivables += Math.max(0, t.amount - (t.paid_amount || 0) - (t.discount || 0));
+      else if (t.type === 'despesa' && t.status !== 'pago') pendingPayables += Math.max(0, t.amount - (t.paid_amount || 0) - (t.discount || 0));
     }
     return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, saldoLiquido: totalReceita - totalDespesa };
   }, [transactions]);
@@ -549,18 +586,38 @@ export default function Transactions() {
     return { receita: totalRev / diffDays, despesa: totalExp / diffDays, days: diffDays };
   }, [filteredTransactions]);
 
+  // Pagamentos granulares da filial: base do gráfico diário, igual ao relatório
+  const { data: allPayments = [] } = useQuery({
+    queryKey: ['transaction-payments', selectedCompanyId],
+    queryFn: () => base44.entities.TransactionPayment.filter({ company_id: selectedCompanyId }),
+    initialData: []
+  });
+
   const dailyCashFlow = useMemo(() => {
+    const txMap = new Map(transactions.map(t => [t.id, t]));
     const grouped = {};
+    const pushDay = (date, type, valor) => {
+      if (!date) return;
+      if (!grouped[date]) grouped[date] = { date, receita: 0, despesa: 0 };
+      if (type === 'receita') grouped[date].receita += valor;
+      else grouped[date].despesa += valor;
+    };
+    // 1) Cada pagamento no dia em que entrou/saiu de verdade
+    allPayments.forEach(p => {
+      const t = txMap.get(p.transaction_id);
+      if (!t) return;
+      pushDay(String(p.payment_date || '').slice(0, 10), t.type, Number(p.amount || 0));
+    });
+    // 2) Legado: lançamentos pagos sem registros granulares
+    const txIdsWithPayment = new Set(allPayments.map(p => p.transaction_id));
     filteredTransactions.forEach(t => {
+      if (txIdsWithPayment.has(t.id)) return;
       if (t.status === 'pago' && t.payment_date) {
-        const date = t.payment_date;
-        if (!grouped[date]) grouped[date] = { date, receita: 0, despesa: 0 };
-        if (t.type === 'receita') grouped[date].receita += (t.paid_amount || 0);
-        else grouped[date].despesa += (t.paid_amount || 0);
+        pushDay(String(t.payment_date).slice(0, 10), t.type, Number(t.paid_amount || 0));
       }
     });
     return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date)).map(item => ({ ...item, formattedDate: formatDate(item.date).slice(0, 5) }));
-  }, [filteredTransactions]);
+  }, [filteredTransactions, transactions, allPayments]);
 
   const statusColors = {
     pendente: "bg-yellow-100 text-yellow-800",

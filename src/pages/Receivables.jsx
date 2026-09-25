@@ -154,7 +154,11 @@ export default function Receivables() {
       const saldoRestante = transaction.amount - (transaction.paid_amount || 0) - (transaction.discount || 0);
       if (valorRecebido <= 0 && abatimento <= 0) throw new Error("Informe o valor recebido ou um abatimento");
       if (valorRecebido > 0 && !accountId) throw new Error("Selecione a conta de destino do recebimento");
-      if (valorRecebido > saldoRestante + 0.005) throw new Error(`Valor recebido excede o saldo restante (${formatBRL(Math.max(0, saldoRestante))})`);
+      // Recebimento + abatimento não pode ultrapassar o saldo restante: sem isso
+      // o caixa registra o valor cheio e a transação só o valor cortado
+      if (valorRecebido + abatimento > saldoRestante + 0.005) {
+        throw new Error(`Valor recebido + abatimento excede o saldo restante (${formatBRL(Math.max(0, saldoRestante))})`);
+      }
 
       const prevPaid = transaction.paid_amount || 0;
       const prevDiscount = transaction.discount || 0;

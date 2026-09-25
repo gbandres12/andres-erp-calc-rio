@@ -137,15 +137,18 @@ export default function Payables() {
         account_id: accountId || transaction.account_id
       });
 
-      // Create Payment Record
+      // Create Payment Record — pelo valor EFETIVAMENTE aplicado (após o corte
+      // no total), que é a fonte da verdade do saldo da conta
+      const effectiveAmount = Math.max(0, newPaid - currentPaid);
+      const effectiveDiscount = Math.max(0, newDiscountTotal - (transaction.discount || 0));
       const account = accounts.find(a => a.id === accountId);
       const user = await base44.auth.me();
 
       await base44.entities.TransactionPayment.create({
         transaction_id: id,
         transaction_reference: transaction.description,
-        amount: amount,
-        discount: abatimento,
+        amount: effectiveAmount,
+        discount: effectiveDiscount,
         payment_date: date,
         account_id: accountId,
         account_name: account?.name || '',
