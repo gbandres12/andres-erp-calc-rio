@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,12 @@ const STATUS_CONFIG = {
   rejeitada:       { label: "Rejeitada",         color: "bg-red-100 text-red-700",       icon: XCircle },
   erro_integracao: { label: "Erro de Integração",color: "bg-orange-100 text-orange-700", icon: AlertCircle },
   cancelada:       { label: "Cancelada",         color: "bg-slate-200 text-slate-600",   icon: XCircle },
+};
+
+const PENDING_STATUSES = ["validando", "enviada", "processando"];
+const FINAL_STATUSES = {
+  autorizada: { type: "success", text: "Nota autorizada pela SEFAZ!" },
+  rejeitada: { type: "error", text: "Nota rejeitada pela SEFAZ — veja o motivo na tela" },
 };
 
 export default function FiscalInvoiceDetail() {
@@ -62,12 +68,38 @@ export default function FiscalInvoiceDetail() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  const pollStartRef = useRef(null);
+  const emittingRef = useRef(false);
+  const emittedRef = useRef(false);
+
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["fiscal_invoice", invoiceId],
-    queryFn: () => base44.entities.FiscalInvoice.get(invoiceId),
+    queryFn: async () => {
+      const inv = await base44.entities.FiscalInvoice.get(invoiceId);
+      // Nota em processamento na SEFAZ: consulta o status real e relê
+      if (["enviada", "processando"].includes(inv?.status) && inv.api_reference) {
+        await queryFiscalStatus({ invoice_id: invoiceId }).catch(() => null);
+        return base44.entities.FiscalInvoice.get(invoiceId);
+      }
+      return inv;
+    },
     enabled: !!invoiceId,
-    refetchInterval: (data) => ["enviada","processando"].includes(data?.status) ? 10000 : false
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (emittingRef.current || !PENDING_STATUSES.includes(status)) { pollStartRef.current = null; return false; }
+      if (!pollStartRef.current) pollStartRef.current = Date.now();
+      return Date.now() - pollStartRef.current < 60000 ? 2500 : 10000;
+    }
   });
+
+  useEffect(() => {
+    if (invoice && FINAL_STATUSES[invoice.status] && emittedRef.current) {
+      emittedRef.current = false;
+      const { type, text } = FINAL_STATUSES[invoice.status];
+      toast[type](text);
+      queryClient.invalidateQueries({ queryKey: ["fiscal_events", invoiceId] });
+    }
+  }, [invoice?.status]);
 
   const { data: events = [] } = useQuery({
     queryKey: ["fiscal_events", invoiceId],
@@ -77,13 +109,23 @@ export default function FiscalInvoiceDetail() {
 
   const emitMutation = useMutation({
     mutationFn: () => emitFiscalInvoice({ invoice_id: invoiceId }),
+    onMutate: () => {
+      // Mostra "Validando" na hora, sem esperar o servidor
+      emittingRef.current = true;
+      queryClient.setQueryData(["fiscal_invoice", invoiceId], (old) => old && { ...old, status: "validando", error_message: "", error_code: "" });
+      toast.info("Enviando nota para a SEFAZ...");
+    },
     onSuccess: (res) => {
       if (res.data?.error) { toast.error(res.data.error); return; }
-      toast.success("Nota enviada para emissão!");
-      queryClient.invalidateQueries(["fiscal_invoice", invoiceId]);
-      queryClient.invalidateQueries(["fiscal_events", invoiceId]);
+      emittedRef.current = true;
+      if (res.data?.status === "processando") queryFiscalStatus({ invoice_id: invoiceId }).catch(() => null);
     },
-    onError: (e) => toast.error(e.response?.data?.error || e.message || "Erro ao emitir nota")
+    onError: (e) => toast.error(e.response?.data?.error || e.message || "Erro ao emitir nota"),
+    onSettled: () => {
+      emittingRef.current = false;
+      queryClient.invalidateQueries({ queryKey: ["fiscal_invoice", invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["fiscal_events", invoiceId] });
+    }
   });
 
   const checkStatusMutation = useMutation({
@@ -191,7 +233,7 @@ export default function FiscalInvoiceDetail() {
           </div>
         </div>
         <span className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${sc.color}`}>
-          <StatusIcon className="w-4 h-4" />
+          <StatusIcon className={`w-4 h-4 ${PENDING_STATUSES.includes(invoice.status) ? "animate-spin" : ""}`} />
           {sc.label}
         </span>
       </div>
@@ -216,8 +258,7 @@ export default function FiscalInvoiceDetail() {
           </Button>
         )}
         {["rascunho","pendente_envio","rejeitada","erro_integracao"].includes(invoice.status) && (
-          <Button onClick={() => emitMutation.mutate()} disabled={emitMutation.isPending} className="bg-violet-600 hover:bg-violet-700">
-            {emitMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-1" /> : null}
+          <Button onClick={() => emitMutation.mutate()} className="bg-violet-600 hover:bg-violet-700">
             Emitir Nota
           </Button>
         )}

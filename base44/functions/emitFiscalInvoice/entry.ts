@@ -27,7 +27,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: message }, { status: 400 });
     };
 
-    const configs = await base44.asServiceRole.entities.FiscalConfig.filter({ company_id: invoice.company_id });
+    // Config e produtos buscados em paralelo
+    const [configs, products] = await Promise.all([
+      base44.asServiceRole.entities.FiscalConfig.filter({ company_id: invoice.company_id }),
+      Promise.all((invoice.items || []).map((item) => item.product_id
+        ? base44.asServiceRole.entities.Product.get(item.product_id).catch(() => null)
+        : null))
+    ]);
     const config = configs[0];
     const configError = validateConfig(config, invoice);
     if (configError) return await reject(configError);
@@ -37,9 +43,6 @@ Deno.serve(async (req) => {
     const invoiceError = validateInvoice(invoice);
     if (invoiceError) return await reject(invoiceError);
 
-    const products = await Promise.all(invoice.items.map(async (item) => item.product_id
-      ? await base44.asServiceRole.entities.Product.get(item.product_id)
-      : null));
     const items = [];
     for (let index = 0; index < invoice.items.length; index += 1) {
       const error = validateProduct(products[index], invoice, index);
@@ -95,7 +98,8 @@ Deno.serve(async (req) => {
     if (data.nNf) updateData.number = Number(data.nNf);
     if (data.serie) updateData.serie = String(data.serie);
     await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, updateData);
-    await base44.asServiceRole.entities.FiscalEvent.create({
+    // Histórico gravado sem bloquear a resposta
+    base44.asServiceRole.entities.FiscalEvent.create({
       invoice_id: invoiceId,
       company_id: invoice.company_id,
       event_type: 'emissao',
@@ -105,7 +109,7 @@ Deno.serve(async (req) => {
       response_summary: JSON.stringify(data).slice(0, 500),
       duration_ms: duration,
       triggered_by: user.id
-    });
+    }).catch((e) => console.error('FiscalEvent', e.message));
     return Response.json({ success: true, status, data: updateData });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
@@ -376,7 +380,7 @@ async function recordFailure(base44, invoice, invoiceId, userId, message, durati
     error_code: String(httpStatus),
     retry_count: (invoice.retry_count || 0) + 1
   });
-  await base44.asServiceRole.entities.FiscalEvent.create({
+  base44.asServiceRole.entities.FiscalEvent.create({
     invoice_id: invoiceId,
     company_id: invoice.company_id,
     event_type: 'emissao',
@@ -387,5 +391,5 @@ async function recordFailure(base44, invoice, invoiceId, userId, message, durati
     duration_ms: duration,
     error_message: message,
     triggered_by: userId
-  });
+  }).catch((e) => console.error('FiscalEvent', e.message));
 }
