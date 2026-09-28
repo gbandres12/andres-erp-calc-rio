@@ -10,7 +10,7 @@ import { formatBRL, formatDate } from "@/components/utils/formatters";
 import { format, parseISO, subDays, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const getTodayStr = () => new Date().toISOString().split("T")[0];
+const getTodayStr = () => new Date().toLocaleDateString("en-CA");
 
 export default function DailyFinancialReport() {
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
@@ -22,17 +22,37 @@ export default function DailyFinancialReport() {
     initialData: [],
   });
 
-  const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions", selectedCompanyId],
-    queryFn: () => base44.entities.Transaction.filter({ company_id: selectedCompanyId }, "-created_date"),
-    initialData: [],
+  const { data: dayData = { transactions: [], payments: [], paidTxIds: [] } } = useQuery({
+    queryKey: ["daily-report", selectedCompanyId, selectedDate],
+    queryFn: async () => {
+      const E = base44.entities;
+      const next = addDays(parseISO(selectedDate), 1).toLocaleDateString("en-CA");
+      const startIso = new Date(`${selectedDate}T00:00:00`).toISOString();
+      const endIso = new Date(`${next}T00:00:00`).toISOString();
+      const dayRange = { $gte: selectedDate, $lt: next };
+      const createdRange = { $gte: startIso, $lt: endIso };
+      const [dayPayments, legacyCandidates] = await Promise.all([
+        E.TransactionPayment.filter({ company_id: selectedCompanyId, $or: [{ payment_date: dayRange }, { created_date: createdRange }] }, null, 1000),
+        E.Transaction.filter({
+          company_id: selectedCompanyId,
+          status: { $in: ["pago", "parcial"] },
+          $or: [{ payment_date: dayRange }, { due_date: dayRange }, { created_date: createdRange }],
+        }, null, 1000),
+      ]);
+      const missingIds = [...new Set(dayPayments.map((p) => p.transaction_id))].filter((id) => !legacyCandidates.some((t) => t.id === id));
+      const [paymentTxs, legacyPays] = await Promise.all([
+        missingIds.length ? E.Transaction.filter({ id: { $in: missingIds } }, null, 1000) : [],
+        legacyCandidates.length ? E.TransactionPayment.filter({ transaction_id: { $in: legacyCandidates.map((t) => t.id) } }, null, 5000) : [],
+      ]);
+      return {
+        transactions: [...legacyCandidates, ...paymentTxs],
+        payments: dayPayments,
+        paidTxIds: [...dayPayments, ...legacyPays].map((p) => p.transaction_id),
+      };
+    },
+    enabled: !!selectedCompanyId,
   });
-
-  const { data: payments = [] } = useQuery({
-    queryKey: ["transaction-payments", selectedCompanyId],
-    queryFn: () => base44.entities.TransactionPayment.filter({ company_id: selectedCompanyId }),
-    initialData: [],
-  });
+  const { transactions, payments, paidTxIds } = dayData;
 
   const mainAccount = accounts[0];
 
@@ -64,7 +84,7 @@ export default function DailyFinancialReport() {
 
   const movements = useMemo(() => {
     const list = [];
-    const txIdsWithPayment = new Set(payments.map((p) => p.transaction_id));
+    const txIdsWithPayment = new Set(paidTxIds);
 
     payments
       .filter((p) => {
@@ -133,7 +153,7 @@ export default function DailyFinancialReport() {
       });
 
     return list.sort((a, b) => a.description.localeCompare(b.description, "pt-BR"));
-  }, [transactions, payments, selectedDate, txMap]);
+  }, [transactions, payments, paidTxIds, selectedDate, txMap]);
 
   const entradas = movements.filter((m) => m.type === "receita" && !m.isAbatimento);
   const saidas = movements.filter((m) => m.type === "despesa" && !m.isAbatimento);
@@ -146,8 +166,8 @@ export default function DailyFinancialReport() {
   const saldoFinal = mainAccount?.current_balance ?? 0;
   const saldoInicial = saldoFinal - totalEntradas + totalSaidas;
 
-  const goToPrevDay = () => setSelectedDate((d) => subDays(parseISO(d), 1).toISOString().split("T")[0]);
-  const goToNextDay = () => setSelectedDate((d) => addDays(parseISO(d), 1).toISOString().split("T")[0]);
+  const goToPrevDay = () => setSelectedDate((d) => subDays(parseISO(d), 1).toLocaleDateString("en-CA"));
+  const goToNextDay = () => setSelectedDate((d) => addDays(parseISO(d), 1).toLocaleDateString("en-CA"));
 
   const formattedDateLabel = format(parseISO(selectedDate), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
