@@ -47,6 +47,7 @@ export default function FiscalInvoices() {
     const matchesStatus = filterStatus === "all" || STATUS_GROUPS[filterStatus]?.includes(inv.status);
     const matchesSearch = !search ||
       inv.reference?.toLowerCase().includes(search.toLowerCase()) ||
+      String(inv.number || "").includes(search) ||
       inv.recipient_name?.toLowerCase().includes(search.toLowerCase()) ||
       inv.api_access_key?.includes(search);
     return matchesStatus && matchesSearch;
@@ -131,7 +132,7 @@ export default function FiscalInvoices() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left px-4 py-3 text-slate-600 font-medium">Referência</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-medium">Nº SEFAZ</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Tipo</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Destinatário</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Data</th>
@@ -145,7 +146,13 @@ export default function FiscalInvoices() {
                 const sc = STATUS_CONFIG[inv.status] || { label: inv.status, color: "bg-gray-100 text-gray-600" };
                 return (
                   <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-medium text-slate-800">{inv.reference}</td>
+                    <td className="px-4 py-3 font-mono">
+                      <div className="font-semibold text-slate-800">
+                        {inv.number ? `Nº ${String(inv.number).padStart(6, "0")}` : "Sem número"}
+                        <span className="text-xs text-slate-500 font-normal ml-1">Série {inv.serie || "1"}</span>
+                      </div>
+                      <div className="text-xs text-slate-400">{inv.reference}</div>
+                    </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-medium text-violet-700 bg-violet-50 px-2 py-0.5 rounded">
                         {DOC_TYPES[inv.document_type] || inv.document_type}
