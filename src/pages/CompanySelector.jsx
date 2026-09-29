@@ -139,8 +139,11 @@ export default function CompanySelector() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="flex items-center justify-center min-h-screen p-6">
+    <div
+      className="min-h-screen bg-cover bg-center bg-fixed"
+      style={{ backgroundImage: "url(https://media.base44.com/images/public/68ea91a66a9614db4a82043d/9ac9ecdea_ChatGPTImage25desetde202611_41_41.png)" }}
+    >
+      <div className="flex items-center justify-center min-h-screen p-6 bg-white/60 backdrop-blur-[2px]">
         <div className="w-full max-w-5xl">
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-14 h-14 bg-slate-800 rounded-xl mb-5">
