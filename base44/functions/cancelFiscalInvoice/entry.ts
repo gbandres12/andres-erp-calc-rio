@@ -29,10 +29,10 @@ Deno.serve(async (req) => {
     if (!apiKey) return Response.json({ error: `Chave NotaAs desta empresa não configurada (segredo ${secretName})` }, { status: 500 });
 
     const startTime = Date.now();
-    const response = await fetch(`https://platform.notaas.com.br/api/v1/nfe/invoices/${invoice.api_reference}/cancelar`, {
+    const response = await fetch('https://platform.notaas.com.br/api/v1/nfe/cancelar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({ justificativa: reason.trim() }),
+      body: JSON.stringify({ invoiceId: invoice.api_reference, justificativa: reason.trim(), motivo: reason.trim() }),
       signal: AbortSignal.timeout(30000)
     });
     const text = await response.text();
