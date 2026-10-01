@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, FileText, RefreshCw, Eye } from "lucide-react";
+import { Plus, Search, FileText, RefreshCw, Eye, Download } from "lucide-react";
+import ExportMonthDialog from "@/components/fiscal/ExportMonthDialog";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { formatCurrency, formatDate } from "@/components/utils/formatters";
@@ -34,6 +35,7 @@ const STATUS_GROUPS = {
 export default function FiscalInvoices() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [exportOpen, setExportOpen] = useState(false);
   const companyId = localStorage.getItem("selectedCompanyId");
   const queryClient = useQueryClient();
 
@@ -72,6 +74,10 @@ export default function FiscalInvoices() {
           <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries(["fiscal_invoices"])}>
             <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
+            <Download className="w-4 h-4 mr-1" /> Exportar mês
+          </Button>
+          <ExportMonthDialog open={exportOpen} onOpenChange={setExportOpen} companyId={companyId} />
           <Button asChild>
             <Link to={createPageUrl("FiscalInvoiceForm")}>
               <Plus className="w-4 h-4 mr-1" /> Nova Nota
