@@ -62,51 +62,41 @@ export default function PaymentReceipt({ payment, sale, previousPayments = [] })
           )}
         </div>
 
+        {/* VALOR ABATIDO EM DESTAQUE */}
+        <div style={{ background: '#000', color: '#fff', textAlign: 'center', padding: '10px 6px', borderRadius: '4px', marginBottom: '10px' }}>
+          <div style={{ fontSize: '8pt', letterSpacing: '2px', fontWeight: 'bold' }}>VALOR ABATIDO</div>
+          <div style={{ fontSize: '22pt', fontWeight: 'bold', fontFamily: 'Arial, sans-serif', marginTop: '2px' }}>
+            {formatBRL(payment.amount)}
+          </div>
+          {payment.discount > 0 && (
+            <div style={{ fontSize: '9pt', marginTop: '3px' }}>+ desconto {formatBRL(payment.discount)}</div>
+          )}
+        </div>
+
         {/* VALORES */}
-        <div style={{ 
-          border: '2px solid #000', 
-          padding: '10px', 
-          marginBottom: '12px',
-          background: '#f5f5f5'
-        }}>
-          <table style={{ width: '100%', fontSize: '9pt' }}>
+        <div style={{ border: '2px solid #000', padding: '8px 10px', marginBottom: '10px', fontFamily: 'Arial, sans-serif' }}>
+          <table style={{ width: '100%', fontSize: '10pt', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
-                <td style={{ padding: '3px 0' }}>Valor Total Venda:</td>
-                <td style={{ padding: '3px 0', textAlign: 'right', fontWeight: 'bold' }}>
-                  {formatBRL(sale.total)}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ padding: '3px 0' }}>Saldo Anterior:</td>
-                <td style={{ padding: '3px 0', textAlign: 'right' }}>
-                  {formatBRL(saldoAnterior)}
-                </td>
+                <td style={{ padding: '4px 0' }}>Total da Venda</td>
+                <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: 'bold', fontSize: '12pt' }}>{formatBRL(sale.total)}</td>
               </tr>
               <tr style={{ borderTop: '1px dashed #000' }}>
-                <td style={{ padding: '6px 0 3px 0', fontSize: '11pt' }}>
-                  <strong>Valor Pago:</strong>
-                </td>
-                <td style={{ padding: '6px 0 3px 0', textAlign: 'right', fontSize: '12pt', fontWeight: 'bold' }}>
-                  {formatBRL(payment.amount)}
-                </td>
+                <td style={{ padding: '4px 0' }}>Saldo Anterior</td>
+                <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: 'bold', fontSize: '12pt' }}>{formatBRL(saldoAnterior)}</td>
               </tr>
-              <tr style={{ borderTop: '2px solid #000' }}>
-                <td style={{ padding: '6px 0 0 0', fontSize: '11pt' }}>
-                  <strong>Saldo Restante:</strong>
-                </td>
-                <td style={{ 
-                  padding: '6px 0 0 0', 
-                  textAlign: 'right', 
-                  fontSize: '13pt', 
-                  fontWeight: 'bold',
-                  color: saldoRestante > 0.01 ? '#d97706' : '#059669'
-                }}>
-                  {formatBRL(saldoRestante)}
-                </td>
+              <tr style={{ borderTop: '1px dashed #000' }}>
+                <td style={{ padding: '4px 0' }}>(−) Abatido agora</td>
+                <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: 'bold', fontSize: '12pt' }}>{formatBRL(payment.amount)}</td>
               </tr>
             </tbody>
           </table>
+          <div style={{ borderTop: '2px solid #000', marginTop: '6px', paddingTop: '6px', textAlign: 'center' }}>
+            <div style={{ fontSize: '8pt', letterSpacing: '1.5px', fontWeight: 'bold' }}>SALDO RESTANTE</div>
+            <div style={{ fontSize: '20pt', fontWeight: 'bold', color: saldoRestante > 0.01 ? '#b45309' : '#047857' }}>
+              {formatBRL(saldoRestante)}
+            </div>
+          </div>
         </div>
 
         {saldoRestante > 0.01 && (

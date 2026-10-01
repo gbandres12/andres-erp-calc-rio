@@ -151,8 +151,8 @@ export default function A4Receipt({ type, data, onPrint }) {
               borderRadius: '4px',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '11pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>PEDIDO DE VENDA</div>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold', marginTop: '2px' }}>N° {data.reference || ''}</div>
+              <div style={{ fontSize: '9pt', fontWeight: 'bold', letterSpacing: '1.5px', opacity: 0.9 }}>PEDIDO DE VENDA</div>
+              <div style={{ fontSize: '16pt', fontWeight: 'bold', marginTop: '3px', letterSpacing: '0.5px' }}>N° {data.reference || ''}</div>
             </div>
             <div style={{
               display: 'flex',
@@ -259,18 +259,32 @@ export default function A4Receipt({ type, data, onPrint }) {
                   <td style={{ padding: '4px 10px', textAlign: 'right', border: '1px solid #ddd', fontWeight: 'bold' }}>{formatBRL(0)}</td>
                 </tr>
                 <tr style={{ background: GREEN, color: '#fff' }}>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '10pt', border: `1px solid ${GREEN}` }}><strong>VALOR TOTAL</strong></td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '11pt', fontWeight: 'bold', border: `1px solid ${GREEN}` }}>{formatBRL(data.total || 0)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '11pt', border: `1px solid ${GREEN}` }}><strong>VALOR TOTAL</strong></td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: '16pt', fontWeight: 'bold', border: `1px solid ${GREEN}` }}>{formatBRL(data.total || 0)}</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* RESUMO DESTACADO */}
+          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+            {[
+              { label: 'TOTAL DO PEDIDO', value: data.total || 0, color: GREEN_DARK, bg: '#eaf4ee' },
+              { label: 'VALOR PAGO', value: data.paid_amount || 0, color: GREEN, bg: '#eaf4ee' },
+              { label: 'SALDO A PAGAR', value: data.remaining_amount ?? Math.max(0, (data.total || 0) - (data.paid_amount || 0)), color: (data.remaining_amount || 0) > 0.01 ? RED : GREEN, bg: (data.remaining_amount || 0) > 0.01 ? '#fdecec' : '#eaf4ee' },
+            ].map(k => (
+              <div key={k.label} style={{ flex: 1, background: k.bg, borderLeft: `4px solid ${k.color}`, borderRadius: '3px', padding: '6px 10px' }}>
+                <div style={{ fontSize: '7.5pt', fontWeight: 'bold', color: '#555', letterSpacing: '0.8px' }}>{k.label}</div>
+                <div style={{ fontSize: '17pt', fontWeight: 'bold', color: k.color, marginTop: '2px' }}>{formatBRL(k.value)}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* FORMA / CONDIÇÕES DE PAGAMENTO */}
         <div style={{ marginTop: '8px', position: 'relative', zIndex: 1 }}>
           <SectionHeader title="Forma / Condições de Pagamento" />
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt' }}>
             <thead>
               <tr style={{ background: GREEN, color: '#fff' }}>
                 <th style={{ border: `1px solid ${GREEN}`, padding: '5px', textAlign: 'left' }}>Descrição</th>
@@ -283,11 +297,11 @@ export default function A4Receipt({ type, data, onPrint }) {
             <tbody>
               {paymentRows.map((row, idx) => (
                 <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : GREY_BG }}>
-                  <td style={{ border: '1px solid #ddd', padding: '5px' }}>{row.descricao}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{row.vencimento}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'center' }}>{row.pagamento}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right' }}>{formatBRL(row.valor)}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '5px', textAlign: 'right', fontWeight: 'bold', color: row.saldo > 0 ? RED : GREEN }}>
+                  <td style={{ border: '1px solid #ddd', padding: '6px 5px' }}>{row.descricao}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '6px 5px', textAlign: 'center' }}>{row.vencimento}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '6px 5px', textAlign: 'center' }}>{row.pagamento}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '6px 5px', textAlign: 'right', fontWeight: 'bold', fontSize: '10pt' }}>{formatBRL(row.valor)}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '6px 5px', textAlign: 'right', fontWeight: 'bold', fontSize: '10pt', color: row.saldo > 0 ? RED : GREEN }}>
                     {formatBRL(row.saldo)}
                   </td>
                 </tr>
