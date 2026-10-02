@@ -168,6 +168,7 @@ export default function Contacts() {
       type: contact.type || "cliente",
       name: contact.name || "",
       document: contact.document || "",
+      ie: contact.ie || "",
       email: contact.email || "",
       phone: contact.phone || "",
       address: contact.address || "",
@@ -738,6 +739,14 @@ export default function Contacts() {
                       inputMode="numeric"
                     />
                     <p className="text-xs text-slate-500">Digite o CNPJ para preencher os dados automaticamente.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Inscrição Estadual</Label>
+                    <Input
+                      value={formData.ie || ""}
+                      onChange={(e) => setFormData({ ...formData, ie: e.target.value })}
+                      placeholder="IE do produtor rural ou ISENTO"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Telefone</Label>

@@ -63,7 +63,7 @@ export default function NewClientDialog({ open, onOpenChange, companyId, onClien
   const switchType = (type) => {
     if (type === personType) return;
     setPersonType(type);
-    setClient(prev => ({ ...prev, document: "", ie: "" }));
+    setClient(prev => ({ ...prev, document: "" }));
   };
 
   const handleSave = async () => {
@@ -83,7 +83,7 @@ export default function NewClientDialog({ open, onOpenChange, companyId, onClien
         city: (client.municipio || "").trim(),
         state: (client.uf || "").toUpperCase(),
         zip_code: client.cep || "",
-        ...(isPj && (client.ie || "").trim() ? { ie: (client.ie || "").trim() } : {}),
+        ...((client.ie || "").trim() ? { ie: (client.ie || "").trim() } : {}),
         company_id: companyId
       });
       toast.success(`Cliente "${created.name}" cadastrado!`);
@@ -150,12 +150,10 @@ export default function NewClientDialog({ open, onOpenChange, companyId, onClien
             />
             {isPj && <p className="text-xs text-slate-500">Digite o CNPJ para preencher os dados automaticamente.</p>}
           </div>
-          {isPj && (
-            <div className="space-y-1">
-              <Label htmlFor="nc-ie">Inscrição Estadual</Label>
-              <Input id="nc-ie" value={client.ie || ""} onChange={e => setField("ie", e.target.value)} placeholder="ISENTO" />
-            </div>
-          )}
+          <div className="space-y-1">
+            <Label htmlFor="nc-ie">Inscrição Estadual {!isPj && "(produtor rural)"}</Label>
+            <Input id="nc-ie" value={client.ie || ""} onChange={e => setField("ie", e.target.value)} placeholder={isPj ? "ISENTO" : "IE do produtor rural"} />
+          </div>
           <div className="space-y-1">
             <Label htmlFor="nc-email">Email</Label>
             <Input id="nc-email" type="email" value={client.email || ""} onChange={e => setField("email", e.target.value)} />
