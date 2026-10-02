@@ -138,17 +138,22 @@ export async function mirrorReceivingToSale(base44, { transaction, companyId, am
   const sale = await findLinkedSale(base44, transaction, companyId);
   if (!sale) return null;
 
-  const openBalance = saleOpenBalance(sale);
-  const discApplied = round2(Math.min(Number(discount || 0), openBalance));
-  const applyAmount = round2(Math.min(Number(amount || 0), openBalance - discApplied));
-  if (applyAmount <= 0 && discApplied <= 0) return null;
-
   // Tag do ID da venda no lançamento: exclusão da venda apaga exatamente os lançamentos dela
   if (!(transaction.notes || "").includes(`sale_id:${sale.id}`)) {
     await base44.entities.Transaction.update(transaction.id, {
       notes: `${(transaction.notes || "").trim()} | sale_id:${sale.id}`.trim()
     });
   }
+  return applyPaymentToSale(base44, sale, { companyId, amount, discount, date, accountId, paymentMethod, notes });
+}
+
+// Registra um recebimento na venda (SalePayment + saldo/status + parcelas).
+// Não mexe em lançamentos financeiros — o relatório diário conta só TransactionPayment.
+export async function applyPaymentToSale(base44, sale, { companyId, amount, discount = 0, date, accountId, paymentMethod = "dinheiro", notes = "" }) {
+  const openBalance = saleOpenBalance(sale);
+  const discApplied = round2(Math.min(Number(discount || 0), openBalance));
+  const applyAmount = round2(Math.min(Number(amount || 0), openBalance - discApplied));
+  if (applyAmount <= 0 && discApplied <= 0) return null;
 
   await base44.entities.SalePayment.create({
     sale_id: sale.id,

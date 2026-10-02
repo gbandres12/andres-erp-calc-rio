@@ -30,7 +30,9 @@ const emptyForm = {
   account_id: "",
   contact_id: "",
   cost_center: "",
-  notes: ""
+  notes: "",
+  link_sale_id: "",
+  link_transaction_id: ""
 };
 
 export default function TransactionFormDialog({
@@ -353,7 +355,7 @@ export default function TransactionFormDialog({
                 <p className="text-xs text-slate-500">Necessário para o extrato por centro de custo e abatimentos.</p>
               </div>
 
-              <PaymentStatusSection formData={formData} setFormData={setFormData} accounts={accounts} />
+              <PaymentStatusSection formData={formData} setFormData={setFormData} accounts={accounts} transactions={transactions} isEditing={!!editingTransaction} />
 
               <div className="space-y-2">
                 <Label>Observações</Label>

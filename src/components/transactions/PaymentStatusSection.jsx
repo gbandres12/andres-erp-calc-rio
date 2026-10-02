@@ -4,13 +4,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LinkSelector from "@/components/transactions/LinkSelector";
 import { formatBRL, getTodayDate } from "@/components/utils/formatters";
 
-export default function PaymentStatusSection({ formData, setFormData, accounts }) {
+export default function PaymentStatusSection({ formData, setFormData, accounts, transactions, isEditing }) {
   const isPaid = formData.status === "pago";
   const isIncome = formData.type === "receita";
   const setStatus = (status) => setFormData(prev => ({
-    ...prev, status, payment_date: status === "pago" ? (prev.payment_date || getTodayDate()) : prev.payment_date
+    ...prev, status,
+    ...(status !== "pago" ? { link_sale_id: "", link_transaction_id: "" } : {}), payment_date: status === "pago" ? (prev.payment_date || getTodayDate()) : prev.payment_date
   }));
   const btn = (active, color) => cn("flex items-center justify-center gap-2 py-3 rounded-lg border-2 font-semibold text-sm transition-all",
     active ? color : "border-slate-200 text-slate-500 hover:border-slate-300");
@@ -26,6 +28,8 @@ export default function PaymentStatusSection({ formData, setFormData, accounts }
           <Clock className="w-4 h-4" /> {isIncome ? "A receber" : "A pagar"}
         </button>
       </div>
+
+      {isPaid && !isEditing && <LinkSelector formData={formData} setFormData={setFormData} transactions={transactions} />}
 
       {isPaid ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

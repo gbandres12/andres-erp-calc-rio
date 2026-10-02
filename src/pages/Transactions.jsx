@@ -19,7 +19,7 @@ import TransactionFormDialog from "@/components/transactions/TransactionFormDial
 import QuickEntryDialog from "@/components/transactions/QuickEntryDialog";
 import ReceivePayDialog from "@/components/transactions/ReceivePayDialog";
 import TransactionRow from "@/components/transactions/TransactionRow";
-import { mirrorReceivingToSale } from "@/utils/saleFinance";
+import { mirrorReceivingToSale, findOpenSaleReceivable, applyPaymentToSale } from "@/utils/saleFinance";
 
 export default function Transactions() {
   const queryClient = useQueryClient();
@@ -91,8 +91,7 @@ export default function Transactions() {
     initialData: []
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data) => {
+  async function createMutationBody(data) {
       const transaction = await base44.entities.Transaction.create({
         ...data,
         company_id: selectedCompanyId,
@@ -119,13 +118,32 @@ export default function Transactions() {
       }
       await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return transaction;
+  }
+
+  const createMutation = useMutation({
+    mutationFn: async ({ link_sale_id, link_transaction_id, ...data }) => {
+      const payArgs = { amount: data.amount, discount: 0, date: data.payment_date || getTodayDate(), accountId: data.account_id, paymentMethod: 'dinheiro', notes: data.notes, costCenter: data.cost_center };
+      // Vinculado a um título em aberto: baixa nele (1 pagamento só, sem lançamento duplicado)
+      if (link_transaction_id) return registerPayment({ id: link_transaction_id, ...payArgs });
+      if (link_sale_id) {
+        const sale = await base44.entities.Sale.get(link_sale_id);
+        const receivable = await findOpenSaleReceivable(base44, sale);
+        if (receivable) return registerPayment({ id: receivable.id, ...payArgs });
+        // Venda sem "Saldo a Receber": cria o lançamento marcado com a venda e espelha nela
+        const tx = await createMutationBody({ ...data, notes: `${data.notes || ''} | sale_id:${sale.id}`.trim() });
+        await applyPaymentToSale(base44, sale, { companyId: selectedCompanyId, amount: data.amount, date: payArgs.date, accountId: data.account_id, notes: data.notes });
+        return tx;
+      }
+      return createMutationBody(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
       queryClient.invalidateQueries(['transaction-payments']);
+      queryClient.invalidateQueries(['sales']);
+      queryClient.invalidateQueries(['open-sales-link']);
       closeFormDialog();
-      toast.success("Lançamento criado com sucesso!");
+      toast.success("Lançamento registrado com sucesso!");
     }
   });
 
@@ -206,9 +224,8 @@ export default function Transactions() {
     }
   });
 
-  const registerPaymentMutation = useMutation({
-    mutationFn: async ({ id, amount, discount, date, accountId, paymentMethod, notes, costCenter }) => {
-      const transaction = transactions.find(t => t.id === id);
+  async function registerPayment({ id, amount, discount, date, accountId, paymentMethod, notes, costCenter }) {
+      const transaction = transactions.find(t => t.id === id) || await base44.entities.Transaction.get(id);
       if (!transaction) throw new Error("Transação não encontrada");
 
       const currentPaidAmount = transaction.paid_amount || 0;
@@ -288,7 +305,10 @@ export default function Transactions() {
 
       await base44.functions.invoke('recalculateBalance', { company_id: selectedCompanyId });
       return { transaction, newStatus, newPaidAmount, remainingAmount, mirror };
-    },
+  }
+
+  const registerPaymentMutation = useMutation({
+    mutationFn: registerPayment,
     onSuccess: ({ newStatus, remainingAmount, mirror }) => {
       queryClient.invalidateQueries(['transactions']);
       queryClient.invalidateQueries(['accounts']);
