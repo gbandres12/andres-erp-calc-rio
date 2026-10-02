@@ -31,6 +31,54 @@ export async function createPaidTransaction(base44, payload, extras = {}) {
   return tx;
 }
 
+// Localiza o título "Saldo a Receber" em aberto de uma venda (criado no faturamento).
+export async function findOpenSaleReceivable(base44, sale) {
+  const list = await base44.entities.Transaction.filter({
+    company_id: sale.company_id,
+    type: "receita",
+    status: { $in: ["pendente", "parcial", "atrasado"] },
+    description: { $regex: "Saldo a Receber" },
+  });
+  return list.find(t => (t.notes || "").includes(`sale_id:${sale.id}`))
+    || list.find(t => (t.description || "").startsWith(`${sale.reference} - Saldo a Receber`))
+    || null;
+}
+
+// Baixa um pagamento (com abatimento) no título "Saldo a Receber" existente,
+// em vez de criar um lançamento novo. Retorna o valor que NÃO coube no título.
+export async function applyToSaleReceivable(base44, receivable, { amount, discount = 0, date, accountId, accountName = "", paymentMethod = "dinheiro", notes = "" }) {
+  const open = receivable.amount - (receivable.paid_amount || 0) - (receivable.discount || 0);
+  const disc = Math.min(Number(discount || 0), Math.max(0, open));
+  const amt = Math.min(Number(amount || 0), Math.max(0, open - disc));
+  if (amt <= 0 && disc <= 0) return { leftover: Number(amount || 0), leftoverDiscount: Number(discount || 0) };
+
+  await base44.entities.TransactionPayment.create({
+    transaction_id: receivable.id,
+    transaction_reference: receivable.description,
+    amount: amt,
+    discount: disc,
+    payment_date: date,
+    account_id: accountId,
+    account_name: accountName,
+    payment_method: paymentMethod,
+    notes,
+    company_id: receivable.company_id,
+  });
+  const newPaid = (receivable.paid_amount || 0) + amt;
+  const newDisc = (receivable.discount || 0) + disc;
+  const remaining = receivable.amount - newPaid - newDisc;
+  const status = remaining <= 0.005 ? "pago" : "parcial";
+  await base44.entities.Transaction.update(receivable.id, {
+    paid_amount: newPaid,
+    discount: newDisc,
+    status,
+    payment_date: status === "pago" ? date : receivable.payment_date,
+    account_id: accountId,
+  });
+  Object.assign(receivable, { paid_amount: newPaid, discount: newDisc, status });
+  return { leftover: Number(amount || 0) - amt, leftoverDiscount: Number(discount || 0) - disc };
+}
+
 // Localiza a venda vinculada a um lançamento: prioriza a tag sale_id em notes;
 // senão casa pela referência (VENDA-xxxxx) quando única na filial.
 export async function findLinkedSale(base44, transaction, companyId) {

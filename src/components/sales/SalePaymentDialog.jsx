@@ -12,7 +12,7 @@ import PaymentReceipt from "@/components/receipts/PaymentReceipt";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import BranchBadge from "@/components/BranchBadge";
-import { createPaidTransaction, reconcileSaleInstallments } from "@/utils/saleFinance";
+import { createPaidTransaction, reconcileSaleInstallments, findOpenSaleReceivable, applyToSaleReceivable } from "@/utils/saleFinance";
 
 const getTodayDate = () => new Date().toISOString().split("T")[0];
 
@@ -72,10 +72,24 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
     setSaving(true);
     try {
       const createdPayments = [];
+      const receivable = await findOpenSaleReceivable(base44, sale);
       for (const p of payments) {
         const amt = parseFloat(p.amount) || 0;
         const disc = parseFloat(p.discount) || 0;
         if (amt <= 0) continue;
+
+        // Baixa primeiro no "Saldo a Receber" existente; só cria lançamento novo para o excedente
+        let txAmt = amt;
+        let txDisc = disc;
+        if (receivable) {
+          const r = await applyToSaleReceivable(base44, receivable, {
+            amount: amt, discount: disc, date: p.date, accountId: p.account_id,
+            paymentMethod: p.payment_method,
+            notes: `${p.description || "Pagamento"}${disc > 0 ? ` | Abatimento: ${formatBRL(disc)}` : ""}`
+          });
+          txAmt = r.leftover;
+          txDisc = r.leftoverDiscount;
+        }
 
         const salePayment = await base44.entities.SalePayment.create({
           sale_id: sale.id,
@@ -88,11 +102,11 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           company_id: sale.company_id,
           notes: p.description || ""
         });
-        await createPaidTransaction(base44, {
+        if (txAmt > 0.005) await createPaidTransaction(base44, {
           description: `${sale.reference} - ${p.description || "Pagamento"} - ${sale.client_name}`,
-          amount: amt,
-          original_amount: amt + disc,
-          discount: disc,
+          amount: txAmt,
+          original_amount: txAmt + txDisc,
+          discount: txDisc,
           discount_type: "valor",
           type: "receita",
           category: "Vendas",
@@ -103,8 +117,8 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           contact_id: sale.client_id,
           contact_name: sale.client_name,
           company_id: sale.company_id,
-          paid_amount: amt,
-          notes: `Venda: ${sale.reference}${disc > 0 ? ` | Abatimento: ${formatBRL(disc)}` : ""}`
+          paid_amount: txAmt,
+          notes: `Venda: ${sale.reference}${txDisc > 0 ? ` | Abatimento: ${formatBRL(txDisc)}` : ""}`
         }, { payment_method: p.payment_method, sale_id: sale.id });
 
         createdPayments.push({ ...salePayment, amount: amt, payment_date: p.date, payment_method: p.payment_method, notes: p.description });
