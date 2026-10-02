@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PaymentStatusSection from "@/components/transactions/PaymentStatusSection";
 import { TrendingUp, TrendingDown, Check, ChevronsUpDown } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -94,6 +94,8 @@ export default function TransactionFormDialog({
 
     const dataToSubmit = {
       ...formData,
+      // pago à vista: o vencimento é a própria data do pagamento (uma data só)
+      due_date: formData.status === "pago" && !editingTransaction ? formData.payment_date : formData.due_date,
       amount: finalAmount,
       discount: totalDiscount,
       original_amount: original,
@@ -113,13 +115,7 @@ export default function TransactionFormDialog({
         </DialogHeader>
         <BranchBadge className="mb-2" />
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Tabs defaultValue="dados">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="dados">Dados</TabsTrigger>
-              <TabsTrigger value="pagamento">Pagamento</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="dados" className="space-y-4">
+          <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Tipo *</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -357,15 +353,7 @@ export default function TransactionFormDialog({
                 <p className="text-xs text-slate-500">Necessário para o extrato por centro de custo e abatimentos.</p>
               </div>
 
-              <div className="space-y-2">
-                <Label>Data de Vencimento *</Label>
-                <Input
-                  type="date"
-                  required
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                />
-              </div>
+              <PaymentStatusSection formData={formData} setFormData={setFormData} accounts={accounts} />
 
               <div className="space-y-2">
                 <Label>Observações</Label>
@@ -375,67 +363,7 @@ export default function TransactionFormDialog({
                   rows={3}
                 />
               </div>
-            </TabsContent>
-
-            <TabsContent value="pagamento" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Status *</Label>
-                <Select
-                  required
-                  value={formData.status}
-                  onValueChange={(value) => setFormData({
-                    ...formData,
-                    status: value,
-                    payment_date: value === "pago" && !formData.payment_date ? getTodayDate() : formData.payment_date
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="pago">Pago</SelectItem>
-                    <SelectItem value="atrasado">Atrasado</SelectItem>
-                    <SelectItem value="parcial">Parcial</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.status === "pago" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Data de Pagamento *</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={formData.payment_date}
-                      onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Conta *</Label>
-                    <Select
-                      required
-                      value={formData.account_id}
-                      onValueChange={(value) => setFormData({ ...formData, account_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a conta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name} ({formatBRL(account.current_balance)})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
