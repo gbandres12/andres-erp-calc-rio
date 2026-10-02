@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Printer, Calendar } from "lucide-react";
 import { formatBRL, formatDate, formatDateTime } from "@/components/utils/formatters";
+import ReceiptLayout from "@/components/receipts/ReceiptLayout";
 
 const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68ea91a66a9614db4a82043d/0e678bbed_CALCARIOAMAZONIALOGO.png";
 const GREEN = "#1a5e35";
@@ -368,89 +369,29 @@ export default function A4Receipt({ type, data, onPrint }) {
 
   const renderPaymentReceipt = () => {
     const isReceita = data.type === 'receita';
+    const open = (data.amount || 0) - (data.paid_amount || 0);
+    const partial = data.paid_amount > 0 && data.paid_amount < data.amount;
+    const details = [
+      ['Descrição', data.description || '—'],
+      data.category && ['Categoria', data.category],
+      data.account_name && ['Conta', data.account_name],
+      partial && ['Valor total', formatBRL(data.amount)],
+    ].filter(Boolean);
 
     return (
-      <div className="print-receipt" style={{
-        width: '210mm',
-        height: '297mm',
-        background: 'white',
-        padding: '15mm',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '10pt',
-        color: '#000',
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: `2px solid ${GREEN}`, paddingBottom: '10px' }}>
-          <h1 style={{ fontSize: '18pt', fontWeight: 'bold', margin: '0 0 5px 0', color: GREEN }}>
-            {isReceita ? 'RECIBO DE RECEBIMENTO' : 'COMPROVANTE DE PAGAMENTO'}
-          </h1>
-          <p style={{ fontSize: '10pt', margin: '0' }}>{data.company_name || 'EMPRESA'}</p>
-        </div>
-
-        <div style={{ marginBottom: '15px' }}>
-          <p style={{ margin: '5px 0' }}><strong>Data:</strong> {formatDateTime(data.payment_date || data.created_date)}</p>
-          <p style={{ margin: '5px 0' }}><strong>{isReceita ? 'Recebido de' : 'Pago para'}:</strong> {data.contact_name || 'N/A'}</p>
-        </div>
-
-        <div style={{ marginBottom: '15px', border: '1px solid #ddd', padding: '10px', background: GREY_BG }}>
-          <p style={{ margin: '0 0 5px 0' }}><strong>Descrição:</strong></p>
-          <p style={{ margin: '0' }}>{data.description || ''}</p>
-          {data.category && (
-            <p style={{ margin: '10px 0 0 0' }}><strong>Categoria:</strong> {data.category}</p>
-          )}
-        </div>
-
-        <div style={{ border: `2px solid ${GREEN}`, padding: '10px', background: GREY_BG }}>
-          <table style={{ width: '100%', fontSize: '11pt' }}>
-            <tbody>
-              <tr>
-                <td style={{ padding: '5px', textAlign: 'right' }}><strong>Valor Total:</strong></td>
-                <td style={{ padding: '5px', textAlign: 'right', width: '30%', fontSize: '14pt', fontWeight: 'bold' }}>
-                  {formatBRL(data.amount)}
-                </td>
-              </tr>
-              {data.paid_amount > 0 && data.paid_amount < data.amount && (
-                <>
-                  <tr>
-                    <td style={{ padding: '5px', textAlign: 'right' }}>Valor Pago:</td>
-                    <td style={{ padding: '5px', textAlign: 'right' }}>{formatBRL(data.paid_amount)}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '5px', textAlign: 'right' }}>Saldo Restante:</td>
-                    <td style={{ padding: '5px', textAlign: 'right', color: RED, fontWeight: 'bold' }}>
-                      {formatBRL(data.amount - data.paid_amount)}
-                    </td>
-                  </tr>
-                </>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {data.account_name && (
-          <p style={{ margin: '15px 0' }}><strong>Conta:</strong> {data.account_name}</p>
-        )}
-
-        {data.notes && (
-          <div style={{ marginTop: '15px', border: '1px solid #ddd', padding: '10px' }}>
-            <p style={{ margin: '0 0 5px 0' }}><strong>Observações:</strong></p>
-            <p style={{ margin: '0' }}>{data.notes}</p>
-          </div>
-        )}
-
-        <div style={{ marginTop: '60px', textAlign: 'center' }}>
-          <div style={{ borderTop: '1px solid #000', width: '60%', margin: '0 auto', paddingTop: '10px' }}>
-            <strong>Assinatura</strong>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '40px', textAlign: 'center', fontSize: '9pt' }}>
-          <p style={{ fontWeight: 'bold', color: GREEN }}>
-            {isReceita ? '✓ RECEBIMENTO EFETUADO COM SUCESSO' : '✓ PAGAMENTO EFETUADO COM SUCESSO'}
-          </p>
-        </div>
-      </div>
+      <ReceiptLayout
+        className="print-receipt"
+        width="210mm"
+        isIncome={isReceita}
+        number={data.reference || (data.id || '').slice(-8).toUpperCase()}
+        amount={partial ? data.paid_amount : data.amount}
+        date={data.payment_date || data.created_date}
+        party={data.contact_name}
+        company={{ name: data.company_name, cnpj: data.company_cnpj }}
+        details={details}
+        highlight={partial ? { label: 'Saldo restante', value: formatBRL(open), color: '#b45309' } : { label: 'Situação', value: 'QUITADO', color: '#047857' }}
+        notes={data.notes}
+      />
     );
   };
 
