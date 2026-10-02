@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import ThermalReceipt from "../components/receipts/ThermalReceipt";
 import A4Receipt from "../components/receipts/A4Receipt";
 import PaymentReceipt from "../components/receipts/PaymentReceipt";
+import SaleReceiptsList from "@/components/sales/SaleReceiptsList";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { ProductSelector } from "@/components/sales/ProductSelector";
 import SalePaymentDialog from "@/components/sales/SalePaymentDialog";
@@ -153,12 +154,12 @@ export default function Sales() {
     queryFn: async () => {
       if (!selectedCompanyId) return [];
       const result = await base44.entities.Sale.filter({ company_id: selectedCompanyId });
-      return result.sort((a, b) => {
-        // Ordenar por data de criação (decrescente) como critério principal
-        const ca = a.created_date || '';
-        const cb = b.created_date || '';
-        return cb.localeCompare(ca);
-      });
+      const refNum = (s) => parseInt(String(s.reference || '').replace(/\D/g, ''), 10) || 0;
+      return result.sort((a, b) =>
+        (b.sale_date || '').localeCompare(a.sale_date || '') ||
+        refNum(b) - refNum(a) ||
+        (b.created_date || '').localeCompare(a.created_date || '')
+      );
     },
     initialData: []
   });
@@ -1879,19 +1880,7 @@ export default function Sales() {
                             <div className="space-y-2">
                               <p className="font-semibold text-sm mb-3">Recibos de Pagamento</p>
                               {sale.paid_amount > 0 ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full justify-start"
-                                  onClick={async () => {
-                                    const payments = await base44.entities.SalePayment.filter({ sale_id: sale.id }, 'payment_date');
-                                    if (payments.length > 0) {
-                                      payments.forEach(p => handlePrintPaymentReceipt(sale, p.id));
-                                    }
-                                  }}
-                                >
-                                  Ver Todos os Recibos
-                                </Button>
+                                <SaleReceiptsList sale={sale} onSelect={(id) => handlePrintPaymentReceipt(sale, id)} />
                               ) : (
                                 <p className="text-xs text-slate-500">Nenhum pagamento registrado</p>
                               )}

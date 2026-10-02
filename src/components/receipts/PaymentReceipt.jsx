@@ -21,16 +21,27 @@ export default function PaymentReceipt({ payment, sale, previousPayments = [] })
     payment.discount > 0 && ["Desconto", formatBRL(payment.discount)],
   ].filter(Boolean);
 
+  // Imprime somente este recibo, numa janela isolada
+  const handlePrint = () => {
+    const node = document.querySelector('.single-payment-receipt');
+    const win = window.open('', '_blank', 'width=700,height=800');
+    if (!node || !win) return window.print();
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Recibo ${number}</title><style>@page{size:A5;margin:0}html,body{margin:0}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${node.outerHTML}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); win.close(); }, 600);
+  };
+
   return (
     <>
       <div className="no-print mb-4">
-        <Button onClick={() => window.print()} className="w-full">
+        <Button onClick={handlePrint} className="w-full">
           <Printer className="w-4 h-4 mr-2" />
           Imprimir Recibo de Pagamento
         </Button>
       </div>
 
       <ReceiptLayout
+        className="single-payment-receipt"
         isIncome
         number={number}
         amount={payment.amount}
