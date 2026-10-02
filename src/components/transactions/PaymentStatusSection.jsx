@@ -14,6 +14,12 @@ export default function PaymentStatusSection({ formData, setFormData, accounts, 
     ...prev, status,
     ...(status !== "pago" ? { link_sale_id: "", link_transaction_id: "" } : {}), payment_date: status === "pago" ? (prev.payment_date || getTodayDate()) : prev.payment_date
   }));
+  // Conta única cadastrada: seleciona automaticamente
+  React.useEffect(() => {
+    if (isPaid && !formData.account_id && accounts.length === 1) {
+      setFormData(prev => ({ ...prev, account_id: accounts[0].id }));
+    }
+  }, [isPaid, formData.account_id, accounts]);
   const btn = (active, color) => cn("flex items-center justify-center gap-2 py-3 rounded-lg border-2 font-semibold text-sm transition-all",
     active ? color : "border-slate-200 text-slate-500 hover:border-slate-300");
 
