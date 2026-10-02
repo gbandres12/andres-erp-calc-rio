@@ -12,7 +12,7 @@ import PaymentReceipt from "@/components/receipts/PaymentReceipt";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import BranchBadge from "@/components/BranchBadge";
-import { createPaidTransaction, reconcileSaleInstallments, findOpenSaleReceivable, applyToSaleReceivable } from "@/utils/saleFinance";
+import { createPaidTransaction, reconcileSaleInstallments, findOpenSaleReceivable, applyToSaleReceivable, round2, saleOpenBalance } from "@/utils/saleFinance";
 
 const getTodayDate = () => new Date().toISOString().split("T")[0];
 
@@ -36,10 +36,10 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
 
   const alreadyPaid = sale.paid_amount || 0;
   const saleTotal = sale.total || 0;
-  const remaining = saleTotal - alreadyPaid;
-  const totalThisPayment = payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const totalAbatimento = payments.reduce((s, p) => s + (parseFloat(p.discount) || 0), 0);
-  const newRemaining = remaining - totalThisPayment - totalAbatimento;
+  const remaining = saleOpenBalance(sale);
+  const totalThisPayment = round2(payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0));
+  const totalAbatimento = round2(payments.reduce((s, p) => s + (parseFloat(p.discount) || 0), 0));
+  const newRemaining = round2(remaining - totalThisPayment - totalAbatimento);
 
   const addPayment = () =>
     setPayments([...payments, { description: `Pagamento ${payments.length + 1}`, amount: "", date: getTodayDate(), account_id: "", payment_method: "pix", discount: 0 }]);
@@ -60,12 +60,20 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
   };
 
   const handleSave = async () => {
-    if (totalThisPayment <= 0) {
-      toast.error("Informe pelo menos um valor de pagamento.");
+    if (totalThisPayment + totalAbatimento <= 0) {
+      toast.error("Informe um valor de pagamento ou abatimento.");
       return;
     }
-    if (payments.some(p => !p.account_id)) {
+    if (payments.some(p => (parseFloat(p.amount) || 0) < 0 || (parseFloat(p.discount) || 0) < 0)) {
+      toast.error("Valores não podem ser negativos.");
+      return;
+    }
+    if (payments.some(p => (parseFloat(p.amount) || 0) > 0 && !p.account_id)) {
       toast.error("Selecione a conta para todos os pagamentos.");
+      return;
+    }
+    if (newRemaining < -0.01) {
+      toast.error(`Pagamento + abatimento (${formatBRL(totalThisPayment + totalAbatimento)}) excede o saldo da venda (${formatBRL(remaining)}).`);
       return;
     }
 
@@ -74,9 +82,9 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
       const createdPayments = [];
       const receivable = await findOpenSaleReceivable(base44, sale);
       for (const p of payments) {
-        const amt = parseFloat(p.amount) || 0;
-        const disc = parseFloat(p.discount) || 0;
-        if (amt <= 0) continue;
+        const amt = round2(parseFloat(p.amount) || 0);
+        const disc = round2(parseFloat(p.discount) || 0);
+        if (amt <= 0 && disc <= 0) continue;
 
         // Baixa primeiro no "Saldo a Receber" existente; só cria lançamento novo para o excedente
         let txAmt = amt;
@@ -124,18 +132,17 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
         createdPayments.push({ ...salePayment, amount: amt, payment_date: p.date, payment_method: p.payment_method, notes: p.description });
       }
 
-      const newPaid = alreadyPaid + totalThisPayment;
-      const newRem = Math.max(0, saleTotal - newPaid - totalAbatimento);
+      const newPaid = round2(alreadyPaid + totalThisPayment);
+      const newRem = newRemaining <= 0.01 ? 0 : newRemaining;
       let paymentStatus = "parcial";
-      if (newRem <= 0.01) paymentStatus = "pago";
-      else if (newPaid === 0) paymentStatus = "pendente";
+      if (newRem === 0) paymentStatus = "pago";
+      else if (newPaid === 0 && totalAbatimento === 0) paymentStatus = "pendente";
 
       await base44.entities.Sale.update(sale.id, {
         paid_amount: newPaid,
         remaining_amount: newRem,
         payment_status: paymentStatus,
-        status: newRem <= 0.01 ? "concluida" : sale.status,
-        discount: (sale.discount || 0) + totalAbatimento
+        status: newRem === 0 && sale.status === "faturada" ? "concluida" : sale.status
       });
 
       // Quitar parcelas cobertas pelos pagamentos registrados
@@ -351,7 +358,7 @@ export default function SalePaymentDialog({ sale, accounts, company, open, onClo
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={handleSave}
-            disabled={saving || totalThisPayment <= 0}
+            disabled={saving || totalThisPayment + totalAbatimento <= 0}
             className="bg-green-600 hover:bg-green-700"
           >
             {saving ? "Salvando..." : "Confirmar Pagamento"}

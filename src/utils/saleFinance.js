@@ -1,3 +1,12 @@
+export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// Saldo em aberto da venda. O total da venda já vem líquido do desconto comercial,
+// então abatimentos são controlados só pelo remaining_amount (nunca somar sale.discount).
+export function saleOpenBalance(sale) {
+  if (sale.remaining_amount !== undefined && sale.remaining_amount !== null) return round2(Math.max(0, sale.remaining_amount));
+  return round2(Math.max(0, (sale.total || 0) - (sale.paid_amount || 0)));
+}
+
 export async function deleteLinkedPayments(base44, transactionId) {
   const payments = await base44.entities.TransactionPayment.filter({ transaction_id: transactionId });
   for (const p of payments) {
@@ -40,16 +49,16 @@ export async function findOpenSaleReceivable(base44, sale) {
     description: { $regex: "Saldo a Receber" },
   });
   return list.find(t => (t.notes || "").includes(`sale_id:${sale.id}`))
-    || list.find(t => (t.description || "").startsWith(`${sale.reference} - Saldo a Receber`))
+    || list.find(t => !/sale_id:/.test(t.notes || "") && (t.description || "").startsWith(`${sale.reference} - Saldo a Receber`))
     || null;
 }
 
 // Baixa um pagamento (com abatimento) no título "Saldo a Receber" existente,
 // em vez de criar um lançamento novo. Retorna o valor que NÃO coube no título.
 export async function applyToSaleReceivable(base44, receivable, { amount, discount = 0, date, accountId, accountName = "", paymentMethod = "dinheiro", notes = "" }) {
-  const open = receivable.amount - (receivable.paid_amount || 0) - (receivable.discount || 0);
-  const disc = Math.min(Number(discount || 0), Math.max(0, open));
-  const amt = Math.min(Number(amount || 0), Math.max(0, open - disc));
+  const open = round2(receivable.amount - (receivable.paid_amount || 0) - (receivable.discount || 0));
+  const disc = round2(Math.min(Number(discount || 0), Math.max(0, open)));
+  const amt = round2(Math.min(Number(amount || 0), Math.max(0, open - disc)));
   if (amt <= 0 && disc <= 0) return { leftover: Number(amount || 0), leftoverDiscount: Number(discount || 0) };
 
   await base44.entities.TransactionPayment.create({
@@ -64,19 +73,19 @@ export async function applyToSaleReceivable(base44, receivable, { amount, discou
     notes,
     company_id: receivable.company_id,
   });
-  const newPaid = (receivable.paid_amount || 0) + amt;
-  const newDisc = (receivable.discount || 0) + disc;
-  const remaining = receivable.amount - newPaid - newDisc;
-  const status = remaining <= 0.005 ? "pago" : "parcial";
+  const newPaid = round2((receivable.paid_amount || 0) + amt);
+  const newDisc = round2((receivable.discount || 0) + disc);
+  const remaining = round2(receivable.amount - newPaid - newDisc);
+  const status = remaining <= 0.01 ? "pago" : "parcial";
   await base44.entities.Transaction.update(receivable.id, {
     paid_amount: newPaid,
     discount: newDisc,
     status,
     payment_date: status === "pago" ? date : receivable.payment_date,
-    account_id: accountId,
+    ...(accountId ? { account_id: accountId } : {}),
   });
   Object.assign(receivable, { paid_amount: newPaid, discount: newDisc, status });
-  return { leftover: Number(amount || 0) - amt, leftoverDiscount: Number(discount || 0) - disc };
+  return { leftover: round2(Number(amount || 0) - amt), leftoverDiscount: round2(Number(discount || 0) - disc) };
 }
 
 // Localiza a venda vinculada a um lançamento: prioriza a tag sale_id em notes;
@@ -129,9 +138,10 @@ export async function mirrorReceivingToSale(base44, { transaction, companyId, am
   const sale = await findLinkedSale(base44, transaction, companyId);
   if (!sale) return null;
 
-  const openBalance = sale.remaining_amount ?? Math.max(0, (sale.total || 0) - (sale.paid_amount || 0) - (sale.discount || 0));
-  const applyAmount = Math.min(Number(amount || 0), openBalance);
-  if (applyAmount <= 0 && discount <= 0) return null;
+  const openBalance = saleOpenBalance(sale);
+  const discApplied = round2(Math.min(Number(discount || 0), openBalance));
+  const applyAmount = round2(Math.min(Number(amount || 0), openBalance - discApplied));
+  if (applyAmount <= 0 && discApplied <= 0) return null;
 
   // Tag do ID da venda no lançamento: exclusão da venda apaga exatamente os lançamentos dela
   if (!(transaction.notes || "").includes(`sale_id:${sale.id}`)) {
@@ -145,18 +155,18 @@ export async function mirrorReceivingToSale(base44, { transaction, companyId, am
     sale_reference: sale.reference,
     payment_method: paymentMethod,
     amount: applyAmount,
-    discount: Number(discount || 0),
+    discount: discApplied,
     payment_date: date,
     account_id: accountId,
     company_id: companyId,
     notes: notes || "Recebido via Contas a Receber"
   });
 
-  const newPaid = (sale.paid_amount || 0) + applyAmount;
-  const newDiscount = (sale.discount || 0) + Number(discount || 0);
-  const newRem = Math.max(0, (sale.total || 0) - newPaid - newDiscount);
-  const paymentStatus = newRem <= 0.01 ? "pago" : (newPaid > 0 ? "parcial" : "pendente");
-  const updates = { paid_amount: newPaid, remaining_amount: newRem, payment_status: paymentStatus, discount: newDiscount };
+  const newPaid = round2((sale.paid_amount || 0) + applyAmount);
+  const rawRem = round2(openBalance - applyAmount - discApplied);
+  const newRem = rawRem <= 0.01 ? 0 : rawRem;
+  const paymentStatus = newRem === 0 ? "pago" : (newPaid > 0 || discApplied > 0 ? "parcial" : "pendente");
+  const updates = { paid_amount: newPaid, remaining_amount: newRem, payment_status: paymentStatus };
   if (paymentStatus === "pago" && sale.status === "faturada") updates.status = "concluida";
   await base44.entities.Sale.update(sale.id, updates);
   await reconcileSaleInstallments(base44, sale.id, (sale.total || 0) - newRem, date);
