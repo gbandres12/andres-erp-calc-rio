@@ -63,7 +63,12 @@ Deno.serve(async (req) => {
     const access = String(invoice.api_access_key || invoice.reference || invoice.id);
     return Response.json({
       success: true,
-      filename: type === 'xml' ? `${access}.xml` : `DANFE-${access}.pdf`,
+      filename: (() => {
+        const name = String(invoice.recipient_name || 'Cliente').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+        const num = invoice.number ? String(invoice.number).padStart(6, '0') : access;
+        const base = `NF-${num}_${name}`;
+        return type === 'xml' ? `${base}.xml` : `DANFE_${base}.pdf`;
+      })(),
       content_type: type === 'xml' ? 'application/xml' : 'application/pdf',
       data: btoa(binary)
     });
