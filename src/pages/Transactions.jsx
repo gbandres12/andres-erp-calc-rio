@@ -597,7 +597,14 @@ export default function Transactions() {
       if (t.type === 'receita' && t.status !== 'pago') pendingReceivables += Math.max(0, t.amount - (t.paid_amount || 0) - (t.discount || 0));
       else if (t.type === 'despesa' && t.status !== 'pago') pendingPayables += Math.max(0, t.amount - (t.paid_amount || 0) - (t.discount || 0));
     }
-    return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, pendingReceivablesCount, pendingPayablesCount, saldoLiquido: totalReceita - totalDespesa };
+    const today = getTodayDate();
+    let caixaDia = 0;
+    for (const t of transactions) {
+      if (t.status === 'pago' && t.payment_date && t.payment_date.slice(0, 10) === today) {
+        caixaDia += t.type === 'receita' ? (t.paid_amount || 0) : -(t.paid_amount || 0);
+      }
+    }
+    return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, pendingReceivablesCount, pendingPayablesCount, saldoLiquido: totalReceita - totalDespesa, caixaDia };
   }, [transactions]);
 
   const dailyAverages = useMemo(() => {

@@ -2,7 +2,7 @@ import { TrendingUp, TrendingDown, DollarSign, AlertCircle } from "lucide-react"
 import { formatBRL } from "@/components/utils/formatters";
 
 export default function TransactionsKpis({ kpis }) {
-  const saldoPositivo = kpis.saldoLiquido >= 0;
+  const saldoPositivo = (kpis.caixaDia || 0) >= 0;
 
   return (
     <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -37,16 +37,16 @@ export default function TransactionsKpis({ kpis }) {
       {/* Saldo Líquido */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo Líquido</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Caixa do Dia</span>
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center border ${saldoPositivo ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
             <DollarSign className="w-4 h-4" />
           </div>
         </div>
         <div className={`my-3 text-2xl font-extrabold tracking-tight ${saldoPositivo ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {formatBRL(kpis.saldoLiquido)}
+          {formatBRL(kpis.caixaDia || 0)}
         </div>
         <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
-          <span>Entradas - Saídas</span>
+          <span>Entradas e saídas de hoje</span>
           <span className={`font-semibold text-[11px] px-1.5 py-0.5 rounded ${saldoPositivo ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
             {saldoPositivo ? 'Superávit' : 'Déficit'}
           </span>
