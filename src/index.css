@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -148,6 +150,11 @@ button:focus-visible {
 }
 
 
+
+/* Fonte da tela de Lançamentos (Plus Jakarta Sans) */
+.font-jakarta {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
 
 @layer base {
   * {

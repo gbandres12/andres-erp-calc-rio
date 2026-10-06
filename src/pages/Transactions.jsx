@@ -7,18 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DollarSign, Plus, TrendingUp, TrendingDown, AlertCircle, History, Upload, ScanLine, FileText, Zap, Badge as BadgeIcon } from "lucide-react";
+import { Plus, History, Upload, ScanLine, FileText, Zap, Search, Download, LayoutList, LayoutGrid } from "lucide-react";
 import DeleteAuthDialog from "@/components/sales/DeleteAuthDialog";
 import EditAuthDialog from "@/components/transactions/EditAuthDialog";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL, getTodayDate, formatDate } from "@/components/utils/formatters";
 import { isSameDay, isSameWeek, isSameMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+
 import { toast } from "sonner";
 import TransactionFormDialog from "@/components/transactions/TransactionFormDialog";
 import QuickEntryDialog from "@/components/transactions/QuickEntryDialog";
 import ReceivePayDialog from "@/components/transactions/ReceivePayDialog";
 import TransactionRow from "@/components/transactions/TransactionRow";
+import TransactionsKpis from "@/components/transactions/TransactionsKpis";
+import CashFlowChartCard from "@/components/transactions/CashFlowChartCard";
+import DailyAveragesCard from "@/components/transactions/DailyAveragesCard";
+import TransactionsTable from "@/components/transactions/TransactionsTable";
 import { mirrorReceivingToSale, findOpenSaleReceivable, applyPaymentToSale } from "@/utils/saleFinance";
 
 export default function Transactions() {
@@ -584,14 +588,16 @@ export default function Transactions() {
   }, [transactions, filterStatus, filterType, dateFilter, customDates, debouncedSearch]);
 
   const kpis = useMemo(() => {
-    let totalReceita = 0, totalDespesa = 0, pendingReceivables = 0, pendingPayables = 0;
+    let totalReceita = 0, totalDespesa = 0, pendingReceivables = 0, pendingPayables = 0, pendingReceivablesCount = 0, pendingPayablesCount = 0;
     for (const t of transactions) {
+      if (t.type === 'receita' && t.status !== 'pago') pendingReceivablesCount++;
+      else if (t.type === 'despesa' && t.status !== 'pago') pendingPayablesCount++;
       if (t.type === 'receita' && t.status === 'pago') totalReceita += (t.paid_amount || 0);
       else if (t.type === 'despesa' && t.status === 'pago') totalDespesa += (t.paid_amount || 0);
       if (t.type === 'receita' && t.status !== 'pago') pendingReceivables += Math.max(0, t.amount - (t.paid_amount || 0) - (t.discount || 0));
       else if (t.type === 'despesa' && t.status !== 'pago') pendingPayables += Math.max(0, t.amount - (t.paid_amount || 0) - (t.discount || 0));
     }
-    return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, saldoLiquido: totalReceita - totalDespesa };
+    return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, pendingReceivablesCount, pendingPayablesCount, saldoLiquido: totalReceita - totalDespesa };
   }, [transactions]);
 
   const dailyAverages = useMemo(() => {
@@ -648,12 +654,79 @@ export default function Transactions() {
 
   const hasActiveFilters = searchTerm || filterType !== 'all' || filterStatus !== 'all' || dateFilter !== 'all';
 
+  // Visualização em tabela/cards, seleção e paginação da lista
+  const [viewMode, setViewMode] = useState('tabela');
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [filterStatus, filterType, dateFilter, customDates, debouncedSearch]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / PAGE_SIZE));
+  const pagedTransactions = useMemo(
+    () => filteredTransactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredTransactions, currentPage]
+  );
+  const pageNumbers = useMemo(() => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, start + 4);
+    const arr = [];
+    for (let i = start; i <= end; i++) arr.push(i);
+    return arr;
+  }, [currentPage, totalPages]);
+
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleSelectAll = () => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (pagedTransactions.every(t => next.has(t.id))) {
+      pagedTransactions.forEach(t => next.delete(t.id));
+    } else {
+      pagedTransactions.forEach(t => next.add(t.id));
+    }
+    return next;
+  });
+
+  const exportTransactionsCsv = (rows) => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = 'Descricao;Tipo;Categoria;Contato;Status;Vencimento;Liquidacao;Valor;Pago;Desconto;Restante';
+    const lines = rows.map(t => [
+      t.description,
+      t.type === 'receita' ? 'Entrada' : 'Saida',
+      t.category,
+      t.contact_name,
+      t.status,
+      t.due_date ? formatDate(t.due_date) : '',
+      t.status === 'pago' && t.payment_date ? formatDate(t.payment_date) : '',
+      Number(t.amount || 0).toFixed(2).replace('.', ','),
+      Number(t.paid_amount || 0).toFixed(2).replace('.', ','),
+      Number(t.discount || 0).toFixed(2).replace('.', ','),
+      Math.max(0, Number(t.amount || 0) - Number(t.paid_amount || 0) - Number(t.discount || 0)).toFixed(2).replace('.', ',')
+    ].map(esc).join(';'));
+    const csv = '\ufeff' + [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lancamentos-${getTodayDate()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto font-jakarta">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Lançamentos Financeiros</h1>
-          <p className="text-slate-500 mt-1">Entradas e saídas</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Lançamentos Financeiros</h1>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Gestão completa de entradas, saídas e conciliação de movimentações diárias de caixa</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
@@ -737,7 +810,9 @@ export default function Transactions() {
             </DialogContent>
           </Dialog>
 
-          <Button onClick={openNewForm}><Plus className="w-4 h-4 mr-2" /> Novo Lançamento</Button>
+          <Button onClick={openNewForm} className="bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-md gap-2">
+            <Plus className="w-4 h-4" /> Novo Lançamento
+          </Button>
         </div>
       </div>
 
@@ -843,153 +918,128 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
 
-      {/* KPIs */}
-      <div className="grid md:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-green-100">Entradas</CardTitle>
-            <TrendingUp className="h-5 w-5 text-green-200" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(kpis.totalReceita)}</div>
-            <p className="text-xs text-green-200 mt-1">Recebido</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-red-100">Saídas</CardTitle>
-            <TrendingDown className="h-5 w-5 text-red-200" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(kpis.totalDespesa)}</div>
-            <p className="text-xs text-red-200 mt-1">Pago</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Saldo Líquido</CardTitle>
-            <DollarSign className={`h-5 w-5 ${kpis.saldoLiquido >= 0 ? 'text-green-500' : 'text-red-500'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${kpis.saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatBRL(kpis.saldoLiquido)}</div>
-            <p className="text-xs text-slate-400 mt-1">Entradas - Saídas</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100">A Receber</CardTitle>
-            <DollarSign className="h-5 w-5 text-blue-200" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{formatBRL(kpis.pendingReceivables)}</div></CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-orange-100">A Pagar</CardTitle>
-            <AlertCircle className="h-5 w-5 text-orange-200" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{formatBRL(kpis.pendingPayables)}</div></CardContent>
-        </Card>
-      </div>
+      <TransactionsKpis kpis={kpis} />
 
       {/* Gráfico e Médias */}
-      <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Movimentação de Caixa Diária</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyCashFlow}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="formattedDate" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatBRL(value)} contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                  <Legend />
-                  <Bar dataKey="receita" name="Entrada" fill="#10B981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="despesa" name="Saída" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Médias Diárias (Filtrado)</CardTitle></CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-100">
-              <div><p className="text-sm text-green-900 font-medium">Entrada Média</p><p className="text-xs text-green-600">Base: {dailyAverages.days} dias</p></div>
-              <span className="text-lg font-bold text-green-700">{formatBRL(dailyAverages.receita)}</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
-              <div><p className="text-sm text-red-900 font-medium">Saída Média</p><p className="text-xs text-red-600">Base: {dailyAverages.days} dias</p></div>
-              <span className="text-lg font-bold text-red-700">{formatBRL(dailyAverages.despesa)}</span>
-            </div>
-            <div className="pt-4 border-t">
-              <p className="text-sm text-slate-500 mb-2 text-center">Saldo Diário Médio</p>
-              <div className={`text-2xl font-bold text-center ${dailyAverages.receita - dailyAverages.despesa >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>{formatBRL(dailyAverages.receita - dailyAverages.despesa)}</div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid lg:grid-cols-12 gap-6 mb-8">
+        <CashFlowChartCard data={dailyCashFlow} />
+        <DailyAveragesCard averages={dailyAverages} />
       </div>
 
-      {/* Filtros */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
+      {/* Lançamentos: filtros, visualização e paginação */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-200/80 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">Lançamentos</h2>
+              <p className="text-xs text-slate-500 font-medium">Listagem detalhada das operações liquidadas e previstas</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center p-1 bg-slate-100 rounded-lg border border-slate-200/80">
+                <button
+                  onClick={() => setViewMode('tabela')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${viewMode === 'tabela' ? 'bg-white text-violet-700 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-900'}`}
+                  title="Visualização em Tabela"
+                >
+                  <LayoutList className="w-3.5 h-3.5" /> <span className="hidden md:inline">Tabela</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${viewMode === 'cards' ? 'bg-white text-violet-700 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-900'}`}
+                  title="Visualização em Cards"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" /> <span className="hidden md:inline">Cards</span>
+                </button>
+              </div>
+              <Button variant="outline" size="sm" className="gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50" onClick={() => exportTransactionsCsv(filteredTransactions)}>
+                <Download className="w-3.5 h-3.5" /> Exportar Excel
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+            <div className="lg:col-span-6 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <Input
-                placeholder="🔍 Pesquisar por descrição, contato ou categoria..."
+                className="pl-9 bg-slate-50 border-slate-200 rounded-xl"
+                placeholder="Pesquisar por descrição, contato ou categoria..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
               />
             </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Tipos</SelectItem>
-                <SelectItem value="receita">Entradas</SelectItem>
-                <SelectItem value="despesa">Saídas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="parcial">Parcial</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                <SelectItem value="atrasado">Atrasado</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todo Período</SelectItem>
-                <SelectItem value="today">Hoje</SelectItem>
-                <SelectItem value="week">Esta Semana</SelectItem>
-                <SelectItem value="month">Este Mês</SelectItem>
-                <SelectItem value="custom">Personalizado</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="lg:col-span-2">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full bg-white rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  <SelectItem value="receita">Entradas</SelectItem>
+                  <SelectItem value="despesa">Saídas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="lg:col-span-2">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full bg-white rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="parcial">Parcial</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="atrasado">Atrasado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="lg:col-span-2">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-full bg-white rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo Período</SelectItem>
+                  <SelectItem value="today">Hoje</SelectItem>
+                  <SelectItem value="week">Esta Semana</SelectItem>
+                  <SelectItem value="month">Este Mês</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {dateFilter === 'custom' && (
-              <div className="flex items-center gap-2">
+              <div className="lg:col-span-12 flex items-center gap-2">
                 <Input type="date" value={customDates.start} onChange={(e) => setCustomDates(prev => ({ ...prev, start: e.target.value }))} className="w-auto" />
                 <span className="text-slate-400">até</span>
                 <Input type="date" value={customDates.end} onChange={(e) => setCustomDates(prev => ({ ...prev, end: e.target.value }))} className="w-auto" />
               </div>
             )}
             {hasActiveFilters && (
-              <Button variant="ghost" onClick={() => { setSearchTerm(''); setFilterType('all'); setFilterStatus('all'); setDateFilter('all'); }} className="ml-auto text-slate-500 hover:text-red-600">Limpar Filtros</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setFilterType('all'); setFilterStatus('all'); setDateFilter('all'); }} className="text-slate-500 hover:text-red-600">Limpar Filtros</Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Lista de Transações */}
-      <Card>
-        <CardHeader><CardTitle>Lançamentos</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {filteredTransactions.map((transaction) => (
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between px-5 py-2.5 bg-violet-50 border-b border-violet-100 text-sm">
+            <span className="font-semibold text-violet-800">{selectedIds.size} selecionado(s)</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="border-violet-200 text-violet-700 hover:bg-violet-100" onClick={() => exportTransactionsCsv(transactions.filter(t => selectedIds.has(t.id)))}>
+                Exportar selecionados
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>Limpar</Button>
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'tabela' ? (
+          <TransactionsTable
+            rows={pagedTransactions}
+            selectedIds={selectedIds}
+            onToggle={toggleSelect}
+            onToggleAll={toggleSelectAll}
+            onEdit={initiateEdit}
+            onDelete={initiateDelete}
+            onReceivePay={handleReceivePay}
+            onViewPayments={handleViewPayments}
+          />
+        ) : (
+          <div className="p-5 space-y-3">
+            {pagedTransactions.map((transaction) => (
               <TransactionRow
                 key={transaction.id}
                 transaction={transaction}
@@ -999,15 +1049,50 @@ export default function Transactions() {
                 onViewPayments={handleViewPayments}
               />
             ))}
-            {filteredTransactions.length === 0 && (
-              <div className="text-center py-8 text-slate-500">
-                <BadgeIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhum lançamento encontrado</p>
-              </div>
-            )}
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {pagedTransactions.length === 0 && (
+          <div className="text-center py-12 text-slate-500">
+            <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>Nenhum lançamento encontrado</p>
+          </div>
+        )}
+
+        <div className="px-5 py-4 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 font-medium">
+          <div>
+            Mostrando <span className="font-bold text-slate-900">{pagedTransactions.length}</span> de{' '}
+            <span className="font-bold text-slate-900">{filteredTransactions.length}</span> lançamentos
+          </div>
+          <div className="flex items-center gap-1.5 self-center">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            {pageNumbers.map(n => (
+              <button
+                key={n}
+                onClick={() => setCurrentPage(n)}
+                className={n === currentPage
+                  ? 'px-3 py-1.5 rounded-lg bg-violet-600 text-white font-bold'
+                  : 'px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Próximo
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
