@@ -36,8 +36,6 @@ export default function Dashboard() {
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: () => base44.entities.Product.filter({ is_active: true }),
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: stockEntries = [], isLoading: loadingStock } = useQuery({
@@ -46,8 +44,6 @@ export default function Dashboard() {
       company_id: selectedCompanyId,
       status: 'ativo'
     }),
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: vehicles = [], isLoading: loadingVehicles } = useQuery({
@@ -56,8 +52,6 @@ export default function Dashboard() {
       company_id: selectedCompanyId,
       status: 'ativo'
     }),
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery({
@@ -65,8 +59,6 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Transaction.filter({
       company_id: selectedCompanyId
     }, '-created_date', 10),
-    initialData: [],
-    staleTime: 2 * 60 * 1000,
   });
 
   const { data: allPaidTransactions = [] } = useQuery({
@@ -75,8 +67,6 @@ export default function Dashboard() {
       company_id: selectedCompanyId,
       status: 'pago'
     }, '-payment_date', 1000),
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: pendingTransactions = [] } = useQuery({
@@ -89,8 +79,6 @@ export default function Dashboard() {
       ]);
       return [...pendente, ...parcial, ...atrasado];
     },
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
@@ -98,8 +86,6 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Sale.filter({
       company_id: selectedCompanyId
     }, '-sale_date', 100),
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: contacts = [] } = useQuery({
@@ -108,8 +94,6 @@ export default function Dashboard() {
       company_id: selectedCompanyId,
       is_active: true
     }),
-    initialData: [],
-    staleTime: 5 * 60 * 1000,
   });
 
   const stats = useMemo(() => {
