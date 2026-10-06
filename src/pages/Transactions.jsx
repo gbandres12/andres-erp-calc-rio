@@ -604,8 +604,8 @@ export default function Transactions() {
         caixaDia += t.type === 'receita' ? (t.paid_amount || 0) : -(t.paid_amount || 0);
       }
     }
-    return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, pendingReceivablesCount, pendingPayablesCount, saldoLiquido: totalReceita - totalDespesa, caixaDia };
-  }, [transactions]);
+    return { totalReceita, totalDespesa, pendingReceivables, pendingPayables, pendingReceivablesCount, pendingPayablesCount, saldoLiquido: totalReceita - totalDespesa, caixaDia, saldoReal: accounts.reduce((s, a) => s + (a.current_balance || 0), 0) };
+  }, [transactions, accounts]);
 
   const dailyAverages = useMemo(() => {
     if (filteredTransactions.length === 0) return { receita: 0, despesa: 0, days: 0 };
