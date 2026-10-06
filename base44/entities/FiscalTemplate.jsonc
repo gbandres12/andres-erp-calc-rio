@@ -1,0 +1,57 @@
+{
+  "name": "FiscalTemplate",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome do modelo (ex: Transfer\u00eancia de Estoque)"
+    },
+    "operation_type": {
+      "type": "string",
+      "enum": [
+        "venda",
+        "devolucao",
+        "entrada"
+      ],
+      "default": "venda",
+      "description": "Tipo de opera\u00e7\u00e3o que o modelo aplica"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "nfe",
+        "nfce"
+      ],
+      "default": "nfe",
+      "description": "Tipo de documento aplicado"
+    },
+    "nature_operation": {
+      "type": "string",
+      "description": "Natureza da opera\u00e7\u00e3o preenchida ao aplicar"
+    },
+    "payment_method": {
+      "type": "string",
+      "description": "Forma de pagamento aplicada (vazio = mant\u00e9m a atual)"
+    },
+    "cfop_interno": {
+      "type": "string",
+      "description": "CFOP fixo para opera\u00e7\u00e3o dentro do estado (vazio = usa o CFOP do produto)"
+    },
+    "cfop_interestadual": {
+      "type": "string",
+      "description": "CFOP fixo para opera\u00e7\u00e3o interestadual (vazio = usa o CFOP do produto)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Texto acrescentado \u00e0s observa\u00e7\u00f5es complementares ao aplicar"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa/filial"
+    }
+  },
+  "required": [
+    "name",
+    "company_id"
+  ]
+}
