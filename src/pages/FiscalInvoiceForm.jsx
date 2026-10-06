@@ -524,12 +524,15 @@ export default function FiscalInvoiceForm() {
             <Label>Email</Label>
             <Input type="email" value={form.recipient_email || ""} onChange={e => setField("recipient_email", e.target.value)} />
           </div>
-          {(form.recipient_cpf_cnpj || "").replace(/\D/g, "").length > 11 && (
-            <div className="space-y-1">
-              <Label>IE Destinatário</Label>
-              <Input value={form.recipient_ie || ""} onChange={e => setField("recipient_ie", e.target.value)} placeholder="ISENTO se isento" />
-            </div>
-          )}
+          <div className="space-y-1">
+            <Label>IE Destinatário</Label>
+            <Input value={form.recipient_ie || ""} onChange={e => setField("recipient_ie", e.target.value)} placeholder="Produtor rural (PF): IE do cartão; ISENTO se isento" />
+            <p className="text-xs text-slate-500">
+              {(form.recipient_cpf_cnpj || "").replace(/\D/g, "").length > 11
+                ? "Obrigatório para CNPJ. Digite ISENTO se isento."
+                : "Pessoa física (produtor rural) também tem IE. Deixe vazio se não contribuinte."}
+            </p>
+          </div>
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="space-y-1 md:col-span-2">
