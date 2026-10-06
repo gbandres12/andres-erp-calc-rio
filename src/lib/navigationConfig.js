@@ -3,7 +3,8 @@ import {
   CreditCard, Users, ShoppingCart, ShieldCheck, Monitor,
   BarChart3, Settings, FileText, History, PackageCheck,
   ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
-  ClipboardList, RepeatIcon, ArrowLeftRight, Receipt, Upload, Layers, Wheat
+  ClipboardList, RepeatIcon, ArrowLeftRight, Receipt, Upload, Layers, Wheat,
+  Calculator
 } from "lucide-react";
 
 // Fonte única da navegação — usada pelo Layout (filtrar menu) e pela tela de
@@ -41,6 +42,7 @@ export const navigationGroups = [
       { title: "Recorrências", url: "RecurringTransactions", icon: RepeatIcon },
       { title: "Extrato por CC", url: "CostCenterReport", icon: Layers },
       { title: "Relatório Diário", url: "DailyFinancialReport", icon: BarChart3 },
+      { title: "Conciliação", url: "CashReconciliation", icon: Calculator },
       { title: "Clientes/Fornecedores", url: "Contacts", icon: Users }
     ]
   },

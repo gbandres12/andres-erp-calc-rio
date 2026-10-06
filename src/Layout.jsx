@@ -77,7 +77,7 @@ export default function Layout({ children, currentPageName }) {
     const hideUsersUnlessAdmin = (groups) => {
       if (isAppAdmin(user)) return groups;
       return groups.map(group => {
-        const items = group.items.filter(i => i.url !== 'Users');
+        const items = group.items.filter(i => i.url !== 'Users' && i.url !== 'CashReconciliation');
         return items.length ? { ...group, items } : null;
       }).filter(Boolean);
     };

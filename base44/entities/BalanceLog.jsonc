@@ -1,0 +1,123 @@
+{
+  "name": "BalanceLog",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "description": "ID da empresa/filial"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "ID da conta financeira"
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Nome da conta (cache)"
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "recalculo",
+        "ajuste_manual",
+        "fechamento"
+      ],
+      "description": "Tipo de opera\u00e7\u00e3o que alterou o saldo"
+    },
+    "balance_before": {
+      "type": "number",
+      "description": "Saldo antes da altera\u00e7\u00e3o"
+    },
+    "balance_after": {
+      "type": "number",
+      "description": "Saldo depois da altera\u00e7\u00e3o"
+    },
+    "difference": {
+      "type": "number",
+      "description": "Diferen\u00e7a aplicada (depois - antes)"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "automatico",
+        "manual"
+      ],
+      "default": "automatico",
+      "description": "Origem do rec\u00e1lculo"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email de quem executou"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Nome de quem executou"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "company_id",
+    "account_id",
+    "operation"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "custom_role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "custom_role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "custom_role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "custom_role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
