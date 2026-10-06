@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, DollarSign, Tag, Calendar, CreditCard, TrendingDown, Receipt, Pencil, Trash2 } from "lucide-react";
+import { History, DollarSign, Tag, Calendar, CreditCard, TrendingDown, Receipt, Pencil, Trash2, Printer } from "lucide-react";
+import SalePaymentReceiptDialog from "@/components/receipts/SalePaymentReceiptDialog";
 import { base44 } from "@/api/base44Client";
 import { formatBRL, formatDate } from "@/components/utils/formatters";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
   const [editingPayment, setEditingPayment] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [receiptTarget, setReceiptTarget] = useState(null);
 
   const { data: payments = [] } = useQuery({
     queryKey: ["sale-payments-history", sale?.id],
@@ -135,9 +137,14 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
                   </div>
                   {p.notes && <p className="text-xs text-slate-500 italic mt-1">{p.notes}</p>}
                 </div>
-                <button type="button" onClick={() => handleDeleteClick(p)} disabled={deletePaymentMutation.isPending} className="text-red-500 hover:bg-red-100 p-1.5 rounded" title="Excluir">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setReceiptTarget({ payment: p, kind: 'abatimento' })} className="text-slate-500 hover:bg-slate-200 p-1.5 rounded" title="Recibo do abatimento">
+                    <Printer className="w-4 h-4" />
+                  </button>
+                  <button type="button" onClick={() => handleDeleteClick(p)} disabled={deletePaymentMutation.isPending} className="text-red-500 hover:bg-red-100 p-1.5 rounded" title="Excluir">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </TabsContent>
@@ -175,9 +182,14 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
                   )}
                   {p.notes && <p className="text-xs text-slate-400 italic">{p.notes}</p>}
                 </div>
-                <button type="button" onClick={() => handleDeleteClick(p)} disabled={deletePaymentMutation.isPending} className="text-red-500 hover:bg-red-100 p-1.5 rounded">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setReceiptTarget({ payment: p, kind: 'pagamento' })} className="text-slate-500 hover:bg-slate-200 p-1.5 rounded" title="Imprimir recibo">
+                    <Printer className="w-4 h-4" />
+                  </button>
+                  <button type="button" onClick={() => handleDeleteClick(p)} disabled={deletePaymentMutation.isPending} className="text-red-500 hover:bg-red-100 p-1.5 rounded" title="Excluir">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </TabsContent>
@@ -193,6 +205,15 @@ export default function SalePaymentHistoryDialog({ sale, open, onClose }) {
           saleId={sale.id}
           open={!!editingPayment}
           onClose={() => setEditingPayment(null)}
+        />
+
+        <SalePaymentReceiptDialog
+          sale={sale}
+          payment={receiptTarget?.payment}
+          kind={receiptTarget?.kind}
+          totals={{ totalPago, totalAbatimento }}
+          open={!!receiptTarget}
+          onClose={() => setReceiptTarget(null)}
         />
 
         <DeleteAuthDialog
