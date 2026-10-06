@@ -4,7 +4,7 @@ import {
   BarChart3, Settings, FileText, History, PackageCheck,
   ArrowDownToLine, ArrowUpFromLine, Bot, TrendingUp,
   ClipboardList, RepeatIcon, ArrowLeftRight, Receipt, Upload, Layers, Wheat,
-  Calculator, RadioTower
+  Calculator
 } from "lucide-react";
 
 // Fonte única da navegação — usada pelo Layout (filtrar menu) e pela tela de
@@ -80,7 +80,6 @@ export const navigationGroups = [
     title: "Gestão",
     icon: BarChart3,
     items: [
-      { title: "Painel Gerencial", url: "Gerencial", icon: RadioTower },
       { title: "Relatórios", url: "Reports", icon: BarChart3 },
       { title: "Auditoria", url: "ActivityLogs", icon: History },
       { title: "Usuários", url: "Users", icon: Users },

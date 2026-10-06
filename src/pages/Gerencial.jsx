@@ -66,32 +66,28 @@ export default function Gerencial() {
   const { data: products = [] } = useQuery({
     queryKey: ['ger-products'],
     queryFn: () => base44.entities.Product.filter({ is_active: true }),
-    initialData: [],
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: stockEntries = [] } = useQuery({
     queryKey: ['ger-stock'],
     queryFn: () => base44.entities.StockEntry.filter({ status: 'ativo' }),
-    initialData: [],
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['ger-vehicles'],
     queryFn: () => base44.entities.Vehicle.filter({ status: 'ativo' }),
-    initialData: [],
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: paidTransactions = [] } = useQuery({
+  const { data: paidTransactions = [], isPending: loadingPaid } = useQuery({
     queryKey: ['ger-paid'],
     queryFn: () => base44.entities.Transaction.filter({ status: 'pago' }, '-payment_date', 1000),
-    initialData: [],
     staleTime: 2 * 60 * 1000,
   });
 
-  const { data: pendingTransactions = [] } = useQuery({
+  const { data: pendingTransactions = [], isPending: loadingPending } = useQuery({
     queryKey: ['ger-pending'],
     queryFn: async () => {
       const [pendente, parcial, atrasado] = await Promise.all([
@@ -101,7 +97,6 @@ export default function Gerencial() {
       ]);
       return [...pendente, ...parcial, ...atrasado];
     },
-    initialData: [],
     staleTime: 2 * 60 * 1000,
   });
 
@@ -114,18 +109,16 @@ export default function Gerencial() {
   const { data: fiscalInvoices = [] } = useQuery({
     queryKey: ['ger-invoices'],
     queryFn: () => base44.entities.FiscalInvoice.filter({}, '-created_date', 25),
-    initialData: [],
     staleTime: 60 * 1000,
   });
 
   const { data: withdrawals = [] } = useQuery({
     queryKey: ['ger-withdrawals'],
     queryFn: () => base44.entities.SaleWithdrawal.filter({}, '-created_date', 15),
-    initialData: [],
     staleTime: 60 * 1000,
   });
 
-  const isLoading = loadingCompanies || loadingRecent;
+  const isLoading = loadingCompanies || loadingRecent || loadingPaid || loadingPending;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

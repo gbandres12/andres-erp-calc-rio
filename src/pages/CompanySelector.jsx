@@ -4,13 +4,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Plus, Edit, Check, LogOut, RefreshCw, Landmark, MapPin, Phone } from "lucide-react";
+import { Building2, Plus, Edit, Check, LogOut, RefreshCw, Landmark, MapPin, Phone, RadioTower, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { createPageUrl } from "@/utils";
 
 export default function CompanySelector() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState(null);
   const [user, setUser] = useState(null);
@@ -132,6 +134,10 @@ export default function CompanySelector() {
 
   const selectedCompanyId = localStorage.getItem('selectedCompanyId');
   const isAdmin = user?.role === 'admin' || user?.custom_role === 'admin';
+  const canAccessGerencial = isAdmin || !user?.custom_role ||
+    (user.custom_role === 'custom'
+      ? (user.custom_permissions || []).includes('Gerencial')
+      : true);
   const initials = (user?.full_name || user?.email || 'U')
     .split(' ')
     .filter(Boolean)
@@ -260,6 +266,31 @@ export default function CompanySelector() {
               )}
             </div>
           </section>
+
+          {/* Painel Gerencial — visão consolidada do grupo */}
+          {canAccessGerencial && companies.length > 0 && (
+            <section
+              onClick={() => navigate(createPageUrl('Gerencial'))}
+              className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 text-white p-5 rounded-2xl shadow-sm cursor-pointer flex items-center justify-between gap-4 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-11 h-11 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <RadioTower className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold">Painel Gerencial Consolidado</h3>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 uppercase tracking-wide">Ao vivo</span>
+                  </div>
+                  <p className="text-xs text-slate-300 truncate">Todas as filiais em uma tela: faturamento, notas, retiradas e lançamentos</p>
+                </div>
+              </div>
+              <span className="flex items-center gap-1.5 text-xs font-bold bg-white/10 border border-white/15 px-4 py-2 rounded-xl group-hover:bg-indigo-600 transition flex-shrink-0">
+                Abrir
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            </section>
+          )}
 
           {/* Cards de filiais */}
           {companies.length === 0 ? (

@@ -72,7 +72,12 @@ export default function Layout({ children, currentPageName }) {
   };
 
   const filteredNavigation = React.useMemo(() => {
-    if (!user) return navigationGroups;
+    // Painel Gerencial tem entrada própria na Central de Filiais (fora do menu)
+    const menuGroups = navigationGroups
+      .map(g => ({ ...g, items: g.items.filter(i => i.url !== 'Gerencial') }))
+      .filter(g => g.items.length);
+
+    if (!user) return menuGroups;
 
     const hideUsersUnlessAdmin = (groups) => {
       if (isAppAdmin(user)) return groups;
@@ -121,7 +126,7 @@ export default function Layout({ children, currentPageName }) {
       }).filter(Boolean));
     }
 
-    return hideUsersUnlessAdmin(navigationGroups);
+    return hideUsersUnlessAdmin(menuGroups);
   }, [user]);
 
   useEffect(() => {
@@ -152,7 +157,7 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     if (!user || companies.length === 0) return;
     const savedCompanyId = localStorage.getItem('selectedCompanyId');
-    if (!savedCompanyId && currentPageName !== 'CompanySelector' && currentPageName !== 'Settings') {
+    if (!savedCompanyId && currentPageName !== 'CompanySelector' && currentPageName !== 'Settings' && currentPageName !== 'Gerencial') {
       navigate(createPageUrl('CompanySelector'));
       return;
     }
@@ -189,7 +194,7 @@ export default function Layout({ children, currentPageName }) {
   };
 
   if (currentPageName === 'CompanySelector') return <>{children}</>;
-  if (!selectedCompanyId && currentPageName !== 'Settings') return null;
+  if (!selectedCompanyId && currentPageName !== 'Settings' && currentPageName !== 'Gerencial') return null;
 
   const isActive = (url) => location.pathname === createPageUrl(url);
 
