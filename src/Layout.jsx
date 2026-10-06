@@ -93,7 +93,7 @@ export default function Layout({ children, currentPageName }) {
           const items = group.items.filter(i => allowed.includes(i.url));
           return items.length ? { ...group, items } : null;
         }
-        const forbidden = ['ActivityLogs', 'Settings', 'Users', 'Dashboard', 'SupplierQuotes', 'SalesForecast', 'CRM'];
+        const forbidden = ['ActivityLogs', 'Settings', 'Users', 'Dashboard', 'SupplierQuotes', 'SalesForecast', 'CRM', 'Gerencial'];
         const items = group.items.filter(i => !forbidden.includes(i.url));
         return items.length ? { ...group, items } : null;
       }).filter(Boolean));
