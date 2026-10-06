@@ -9,6 +9,7 @@ import FiscalImport from './pages/FiscalImport';
 import CostCenterReport from './pages/CostCenterReport';
 import ClientDeliveries from './pages/ClientDeliveries';
 import Cubage from './pages/Cubage';
+import CashReconciliation from './pages/CashReconciliation';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -75,6 +76,7 @@ const AuthenticatedApp = () => {
       <Route path="/CostCenterReport" element={<LayoutWrapper currentPageName="CostCenterReport"><CostCenterReport /></LayoutWrapper>} />
       <Route path="/ClientDeliveries" element={<LayoutWrapper currentPageName="ClientDeliveries"><ClientDeliveries /></LayoutWrapper>} />
       <Route path="/Cubage" element={<LayoutWrapper currentPageName="Cubage"><Cubage /></LayoutWrapper>} />
+      <Route path="/CashReconciliation" element={<LayoutWrapper currentPageName="CashReconciliation"><CashReconciliation /></LayoutWrapper>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
