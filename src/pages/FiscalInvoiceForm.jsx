@@ -18,15 +18,8 @@ import { maskCpfCnpj } from "@/components/fiscal/cpfCnpj";
 import { fetchIbgeCode } from "@/components/fiscal/ibge";
 import useCepLookup from "@/hooks/useCepLookup";
 
-const PAYMENT_METHODS = [
-  { value: "01", label: "Dinheiro" },
-  { value: "02", label: "Cheque" },
-  { value: "03", label: "Cartão de Crédito" },
-  { value: "04", label: "Cartão de Débito" },
-  { value: "15", label: "Boleto Bancário" },
-  { value: "90", label: "Sem Pagamento" },
-  { value: "99", label: "Outros" },
-];
+import { PAYMENT_METHODS, OPERATION_TYPES } from "@/components/fiscal/paymentMethods";
+import TemplateSelector from "@/components/fiscal/TemplateSelector";
 
 const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "", cst: "", csosn: "", unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
 
@@ -243,6 +236,33 @@ export default function FiscalInvoiceForm() {
     });
   };
 
+  // Aplica um modelo de nota: tipo, natureza, pagamento e CFOP dos itens
+  const applyTemplate = (t) => {
+    setForm(prev => {
+      const uf = prev.recipient_address?.uf || "";
+      const internal = !uf || !config?.uf || uf === config.uf;
+      const items = prev.items.map(item => {
+        const product = products.find(p => p.id === item.product_id);
+        if (!product) return item;
+        if (t.operation_type === "devolucao") return { ...item, cfop: devolucaoCfopFor(product, config, uf) };
+        const cfop = (internal
+          ? (t.cfop_interno || product.cfop_internal)
+          : (t.cfop_interestadual || product.cfop_interstate)) || product.cfop || "";
+        return cfop ? { ...item, cfop } : item;
+      });
+      return {
+        ...prev,
+        operation_type: t.operation_type,
+        document_type: t.document_type || prev.document_type,
+        nature_operation: t.nature_operation || prev.nature_operation,
+        payment_method: t.payment_method || prev.payment_method,
+        notes: t.notes ? [prev.notes, t.notes].filter(Boolean).join(" ").slice(0, 5000) : prev.notes,
+        items
+      };
+    });
+    toast.success(`Modelo "${t.name}" aplicado`);
+  };
+
   // Busca automática de endereço via ViaCEP no CEP do destinatário
   const { cepLoading, handleCepChange } = useCepLookup((data) => {
     setForm(prev => {
@@ -414,6 +434,8 @@ export default function FiscalInvoiceForm() {
         </div>
       )}
 
+      <TemplateSelector companyId={companyId} onApply={applyTemplate} />
+
       {/* Tipo e ambiente */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 grid md:grid-cols-3 gap-4">
         <div className="space-y-1">
@@ -421,8 +443,7 @@ export default function FiscalInvoiceForm() {
           <Select value={form.operation_type || "venda"} onValueChange={handleOperationTypeChange}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="venda">Venda</SelectItem>
-              <SelectItem value="devolucao">Devolução de venda</SelectItem>
+              {OPERATION_TYPES.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

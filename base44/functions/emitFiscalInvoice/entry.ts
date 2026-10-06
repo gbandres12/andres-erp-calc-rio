@@ -265,7 +265,7 @@ function buildPayload(invoice, config) {
     modelo: invoice.document_type === 'nfce' ? 65 : 55,
     naturezaOperacao: invoice.nature_operation,
     destinoOperacao: config.uf !== address.uf ? 2 : 1,
-    tipoOperacao: invoice.operation_type === 'devolucao' ? 0 : 1,
+    tipoOperacao: ['devolucao', 'entrada'].includes(invoice.operation_type) ? 0 : 1,
     finalidade: invoice.operation_type === 'devolucao' ? 4 : 1,
     ...(invoice.operation_type === 'devolucao' && invoice.referenced_access_key
       ? { nfesReferenciadas: [String(invoice.referenced_access_key).replace(/\D/g, '')] }

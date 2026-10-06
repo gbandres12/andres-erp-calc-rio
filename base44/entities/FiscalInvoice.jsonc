@@ -52,10 +52,11 @@
       "type": "string",
       "enum": [
         "venda",
-        "devolucao"
+        "devolucao",
+        "entrada"
       ],
       "default": "venda",
-      "description": "Tipo da opera\u00e7\u00e3o: venda normal ou devolu\u00e7\u00e3o de mercadoria"
+      "description": "Tipo da opera\u00e7\u00e3o: venda normal, devolu\u00e7\u00e3o de mercadoria ou entrada (compra)"
     },
     "referenced_access_key": {
       "type": "string",
