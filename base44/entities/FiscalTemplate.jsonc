@@ -11,7 +11,8 @@
       "enum": [
         "venda",
         "devolucao",
-        "entrada"
+        "entrada",
+        "remessa"
       ],
       "default": "venda",
       "description": "Tipo de opera\u00e7\u00e3o que o modelo aplica"

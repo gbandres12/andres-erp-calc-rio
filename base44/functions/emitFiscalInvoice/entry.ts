@@ -45,9 +45,11 @@ Deno.serve(async (req) => {
 
     const items = [];
     for (let index = 0; index < invoice.items.length; index += 1) {
-      const error = validateProduct(products[index], invoice, index);
+      const error = validateProduct(products[index], invoice.items[index], config, invoice, index);
       if (error) return await reject(error);
-      items.push(snapshotItem(invoice.items[index], products[index], config, invoice));
+      items.push(products[index]
+        ? snapshotItem(invoice.items[index], products[index], config, invoice)
+        : snapshotAvulsoItem(invoice.items[index], config));
     }
 
     const auditedInvoice = { ...invoice, items };
@@ -140,8 +142,8 @@ function validateInvoice(invoice) {
   }
   if (!address.logradouro || !address.bairro || !address.municipio || !address.uf || !address.cep) return 'Complete o endereço do destinatário';
   if (!/^\d{7}$/.test(String(address.codigoMunicipio || ''))) return 'Código IBGE do destinatário inválido';
-  if (invoice.operation_type === 'devolucao') {
-    if (invoice.document_type !== 'nfe') return 'Nota de devolução deve ser NF-e (modelo 55)';
+  if (['devolucao', 'remessa'].includes(invoice.operation_type)) {
+    if (invoice.document_type !== 'nfe') return 'Documento deve ser NF-e (modelo 55)';
     const key = String(invoice.referenced_access_key || '').replace(/\D/g, '');
     if (key.length !== 44) return 'Informe a chave de acesso (44 dígitos) da NF-e original referenciada';
   }
@@ -153,11 +155,70 @@ function validateInvoice(invoice) {
 // Valida apenas o que impede de montar o XML. Todo o resto (NCM, CFOP,
 // CST/CSOSN, alíquotas, classificação, aprovação do contador) a NotaAs/SEFAZ
 // valida e devolve a rejeição com código e motivo.
-function validateProduct(product, invoice, index) {
+function validateProduct(product, item, config, invoice, index) {
   const position = index + 1;
-  if (!product) return `Selecione um produto cadastrado no item ${position}`;
+  if (!product) {
+    // Item avulso: dados fiscais digitados manualmente no formulário
+    if (item.avulso !== true) return `Selecione um produto cadastrado no item ${position} (ou use "Avulso")`;
+    if (!String(item.product_name || '').trim()) return `Informe a descrição do produto avulso no item ${position}`;
+    if (!/^\d{8}$/.test(String(item.ncm || '').replace(/\D/g, ''))) return `Informe o NCM (8 dígitos) do produto avulso no item ${position}`;
+    if (!/^\d{4}$/.test(String(item.cfop || '').replace(/\D/g, ''))) return `Informe o CFOP do produto avulso no item ${position}`;
+    return null;
+  }
   if (product.company_id !== invoice.company_id) return `Produto do item ${position} pertence a outra empresa`;
   return null;
+}
+
+// Item avulso: usa os dados digitados no item, sem cadastro de produto
+function snapshotAvulsoItem(item, config) {
+  const quantity = Number(item.quantity);
+  const unitPrice = Number(item.unit_price);
+  const discount = Number(item.discount || 0);
+  const total = Number(item.total) > 0 ? Number(item.total) : round2(quantity * unitPrice - discount);
+  const base = Math.max(0, total);
+  const crt = Number(config.crt);
+  const icmsCst = String(item.icms_cst || item.cst || '');
+  const csosn = String(item.icms_csosn || item.csosn || '');
+  return {
+    ...item,
+    avulso: true,
+    product_id: '',
+    product_name: String(item.product_name || '').trim(),
+    product_code: String(item.product_code || '').trim(),
+    ncm: String(item.ncm).replace(/\D/g, ''),
+    cest: item.cest || '',
+    cfop: String(item.cfop).replace(/\D/g, ''),
+    unit: item.unit || 'UN',
+    cst: crt === 1 ? '' : icmsCst,
+    csosn: crt === 1 ? csosn : '',
+    icms_cst: icmsCst,
+    icms_csosn: csosn,
+    icms_base: base,
+    icms_aliquota: Number(item.icms_aliquota || 0),
+    icms_aliquota_configurada: true,
+    icms_valor: round2(base * Number(item.icms_aliquota || 0) / 100),
+    pis_cst: item.pis_cst || '',
+    pis_base: base,
+    pis_aliquota: Number(item.pis_aliquota || 0),
+    pis_aliquota_configurada: true,
+    pis_valor: round2(base * Number(item.pis_aliquota || 0) / 100),
+    cofins_cst: item.cofins_cst || '',
+    cofins_base: base,
+    cofins_aliquota: Number(item.cofins_aliquota || 0),
+    cofins_aliquota_configurada: true,
+    cofins_valor: round2(base * Number(item.cofins_aliquota || 0) / 100),
+    ibs_cbs_cst: item.ibs_cbs_cst || '',
+    classificacao_tributaria: item.classificacao_tributaria || '',
+    ibs_aliquota: Number(item.ibs_aliquota || 0),
+    ibs_aliquota_configurada: true,
+    cbs_aliquota: Number(item.cbs_aliquota || 0),
+    cbs_aliquota_configurada: true,
+    accountant_approved: true,
+    quantity,
+    unit_price: unitPrice,
+    discount,
+    total
+  };
 }
 
 function devolucaoCfop(item, product, config, invoice) {
@@ -267,7 +328,7 @@ function buildPayload(invoice, config) {
     destinoOperacao: config.uf !== address.uf ? 2 : 1,
     tipoOperacao: ['devolucao', 'entrada'].includes(invoice.operation_type) ? 0 : 1,
     finalidade: invoice.operation_type === 'devolucao' ? 4 : 1,
-    ...(invoice.operation_type === 'devolucao' && invoice.referenced_access_key
+    ...(['devolucao', 'remessa'].includes(invoice.operation_type) && invoice.referenced_access_key
       ? { nfesReferenciadas: [String(invoice.referenced_access_key).replace(/\D/g, '')] }
       : {}),
     consumidorFinal: ie && !ieIsento ? 0 : 1,

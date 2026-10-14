@@ -22,6 +22,8 @@ import { PAYMENT_METHODS, OPERATION_TYPES } from "@/components/fiscal/paymentMet
 import TemplateSelector from "@/components/fiscal/TemplateSelector";
 
 const emptyItem = { sequence: 1, product_name: "", product_code: "", ncm: "", cfop: "", cst: "", csosn: "", unit: "TON", quantity: 1, unit_price: 0, discount: 0, total: 0 };
+// Item avulso: sem produto cadastrado — código, descrição, NCM, CFOP e CST/CSOSN digitados manualmente
+const avulsoItem = { ...emptyItem, avulso: true, unit: "PC" };
 
 // CFOP de devolução de venda: 1.201/2.201 produção própria, 1.202/2.202 adquirido de terceiros
 const devolucaoCfopFor = (product, config, uf) => {
@@ -228,10 +230,12 @@ export default function FiscalInvoiceForm() {
       return {
         ...prev,
         operation_type: value,
-        document_type: value === "devolucao" ? "nfe" : prev.document_type,
+        document_type: ["devolucao", "remessa"].includes(value) ? "nfe" : prev.document_type,
         items,
-        nature_operation: value === "devolucao" && (prev.nature_operation || "") === "Venda de produto" ? "Devolução de venda" : prev.nature_operation,
-        payment_method: value === "devolucao" ? "90" : prev.payment_method
+        nature_operation: ["devolucao", "remessa"].includes(value) && (prev.nature_operation || "") === "Venda de produto"
+          ? (value === "devolucao" ? "Devolução de venda" : "Remessa para garantia (conserto ou reparo)")
+          : prev.nature_operation,
+        payment_method: ["devolucao", "remessa"].includes(value) ? "90" : prev.payment_method
       };
     });
   };
@@ -243,11 +247,13 @@ export default function FiscalInvoiceForm() {
       const internal = !uf || !config?.uf || uf === config.uf;
       const items = prev.items.map(item => {
         const product = products.find(p => p.id === item.product_id);
-        if (!product) return item;
-        if (t.operation_type === "devolucao") return { ...item, cfop: devolucaoCfopFor(product, config, uf) };
+        if (t.operation_type === "devolucao") {
+          return product ? { ...item, cfop: devolucaoCfopFor(product, config, uf) } : item;
+        }
+        // Itens avulso (sem produto cadastrado) também recebem o CFOP do modelo
         const cfop = (internal
-          ? (t.cfop_interno || product.cfop_internal)
-          : (t.cfop_interestadual || product.cfop_interstate)) || product.cfop || "";
+          ? (t.cfop_interno || product?.cfop_internal)
+          : (t.cfop_interestadual || product?.cfop_interstate)) || product?.cfop || "";
         return cfop ? { ...item, cfop } : item;
       });
       return {
@@ -299,6 +305,17 @@ export default function FiscalInvoiceForm() {
     });
   };
 
+  // Item avulso: CST/CSOSN digitado manualmente (grava nos dois campos)
+  const setItemTaxCode = (idx, value) => {
+    setForm(prev => {
+      const items = [...prev.items];
+      items[idx] = config?.crt === 1
+        ? { ...items[idx], csosn: value, icms_csosn: value }
+        : { ...items[idx], cst: value, icms_cst: value };
+      return { ...prev, items };
+    });
+  };
+
   const selectProduct = (idx, productId) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -319,6 +336,13 @@ export default function FiscalInvoiceForm() {
     setForm(prev => ({
       ...prev,
       items: [...prev.items, { ...emptyItem, sequence: prev.items.length + 1 }]
+    }));
+  };
+
+  const addAvulsoItem = () => {
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, { ...avulsoItem, sequence: prev.items.length + 1 }]
     }));
   };
 
@@ -414,7 +438,7 @@ export default function FiscalInvoiceForm() {
   });
 
   const isValid = form.recipient_cpf_cnpj && form.items.length > 0 && form.total > 0
-    && (form.operation_type !== "devolucao" || (form.referenced_access_key || "").replace(/\D/g, "").length === 44);
+    && (!["devolucao", "remessa"].includes(form.operation_type) || (form.referenced_access_key || "").replace(/\D/g, "").length === 44);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -478,7 +502,7 @@ export default function FiscalInvoiceForm() {
             </SelectContent>
           </Select>
         </div>
-        {form.operation_type === "devolucao" && (
+        {["devolucao", "remessa"].includes(form.operation_type) && (
           <div className="space-y-1 md:col-span-3">
             <Label>Chave de acesso da NF-e original *</Label>
             <Input
@@ -489,7 +513,7 @@ export default function FiscalInvoiceForm() {
               maxLength={44}
             />
             <p className="text-xs text-slate-500">
-              Obrigatório em devoluções. Use o botão "Nota de Devolução" em uma nota autorizada para preencher automaticamente.
+              Obrigatório em devoluções e remessas (garantia/conserto). Use o botão "Nota de Devolução" em uma nota autorizada para preencher automaticamente.
             </p>
           </div>
         )}
@@ -576,7 +600,10 @@ export default function FiscalInvoiceForm() {
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-semibold text-slate-800">Itens</h3>
-          <Button variant="outline" size="sm" onClick={addItem}><Plus className="w-4 h-4 mr-1" /> Adicionar</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={addItem}><Plus className="w-4 h-4 mr-1" /> Adicionar</Button>
+            <Button variant="outline" size="sm" onClick={addAvulsoItem}><Plus className="w-4 h-4 mr-1" /> Avulso</Button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -602,8 +629,17 @@ export default function FiscalInvoiceForm() {
                 <tr key={idx}>
                   <td className="px-3 py-2 text-slate-400">{item.sequence}</td>
                   <td className="px-3 py-2 space-y-1">
-                    <ProductCombobox products={products} value={item.product_id} onSelect={productId => selectProduct(idx, productId)} />
-                    <Input value={item.product_name} readOnly className="h-9 text-sm bg-slate-50" />
+                    {item.avulso ? (
+                      <>
+                        <Input value={item.product_code || ""} onChange={e => updateItem(idx, "product_code", e.target.value)} className="h-9 text-sm font-mono" placeholder="Código do produto" />
+                        <Input value={item.product_name || ""} onChange={e => updateItem(idx, "product_name", e.target.value)} className="h-9 text-sm" placeholder="Descrição do produto avulso" />
+                      </>
+                    ) : (
+                      <>
+                        <ProductCombobox products={products} value={item.product_id} onSelect={productId => selectProduct(idx, productId)} />
+                        <Input value={item.product_name} readOnly className="h-9 text-sm bg-slate-50" />
+                      </>
+                    )}
                   </td>
                   <td className="px-3 py-2"><Input value={item.ncm} onChange={e => updateItem(idx, "ncm", e.target.value)} className="h-9 text-sm" placeholder="00000000" /></td>
                   <td className="px-3 py-2">
@@ -625,7 +661,18 @@ export default function FiscalInvoiceForm() {
                       );
                     })()}
                   </td>
-                  <td className="px-3 py-2"><Input value={(config?.crt === 1 ? item.csosn : item.cst) || ""} readOnly className="h-9 text-sm bg-slate-50" placeholder={config?.crt === 1 ? "CSOSN" : "CST"} /></td>
+                  <td className="px-3 py-2">
+                    {item.avulso ? (
+                      <Input
+                        value={(config?.crt === 1 ? item.csosn : item.cst) || ""}
+                        onChange={e => setItemTaxCode(idx, e.target.value)}
+                        className="h-9 text-sm font-mono"
+                        placeholder={config?.crt === 1 ? "Ex: 400" : "Ex: 41"}
+                      />
+                    ) : (
+                      <Input value={(config?.crt === 1 ? item.csosn : item.cst) || ""} readOnly className="h-9 text-sm bg-slate-50" placeholder={config?.crt === 1 ? "CSOSN" : "CST"} />
+                    )}
+                  </td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.ibs_aliquota ?? 0} onChange={e => updateItem(idx, "ibs_aliquota", e.target.value)} className="h-9 text-sm text-right" /></td>
                   <td className="px-3 py-2"><Input type="number" min="0" step="0.0001" value={item.cbs_aliquota ?? 0} onChange={e => updateItem(idx, "cbs_aliquota", e.target.value)} className="h-9 text-sm text-right" /></td>
                   <td className="px-3 py-2">
@@ -635,6 +682,7 @@ export default function FiscalInvoiceForm() {
                         <SelectItem value="TON">TON</SelectItem>
                         <SelectItem value="KG">KG</SelectItem>
                         <SelectItem value="UN">UN</SelectItem>
+                        <SelectItem value="PC">PC</SelectItem>
                         <SelectItem value="M3">M³</SelectItem>
                       </SelectContent>
                     </Select>

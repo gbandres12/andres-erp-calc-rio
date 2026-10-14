@@ -12,4 +12,5 @@ export const OPERATION_TYPES = [
   { value: "venda", label: "Venda" },
   { value: "devolucao", label: "Devolução de venda" },
   { value: "entrada", label: "Entrada (compra)" },
+  { value: "remessa", label: "Remessa (garantia/conserto)" },
 ];

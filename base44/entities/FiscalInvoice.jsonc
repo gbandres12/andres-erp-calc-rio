@@ -53,14 +53,15 @@
       "enum": [
         "venda",
         "devolucao",
-        "entrada"
+        "entrada",
+        "remessa"
       ],
       "default": "venda",
-      "description": "Tipo da opera\u00e7\u00e3o: venda normal, devolu\u00e7\u00e3o de mercadoria ou entrada (compra)"
+      "description": "Tipo da opera\u00e7\u00e3o: venda normal, devolu\u00e7\u00e3o, entrada (compra) ou remessa (garantia/conserto)"
     },
     "referenced_access_key": {
       "type": "string",
-      "description": "Chave de acesso (44 d\u00edgitos) da NF-e original referenciada em devolu\u00e7\u00f5es"
+      "description": "Chave de acesso (44 d\u00edgitos) da NF-e original referenciada em devolu\u00e7\u00f5es/remessas"
     },
     "referenced_invoice_id": {
       "type": "string",
