@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, Save, Loader2, UserPlus } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Loader2, UserPlus, FileInput } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import ContactCombobox from "@/components/fiscal/ContactCombobox";
 import ProductCombobox from "@/components/fiscal/ProductCombobox";
 import TransportSection from "@/components/fiscal/TransportSection";
 import NewClientDialog from "@/components/fiscal/NewClientDialog";
+import ImportDocumentDialog from "@/components/fiscal/ImportDocumentDialog";
 import { maskCpfCnpj } from "@/components/fiscal/cpfCnpj";
 import { fetchIbgeCode } from "@/components/fiscal/ibge";
 import useCepLookup from "@/hooks/useCepLookup";
@@ -96,6 +97,7 @@ export default function FiscalInvoiceForm() {
   const config = configs[0];
   const queryClient = useQueryClient();
   const [showNewClient, setShowNewClient] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const { data: existingInvoice } = useQuery({
     queryKey: ["fiscal_invoice_edit", invoiceId],
@@ -354,6 +356,60 @@ export default function FiscalInvoiceForm() {
     });
   };
 
+  // Aplica os dados lidos de um XML/PDF importado no formulário
+  const applyImportedData = (data) => {
+    const d = data.destinatario || {};
+    const items = (data.items || []).map((it, i) => {
+      const code = String(it.codigo || "").trim();
+      const product = products.find(p =>
+        (code && p.code === code) ||
+        (it.descricao && (p.fiscal_description === it.descricao || p.name === it.descricao))
+      );
+      if (product) {
+        return {
+          sequence: i + 1, ...fiscalSnapshot(product, config, d.uf),
+          quantity: it.quantidade || 1, unit_price: it.valor_unitario || 0,
+          discount: it.desconto || 0, total: it.total ?? ((it.quantidade || 1) * (it.valor_unitario || 0))
+        };
+      }
+      // Sem produto cadastrado: item avulso com os dados do arquivo
+      return {
+        ...emptyItem, avulso: true, sequence: i + 1,
+        product_code: code, product_name: it.descricao || "",
+        ncm: it.ncm || "", cfop: it.cfop || "",
+        cst: it.cst_csosn || "", icms_cst: it.cst_csosn || "",
+        csosn: it.cst_csosn || "", icms_csosn: it.cst_csosn || "",
+        unit: it.unidade || "UN", quantity: it.quantidade || 1,
+        unit_price: it.valor_unitario || 0, discount: it.desconto || 0,
+        total: it.total || 0
+      };
+    });
+    const subtotal = items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+    const discount_total = items.reduce((s, i) => s + (parseFloat(i.discount) || 0), 0);
+    setForm(prev => ({
+      ...prev,
+      recipient_name: d.nome || prev.recipient_name,
+      recipient_cpf_cnpj: d.cpf_cnpj ? maskCpfCnpj(d.cpf_cnpj) : prev.recipient_cpf_cnpj,
+      recipient_ie: d.ie || prev.recipient_ie,
+      recipient_address: {
+        logradouro: d.logradouro || prev.recipient_address?.logradouro || "",
+        numero: d.numero || prev.recipient_address?.numero || "S/N",
+        bairro: d.bairro || prev.recipient_address?.bairro || "",
+        municipio: d.municipio || prev.recipient_address?.municipio || "",
+        uf: d.uf || prev.recipient_address?.uf || "",
+        cep: d.cep || prev.recipient_address?.cep || ""
+      },
+      nature_operation: data.natureza || prev.nature_operation,
+      issue_date: data.data_emissao || prev.issue_date,
+      items, subtotal, discount_total,
+      shipping: Number(data.frete) || 0,
+      total: Number(data.total) || subtotal
+    }));
+    notesTouchedRef.current = true;
+    setShowImport(false);
+    toast.success(`Nota ${data.numero || ""} importada — confira os dados antes de salvar`);
+  };
+
   const handleClientCreated = (contact) => {
     queryClient.invalidateQueries({ queryKey: ["contacts_active", companyId] });
     applyContact(contact);
@@ -446,10 +502,13 @@ export default function FiscalInvoiceForm() {
         <Button variant="ghost" size="sm" asChild>
           <Link to={createPageUrl("FiscalInvoices")}><ArrowLeft className="w-4 h-4" /></Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-slate-900">{invoiceId ? "Editar Nota Fiscal" : "Nova Nota Fiscal"}</h1>
           <p className="text-slate-500 text-sm">Preencha os dados e salve como rascunho para emitir</p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+          <FileInput className="w-4 h-4 mr-1" /> Importar PDF/XML
+        </Button>
       </div>
 
       {!config && (
@@ -748,6 +807,12 @@ export default function FiscalInvoiceForm() {
         onOpenChange={setShowNewClient}
         companyId={companyId}
         onClientCreated={handleClientCreated}
+      />
+
+      <ImportDocumentDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        onImported={applyImportedData}
       />
 
       <div className="flex gap-3">
