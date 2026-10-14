@@ -189,6 +189,11 @@
           "sequence": {
             "type": "number"
           },
+          "avulso": {
+            "type": "boolean",
+            "default": false,
+            "description": "Item avulso: dados digitados manualmente, sem produto cadastrado"
+          },
           "product_id": {
             "type": "string"
           },

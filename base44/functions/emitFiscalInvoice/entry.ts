@@ -353,7 +353,8 @@ function buildPayload(invoice, config) {
       else mapped.cst = item.cst;
       return mapped;
     }),
-    pagamentos: [{ tipoPagamento: invoice.payment_method, valor: Number(invoice.total) }],
+    // tPag 90 (Sem Pagamento) não aceita valor > 0 na NotaAs/SEFAZ
+    pagamentos: [{ tipoPagamento: invoice.payment_method, valor: invoice.payment_method === '90' ? 0 : Number(invoice.total) }],
     infCpl: sanitize(invoice.notes),
     transporte: buildTransporte(invoice.transporte)
   };
