@@ -118,6 +118,12 @@ export default function Gerencial() {
     staleTime: 60 * 1000,
   });
 
+  const { data: financialAccounts = [] } = useQuery({
+    queryKey: ['ger-accounts'],
+    queryFn: () => base44.entities.FinancialAccount.filter({ is_active: true }),
+    staleTime: 2 * 60 * 1000,
+  });
+
   const isLoading = loadingCompanies || loadingRecent || loadingPaid || loadingPending;
 
   const handleRefresh = async () => {
@@ -163,7 +169,7 @@ export default function Gerencial() {
   // Estatísticas por filial + consolidadas
   const perCompany = useMemo(() => {
     const map = {};
-    companies.forEach(c => { map[c.id] = { company: c, tons: 0, stockCost: 0, revenue: 0, expenses: 0, receivables: 0, payables: 0, invoices: 0, vehicles: 0 }; });
+    companies.forEach(c => { map[c.id] = { company: c, tons: 0, stockCost: 0, revenue: 0, expenses: 0, receivables: 0, payables: 0, invoices: 0, vehicles: 0, cash: 0 }; });
 
     stockEntries.forEach(e => {
       const m = map[e.company_id];
@@ -174,6 +180,8 @@ export default function Gerencial() {
       m.stockCost += (e.quantity_available || 0) * cost;
     });
     vehicles.forEach(v => { if (map[v.company_id]) map[v.company_id].vehicles += 1; });
+
+    financialAccounts.forEach(a => { if (map[a.company_id]) map[a.company_id].cash += (a.current_balance || 0); });
 
     paidTransactions.forEach(t => {
       const m = map[t.company_id];
@@ -198,7 +206,7 @@ export default function Gerencial() {
     });
 
     return Object.values(map);
-  }, [companies, stockEntries, products, vehicles, paidTransactions, pendingTransactions, fiscalInvoices, thisMonth, thisYear]);
+  }, [companies, stockEntries, products, vehicles, financialAccounts, paidTransactions, pendingTransactions, fiscalInvoices, thisMonth, thisYear]);
 
   const consolidated = useMemo(() => {
     const sum = (arr, fn) => arr.reduce((s, x) => s + fn(x), 0);
@@ -227,6 +235,7 @@ export default function Gerencial() {
       marginPercent: revenue > 0 ? ((revenue - expenses) / revenue) * 100 : 0,
       vehicles: sum(perCompany, c => c.vehicles),
       invoices: sum(perCompany, c => c.invoices),
+      cash: sum(perCompany, c => c.cash),
     };
   }, [perCompany, paidTransactions, paidTransactions]);
 
@@ -331,6 +340,14 @@ export default function Gerencial() {
       bar: 'bg-amber-500',
       barWidth: Math.min((consolidated.payables / Math.max(consolidated.receivables, consolidated.payables, 1)) * 100, 100),
     },
+    {
+      label: 'Caixa do Grupo',
+      badge: { text: 'Saldo total', cls: 'bg-indigo-50 text-indigo-700' },
+      value: consolidated.cash,
+      note: 'Soma do saldo atual de todas as contas',
+      bar: 'bg-indigo-600',
+      barWidth: Math.min((consolidated.cash / Math.max(consolidated.revenue, consolidated.cash, 1)) * 100, 100),
+    },
   ];
 
   return (
@@ -429,6 +446,13 @@ export default function Gerencial() {
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">A Pagar</span>
                       <div className="text-base font-black text-amber-600">{formatBRL(c.payables)}</div>
                     </div>
+                    <div className="col-span-2 flex items-center justify-between bg-indigo-50/70 border border-indigo-100 rounded-lg px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        <Wallet className="w-3.5 h-3.5 text-indigo-600" />
+                        Caixa Atual
+                      </span>
+                      <span className="text-xl font-black text-indigo-700">{formatBRL(c.cash)}</span>
+                    </div>
                     <div className="col-span-2 flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-[11px]">
                       <span className="text-slate-500 font-medium">Margem: <strong className={margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}>{margin.toFixed(1).replace('.', ',')}%</strong></span>
                       <span className="text-slate-500 font-medium">Veículos: <strong className="text-slate-800">{c.vehicles}</strong></span>
@@ -455,7 +479,7 @@ export default function Gerencial() {
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Métricas Financeiras Consolidadas — Todas as Filiais</h2>
             <span className="text-xs font-semibold text-indigo-600">Margem do grupo: {consolidated.marginPercent.toFixed(1).replace('.', ',')}%</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {kpiCards.map((k, i) => (
               <div key={i} className="bg-white p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-2">
