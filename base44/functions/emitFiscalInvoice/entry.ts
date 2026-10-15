@@ -322,11 +322,17 @@ function buildPayload(invoice, config) {
     dest.indicadorIE = ieIsento ? 2 : 9;
   }
   if (invoice.recipient_email) dest.email = invoice.recipient_email;
+  // Devolução pode ser saída (comprador devolve ao fornecedor — CFOP 2.x/4.x)
+  // ou entrada (vendedor recebe de volta — CFOP 1.x/3.x). A direção vem do CFOP.
+  const firstCfop = String(invoice.items?.[0]?.cfop || '').replace(/\D/g, '');
+  const cfopSaida = /^[2468]/.test(firstCfop);
   return {
     modelo: invoice.document_type === 'nfce' ? 65 : 55,
     naturezaOperacao: invoice.nature_operation,
     destinoOperacao: config.uf !== address.uf ? 2 : 1,
-    tipoOperacao: ['devolucao', 'entrada'].includes(invoice.operation_type) ? 0 : 1,
+    tipoOperacao: invoice.operation_type === 'devolucao'
+      ? (cfopSaida ? 1 : 0)
+      : (invoice.operation_type === 'entrada' ? 0 : 1),
     finalidade: invoice.operation_type === 'devolucao' ? 4 : 1,
     ...(['devolucao', 'remessa'].includes(invoice.operation_type) && invoice.referenced_access_key
       ? { nfesReferenciadas: [String(invoice.referenced_access_key).replace(/\D/g, '')] }
