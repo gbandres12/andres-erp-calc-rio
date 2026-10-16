@@ -96,6 +96,14 @@ export default function Dashboard() {
     }),
   });
 
+  const { data: financialAccounts = [] } = useQuery({
+    queryKey: ['financialAccounts', selectedCompanyId],
+    queryFn: () => base44.entities.FinancialAccount.filter({
+      company_id: selectedCompanyId,
+      is_active: true
+    }),
+  });
+
   const stats = useMemo(() => {
     const totalStockValueCost = stockEntries.reduce((sum, entry) => {
       const product = products.find(p => p.id === entry.product_id);
@@ -172,6 +180,10 @@ export default function Dashboard() {
     const liquidMargin = thisMonthRevenue - thisMonthExpenses;
     const marginPercent = thisMonthRevenue > 0 ? (liquidMargin / thisMonthRevenue) * 100 : 0;
 
+    const totalCash = financialAccounts
+      .filter(a => a.is_active)
+      .reduce((sum, a) => sum + (a.current_balance || 0), 0);
+
     return {
       totalStockValueCost,
       totalPotentialSalesValue,
@@ -188,8 +200,9 @@ export default function Dashboard() {
       poStock,
       liquidMargin,
       marginPercent,
+      totalCash,
     };
-  }, [stockEntries, products, allPaidTransactions, contacts, pendingTransactions]);
+  }, [stockEntries, products, allPaidTransactions, contacts, pendingTransactions, financialAccounts]);
 
   // Fluxo de caixa diário conforme período selecionado
   const daysBack = period === 'trimestre' ? 90 : period === 'mes' ? Math.max(new Date().getDate(), 7) : 30;
@@ -467,6 +480,14 @@ export default function Dashboard() {
       bar: 'bg-amber-500',
       barWidth: Math.min((stats.pendingPayables / Math.max(stats.pendingReceivables, stats.pendingPayables, 1)) * 100, 100),
     },
+    {
+      label: 'Caixa Atual',
+      badge: { text: 'Saldo total', cls: 'bg-indigo-50 text-indigo-700' },
+      value: stats.totalCash,
+      note: `${financialAccounts.length} ${financialAccounts.length === 1 ? 'conta ativa' : 'contas ativas'}`,
+      bar: 'bg-indigo-600',
+      barWidth: 100,
+    },
   ];
 
   return (
@@ -571,7 +592,7 @@ export default function Dashboard() {
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Métricas Financeiras Consolidadas — {companyName}</h2>
             <span className="text-xs font-semibold text-indigo-600">Margem do mês: {stats.marginPercent.toFixed(1).replace('.', ',')}%</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {kpiCards.map((k, i) => (
               <div key={i} className="bg-white p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                 <div className="flex items-start justify-between gap-2">
