@@ -375,7 +375,10 @@ function buildTransporte(t) {
     if (doc.length === 14) out.transportadora.cnpj = doc;
     else if (doc.length === 11) out.transportadora.cpf = doc;
     if (tr.nome) out.transportadora.nome = tr.nome;
-    if (tr.ie) out.transportadora.ie = tr.ie;
+    // IE da transportadora: o schema XML da SEFAZ aceita apenas dígitos —
+    // máscaras (15.933.540-0) e a palavra "ISENTO" causam rejeição do XML.
+    const trIeDigits = String(tr.ie || '').replace(/\D/g, '');
+    if (trIeDigits) out.transportadora.ie = trIeDigits;
     if (tr.endereco) out.transportadora.endereco = tr.endereco;
     if (tr.cidade) out.transportadora.cidade = tr.cidade;
     if (tr.uf) out.transportadora.uf = tr.uf;
