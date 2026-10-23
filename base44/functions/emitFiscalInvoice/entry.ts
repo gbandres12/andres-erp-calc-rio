@@ -315,11 +315,18 @@ function buildPayload(invoice, config) {
     // pois o schema da SEFAZ recusa pontos/hífens da máscara (15.933.540-0)
     dest.indicadorIE = 1;
     dest.ie = ie.replace(/\D/g, '');
+  } else if (ieIsento && config.uf === address.uf) {
+    // Isento de IE em operação INTERNA: indicador 2, sem enviar a palavra
+    // "ISENTO" como se fosse inscrição (a SEFAZ rejeita).
+    dest.indicadorIE = 2;
   } else {
-    // Isento de IE: indicador 2, sem enviar a palavra "ISENTO" como se fosse
-    // inscrição (a SEFAZ rejeita). Sem IE: CPF é não contribuinte (9); CNPJ sem
-    // IE é barrado antes na validação com mensagem clara.
-    dest.indicadorIE = ieIsento ? 2 : 9;
+    // Isento de IE em operação INTERESTADUAL: a SEFAZ de alguns estados
+    // (ex.: AM) rejeita o indicador 2 — "A SEFAZ do destinatário não permite
+    // Contribuinte Isento de Inscrição Estadual". Enviamos 9 (não
+    // contribuinte) com consumidor final, que é aceito nessas UF.
+    // Sem IE: CPF é não contribuinte (9); CNPJ sem IE é barrado antes na
+    // validação com mensagem clara.
+    dest.indicadorIE = 9;
   }
   if (invoice.recipient_email) dest.email = invoice.recipient_email;
   // Devolução pode ser saída (comprador devolve ao fornecedor — CFOP 2.x/4.x)
