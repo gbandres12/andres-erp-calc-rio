@@ -39,7 +39,10 @@ Deno.serve(async (req) => {
     if (configError) return await reject(configError);
     const secretName = config.notaas_secret_name || 'NOTAAS_PROJECT_KEY';
     const apiKey = Deno.env.get(secretName);
-    if (!apiKey) return Response.json({ error: `Chave NotaAs desta empresa não configurada (segredo ${secretName})` }, { status: 500 });
+    if (!apiKey) {
+      console.error('[emitFiscalInvoice] segredo NotaAs ausente', { secretName, invoiceId, company_id: invoice.company_id });
+      return Response.json({ error: `Chave NotaAs desta empresa não configurada (segredo ${secretName})` }, { status: 500 });
+    }
     const invoiceError = validateInvoice(invoice);
     if (invoiceError) return await reject(invoiceError);
 
@@ -114,6 +117,7 @@ Deno.serve(async (req) => {
     }).catch((e) => console.error('FiscalEvent', e.message));
     return Response.json({ success: true, status, data: updateData });
   } catch (error) {
+    console.error('[emitFiscalInvoice] erro inesperado', error?.message, error?.stack);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
