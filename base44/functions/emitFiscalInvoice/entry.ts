@@ -84,7 +84,12 @@ Deno.serve(async (req) => {
 
     const duration = Date.now() - started;
     if (!response.ok) {
-      const message = extractError(data, response.status);
+      let message = extractError(data, response.status);
+      // A razão social é validada no cadastro do PROJETO na NotaAs (não no
+      // sistema): sem o token da Org API a correção é feita no painel.
+      if (/razao_social|raz\u00e3o social/i.test(message)) {
+        message += ' — Corrija a razão social do projeto no painel da NotaAs (Configurações → Dados da Empresa), com no máximo 60 caracteres, e emita novamente.';
+      }
       await recordFailure(base44, invoice, invoiceId, user.id, message, duration, response.status, data, summary);
       return Response.json({ error: message }, { status: response.status });
     }
