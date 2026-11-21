@@ -125,6 +125,8 @@ Deno.serve(async (req) => {
 function validateConfig(config, invoice) {
   if (!config) return 'Configuração fiscal não encontrada';
   if (!config.cnpj || !config.razao_social || !config.inscricao_estadual) return 'Dados do EMITENTE incompletos: preencha CNPJ, razão social e Inscrição Estadual da empresa em Config. Fiscal';
+  // xNome da NF-e aceita no máximo 60 caracteres — a NotaAs recusa a emissão (422) acima disso
+  if (String(config.razao_social).length > 60) return 'A Razão Social do emitente deve ter no máximo 60 caracteres (limite da NF-e). Abrevie em Config. Fiscal';
   if (![1, 2, 3].includes(Number(config.crt))) return 'CRT inválido';
   if (config.regime_tributario === 'simples_nacional' && Number(config.crt) === 3) return 'Simples Nacional deve usar CRT 1 ou 2';
   if (['lucro_real', 'lucro_presumido'].includes(config.regime_tributario) && Number(config.crt) !== 3) {

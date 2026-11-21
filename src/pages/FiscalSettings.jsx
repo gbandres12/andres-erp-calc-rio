@@ -63,6 +63,7 @@ export default function FiscalSettings() {
       // Garante campos obrigatórios mínimos ao criar
       const payload = { ...data };
       if (!payload.cnpj || !payload.razao_social) throw new Error("Preencha CNPJ e Razão Social reais antes de salvar");
+      if (payload.razao_social.length > 60) throw new Error("A Razão Social deve ter no máximo 60 caracteres (limite da NF-e). Abrevie o nome.");
       if (config?.id) return base44.entities.FiscalConfig.update(config.id, payload);
       return base44.entities.FiscalConfig.create(payload);
     },
@@ -173,8 +174,14 @@ export default function FiscalSettings() {
               <Field label="CNPJ *">
                 <Input placeholder="00.000.000/0001-00" value={form.cnpj || ""} onChange={e => handleChange("cnpj", e.target.value)} />
               </Field>
-              <Field label="Razão Social *">
-                <Input placeholder="Empresa Ltda" value={form.razao_social || ""} onChange={e => handleChange("razao_social", e.target.value)} />
+              <Field label="Razão Social * (máx. 60 caracteres)">
+                <Input
+                  placeholder="Empresa Ltda"
+                  maxLength={60}
+                  value={form.razao_social || ""}
+                  onChange={e => handleChange("razao_social", e.target.value)}
+                />
+                <p className="text-xs text-slate-500">{(form.razao_social || "").length}/60 — limite do campo xNome da NF-e</p>
               </Field>
               <Field label="Nome Fantasia">
                 <Input value={form.nome_fantasia || ""} onChange={e => handleChange("nome_fantasia", e.target.value)} />
