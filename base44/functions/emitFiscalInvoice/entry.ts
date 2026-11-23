@@ -58,25 +58,31 @@ Deno.serve(async (req) => {
     const auditedInvoice = { ...invoice, items };
     const payload = buildPayload(auditedInvoice, config);
     const summary = summarize(payload, auditedInvoice, config);
-    await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, { items, status: 'validando', error_message: '', error_code: '' });
+    // A Idempotency-Key precisa acompanhar o conteúdo da nota: reaproveitar a
+    // mesma chave com payload diferente faz a NotaAs recusar com HTTP 409.
+    const idempotencyKey = `${invoice.reference}-${payloadHash(payload)}`;
+    await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, {
+      items,
+      status: 'validando',
+      error_message: '',
+      error_code: '',
+      idempotency_key: idempotencyKey
+    });
 
     const started = Date.now();
     let response;
     let data;
     try {
-      response = await fetch('https://platform.notaas.com.br/api/v1/nfe/emitir', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'Idempotency-Key': invoice.idempotency_key || invoice.reference
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000)
-      });
-      const text = await response.text();
-      try { data = text ? JSON.parse(text) : {}; }
-      catch { data = { message: text || `HTTP ${response.status}` }; }
+      const first = await sendToNotaas(payload, apiKey, idempotencyKey);
+      response = first.response;
+      data = first.data;
+      // 409 = chave já usada com outro conteúdo (nota editada depois da
+      // tentativa): reenvia uma única vez com uma chave nova.
+      if (response.status === 409) {
+        const retry = await sendToNotaas(payload, apiKey, `${idempotencyKey}-${Date.now().toString(36)}`);
+        response = retry.response;
+        data = retry.data;
+      }
     } catch (fetchError) {
       await recordFailure(base44, invoice, invoiceId, user.id, fetchError.message, Date.now() - started, 502, {}, summary);
       return Response.json({ error: 'Erro de comunicação com a NotaAs', details: fetchError.message }, { status: 502 });
@@ -343,7 +349,9 @@ function buildPayload(invoice, config) {
   // Devolução pode ser saída (comprador devolve ao fornecedor — CFOP 2.x/4.x)
   // ou entrada (vendedor recebe de volta — CFOP 1.x/3.x). A direção vem do CFOP.
   const firstCfop = String(invoice.items?.[0]?.cfop || '').replace(/\D/g, '');
-  const cfopSaida = /^[2468]/.test(firstCfop);
+  // 1/2/5/6 = saída (inclusive os códigos específicos 5xxx/6xxx de devolução);
+  // 3/4/7 = entrada. Antes 1xxx e 5xxx eram tratados como entrada.
+  const cfopSaida = /^[1256]/.test(firstCfop);
   return {
     modelo: invoice.document_type === 'nfce' ? 65 : 55,
     naturezaOperacao: invoice.nature_operation,
@@ -448,6 +456,35 @@ function summarize(payload, invoice, config) {
 }
 
 function round2(value) { return Number(Number(value || 0).toFixed(2)); }
+
+async function sendToNotaas(payload, apiKey, idempotencyKey) {
+  const response = await fetch('https://platform.notaas.com.br/api/v1/nfe/emitir', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'Idempotency-Key': idempotencyKey
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30000)
+  });
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; }
+  catch { data = { message: text || `HTTP ${response.status}` }; }
+  return { response, data };
+}
+
+// Hash estável do payload: mesmo conteúdo = mesma chave (idempotência real),
+// conteúdo alterado = chave nova.
+function payloadHash(payload) {
+  const text = JSON.stringify(payload);
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash * 33) ^ text.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
+}
 function sanitize(value) {
   const text = String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
   return text || undefined;
