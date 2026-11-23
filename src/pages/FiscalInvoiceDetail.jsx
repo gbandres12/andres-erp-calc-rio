@@ -150,7 +150,7 @@ export default function FiscalInvoiceDetail() {
         status: "rascunho",
         issue_date: new Date().toISOString().split("T")[0],
         retry_count: 0,
-        idempotency_key: `${invoice.company_id}-${invoice.document_type}-${invoice.serie}-${reference}`
+        idempotency_key: `${invoice.company_id}-${invoice.document_type}-${invoice.serie}-${reference}-${Date.now().toString(36)}`
       });
     },
     onSuccess: (draft) => {
@@ -189,7 +189,7 @@ export default function FiscalInvoiceDetail() {
         status: "rascunho",
         issue_date: new Date().toISOString().split("T")[0],
         retry_count: 0,
-        idempotency_key: `${invoice.company_id}-${invoice.document_type}-${invoice.serie}-${reference}`
+        idempotency_key: `${invoice.company_id}-${invoice.document_type}-${invoice.serie}-${reference}-${Date.now().toString(36)}`
       });
     },
     onSuccess: (draft) => {

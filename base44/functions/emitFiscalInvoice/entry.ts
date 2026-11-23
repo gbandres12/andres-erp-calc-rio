@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     const summary = summarize(payload, auditedInvoice, config);
     // A Idempotency-Key precisa acompanhar o conteúdo da nota: reaproveitar a
     // mesma chave com payload diferente faz a NotaAs recusar com HTTP 409.
-    const idempotencyKey = `${invoice.reference}-${payloadHash(payload)}`;
+    const idempotencyKey = `${invoice.id}-${payloadHash(payload)}`;
     await base44.asServiceRole.entities.FiscalInvoice.update(invoiceId, {
       items,
       status: 'validando',

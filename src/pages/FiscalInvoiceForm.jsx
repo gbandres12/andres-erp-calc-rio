@@ -483,7 +483,7 @@ export default function FiscalInvoiceForm() {
         if (match) { const n = parseInt(match[1], 10); if (n > maxNum) maxNum = n; }
       });
       const reference = `NF-${String(maxNum + 1).padStart(6, "0")}`;
-      const idempotency_key = `${companyId}-${data.document_type}-${data.serie}-${reference}`;
+      const idempotency_key = `${companyId}-${data.document_type}-${data.serie}-${reference}-${Date.now().toString(36)}`;
       return base44.entities.FiscalInvoice.create({ ...data, reference, idempotency_key });
     },
     onSuccess: (inv) => {
